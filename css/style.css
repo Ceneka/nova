@@ -4,7 +4,9 @@
 }
 
 [data-theme="standard"] { 
-    --primary: #ff6b4a; 
+    --primary: #ff6b4a;
+    --primary-ink: #ba4e36;
+    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
     --primary-dim: rgba(255, 107, 74, 0.1); 
     --bg: #f5f6fa; 
     --surface: #ffffff; 
@@ -21,7 +23,9 @@
 }
 
 [data-theme="ocean"] { 
-    --primary: #0984e3; 
+    --primary: #0984e3;
+    --primary-ink: #0873c5;
+    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
     --primary-dim: rgba(9, 132, 227, 0.1); 
     --bg: #f0f9ff; 
     --surface: #ffffff; 
@@ -38,7 +42,9 @@
 }
 
 [data-theme="forest"] { 
-    --primary: #00b894; 
+    --primary: #00b894;
+    --primary-ink: #007b63;
+    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
     --primary-dim: rgba(0, 184, 148, 0.1); 
     --bg: #f1f2f6; 
     --surface: #ffffff; 
@@ -55,7 +61,9 @@
 }
 
 [data-theme="night"] { 
-    --primary: #ff7675; 
+    --primary: #ff7675;
+    --primary-ink: #ff7e7d;
+    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
     --primary-dim: rgba(255, 118, 117, 0.15); 
     --bg: #1e272e; 
     --surface: #2f3640; 
@@ -833,15 +841,17 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 
 .field-header label { 
-    font-size: 0.6rem; 
+    font-size: 0.65rem; 
     color: var(--text-light); 
     font-weight: 700; 
     text-transform: uppercase;
 }
 
 .field-header .range-hint { 
-    font-size: 0.5rem; 
-    color: #b2bec3; 
+    font-size: 0.58rem; 
+    /* was a hardcoded #b2bec3 (1.9:1 on white) - unreadable on light themes */
+    color: var(--text-light); 
+    opacity: 0.85;
 }
 
 /* Fast Input Styling */
@@ -983,7 +993,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     flex: 0 0 44px; 
     padding: 0;
 }
-.btn-delete-drill svg { width: 20px; height: 20px; fill: currentColor; }
+.btn-delete-drill svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-delete-drill:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .btn-test-combo { 
@@ -1073,3 +1083,177 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     transform: translateY(-50%);
     font-size: 0.8rem;
 }
+/* ==========================================================================
+   BALL PRESETS
+   A library of named ball recipes that can be dropped into a drill with
+   their placement/depth variations expanded. See js/presets.js.
+   ========================================================================== */
+
+/* Header button in the drill editor */
+.btn-header-presets {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.btn-header-presets:hover { transform: scale(1.1); color: var(--text); }
+.btn-header-presets { color: var(--primary-ink); }
+.btn-header-presets svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Main "add from preset" entry point, at the top of the drill editor body. */
+.preset-entry {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px;
+    margin: 0 0 14px 0;
+    border: 2px dashed var(--primary);
+    border-radius: 12px;
+    background: var(--primary-dim);
+    color: var(--primary-ink);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+}
+.preset-entry:hover { filter: brightness(0.97); }
+.preset-entry:active { transform: scale(0.99); }
+.preset-entry svg { flex-shrink: 0; fill: none; stroke: currentColor; }
+
+/* Compact variant sitting directly under the "+" at the end of the list. */
+.preset-entry-inline {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 11px;
+    margin: 0 0 20px 0;
+    border: 2px dashed var(--primary);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--primary-ink);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+.preset-entry-inline:hover { background: var(--primary-dim); }
+.preset-entry-inline:active { transform: scale(0.99); }
+.preset-entry-inline svg { flex-shrink: 0; fill: none; stroke: currentColor; }
+
+/* --- PRESET CARDS (picker) --- */
+.preset-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    padding: 10px;
+    margin-bottom: 10px;
+}
+.preset-card-top { display: flex; align-items: flex-start; gap: 4px; }
+.preset-name { font-weight: 800; font-size: 1rem; color: var(--text); flex: 1; word-break: break-word; }
+.preset-sub { font-size: 0.72rem; color: var(--text); opacity: 0.8; font-weight: 600; margin-top: 2px; }
+.preset-edit-btn {
+    background: transparent; border: none; color: var(--text-light);
+    cursor: pointer; width: 34px; height: 34px;            /* >=32px touch target */
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: color 0.2s;
+}
+.preset-edit-btn:hover { color: var(--primary); }
+.preset-edit-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.preset-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.preset-chip {
+    font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    white-space: nowrap;
+}
+.preset-chip b { color: var(--primary-ink); font-weight: 800; }
+.preset-chip.placement b { color: var(--text); }
+.preset-chip-axis { font-size: 0.68rem; color: var(--text); opacity: 0.75; }
+
+.preset-actions { display: flex; gap: 6px; margin-top: 10px; }
+.btn-preset-add {
+    flex: 1; padding: 9px 4px; border-radius: 8px; border: 2px solid var(--primary);
+    background: transparent; color: var(--primary-ink); font-size: 0.7rem; font-weight: 800;
+    cursor: pointer; text-transform: uppercase; white-space: nowrap;
+    transition: background 0.2s, transform 0.1s;
+}
+.btn-preset-add:hover { background: var(--primary-dim); }
+.btn-preset-add:disabled { color: var(--text-light); border-color: var(--border); background: transparent; }
+.btn-preset-add:active { transform: scale(0.96); }
+.btn-preset-add.solid { background: var(--primary); color: var(--primary-solid-ink); }
+.btn-preset-add:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.preset-empty { text-align: center; color: var(--text-light); font-size: 0.85rem; padding: 25px 10px; line-height: 1.5; }
+
+.btn-preset-new { border: 2px solid var(--primary); background: transparent; color: var(--primary-ink); flex: 1; }
+.btn-preset-new:hover { background: var(--primary-dim); }
+
+.btn-delete-preset { background: var(--danger); color: white; width: 44px; flex: 0 0 44px; padding: 0; }
+.btn-delete-preset svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-delete-preset[hidden] { display: none; }
+
+/* --- PRESET EDITOR --- */
+.preset-name-input {
+    width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--primary-ink); font-weight: 800; font-size: 1.1rem;
+    text-align: center; margin-bottom: 12px;
+}
+.preset-name-input:focus { outline: none; border-color: var(--primary); }
+
+/* One variation axis: a list of label + value rows. */
+.axis-block {
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); padding: 8px; margin-bottom: 10px;
+}
+.axis-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.axis-title { font-size: 0.68rem; font-weight: 800; color: var(--text); text-transform: uppercase; }
+.axis-hint { font-size: 0.68rem; color: var(--text); opacity: 0.75; font-weight: 600; margin-top: -2px; margin-bottom: 8px; line-height: 1.4; }
+.axis-row { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
+.axis-row:last-child { margin-bottom: 0; }
+.axis-row input {
+    box-sizing: border-box;   /* the app is not globally border-box */
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 7px; padding: 6px 4px; font-weight: 700; text-align: center;
+}
+.axis-row input:focus { outline: none; border-color: var(--primary); color: var(--primary-ink); }
+.axis-row .axis-label-input { flex: 1 1 0; min-width: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
+.axis-row .axis-value-input { width: 64px; min-width: 0; flex: 0 0 64px; font-size: 0.9rem; }
+.axis-del-btn {
+    background: transparent; border: none; color: var(--text-light); cursor: pointer;
+    width: 34px; height: 34px;                                /* >=32px touch target */
+    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 34px;                                            /* no shrink, no overflow */
+}
+.axis-del-btn:hover { color: var(--danger); }
+.axis-del-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-axis-add {
+    width: 100%; margin-top: 6px; padding: 10px; border-radius: 7px;
+    border: 1px dashed var(--border); background: transparent; color: var(--text);
+    font-size: 0.72rem; font-weight: 700; cursor: pointer; text-transform: uppercase;
+}
+.btn-axis-add:hover { border-color: var(--primary); color: var(--primary-ink); }
+.axis-standard-btn {
+    width: 100%; margin-top: 6px; padding: 10px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-size: 0.7rem; font-weight: 700; cursor: pointer; text-transform: uppercase;
+}
+.axis-standard-btn:hover { border-color: var(--primary); color: var(--primary-ink); }
+
+/* "Save this ball as a preset" on an option card */
+.btn-act-preset { flex: 0 0 42px; background: var(--card-bg); color: var(--text); padding: 8px 0; }
+.btn-act-preset:hover { color: var(--primary-ink); }
+.btn-act-preset svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

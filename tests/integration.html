@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<!--
+  Browser integration checks for the drill editor and the ball-preset library.
+
+  Serve the repo root over http (the app uses ES modules, so file:// will not do)
+  and open tests/integration.html. The page title becomes PASS(n) or FAIL(n)
+  and the results table at the bottom lists every check.
+
+  Headless one-liner:
+    python3 -m http.server 8123 &
+    google-chrome --headless --disable-gpu --virtual-time-budget=10000 \
+      --dump-dom http://127.0.0.1:8123/tests/integration.html | grep -o '<title>[^<]*'
+-->
+<html lang="en" data-theme="standard">
+<head>
+    <meta charset="UTF-8">
+    <title>PENDING</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div id="editor-modal" class="modal-overlay"><div class="modal">
+    <div class="modal-header">
+        <div class="header-top"><div class="title-container"><span id="editor-drill-name"></span><span id="editor-drill-edit-icon"></span></div></div>
+        <div class="header-actions"><input type="checkbox" id="chk-drill-random"></div>
+    </div>
+    <div id="editor-body" class="modal-body"></div>
+</div></div>
+<div id="preset-sheet" class="modal-overlay"><div class="modal"><div id="preset-list"></div></div></div>
+<div id="preset-modal" class="modal-overlay"><div class="modal">
+    <div id="preset-modal-title"></div><div id="preset-editor-body"></div>
+    <button class="btn-delete-preset" onclick="window.deleteEditingPreset()"></button>
+</div></div>
+<div id="theme-menu" class="theme-menu"></div>
+<div id="toast"></div><div id="log" class="log-box"></div>
+<pre id="out"></pre>
+
+<script type="module">
+import { initData, currentDrills, userCustomDrills } from '../js/state.js';
+import { openEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
+import * as P from '../js/presets.js';
+import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
+import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
+import '../js/presetUi.js';
+
+const results = [];
+const report = () => {
+    const failed = results.filter(r => !r.pass);
+    document.title = failed.length ? `FAIL(${failed.length})` : `PASS(${results.length})`;
+    document.getElementById('out').textContent =
+        results.map(r => `${r.pass ? 'PASS' : 'FAIL'}  ${r.name}${r.pass ? '' : '  -> ' + r.extra}`).join('\n');
+};
+window.addEventListener('error', e => {
+    results.push({ name: 'uncaught: ' + e.message, pass: false, extra: (e.error && e.error.stack) || '' });
+    report();
+});
+window.addEventListener('unhandledrejection', e => {
+    results.push({ name: 'rejection: ' + (e.reason && e.reason.message || e.reason), pass: false, extra: (e.reason && e.reason.stack) || '' });
+    report();
+});
+const cut = (s, n = 300) => { s = String(s); return s.length > n ? s.slice(0, n) + `... (+${s.length - n} chars)` : s; };
+const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra: cut(extra) });
+const eq = (name, a, b) => results.push({ name, pass: JSON.stringify(a) === JSON.stringify(b), extra: `got ${cut(JSON.stringify(a))} want ${cut(JSON.stringify(b))}` });
+
+const groups = () => document.querySelectorAll('#editor-body .ball-group');
+const entryBtn = () => document.querySelector('#editor-body .preset-entry');
+const chips = () => document.querySelectorAll('#preset-list .preset-card');
+
+try {
+initData();
+
+/* ---- the shared drill CSV export is byte-for-byte unchanged ---- */
+// Reproduce the pre-refactor expression over the same data and compare.
+let expected = "Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps\n";
+const cats = { basic: 'Basic', combined: 'Combined', complex: 'Complex' };
+const fmtLvl = (key, lvl) => `${key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} (Lvl ${lvl})`;
+for (const cat of ['basic', 'combined', 'complex']) {
+    const list = CATEGORIES[cat];
+    for (const key of list) {
+        const drill = DEFAULT_DRILLS[key];
+        for (let lvl = 1; lvl <= 3; lvl++) {
+            const seq = drill[lvl];
+            if (!seq || !seq.length) continue;
+            seq.forEach((stepOptions, si) => stepOptions.forEach(ball => {
+                let speed = ball[7], spin = ball[8], type = ball[9];
+                if (speed === undefined) {
+                    const rev = (() => {
+                        const t = ball[0] >= ball[1] ? 'top' : 'back';
+                        const base = (ball[0] + ball[1]) / 2;
+                        return { speed: Math.round(((base - 970) / 630.5) * 2) / 2,
+                                 spin: Math.round((Math.abs(ball[0]-ball[1])/2/342) * 2) / 2, type: t };
+                    })();
+                    speed = rev.speed; spin = rev.spin; type = rev.type;
+                }
+                const bpm = Math.round(30 + (ball[4] * 0.6));
+                expected += [cats[cat], si+1, fmtLvl(key, lvl), speed, spin, type, ball[2], ball[3], bpm, ball[5]].join(';') + '\n';
+            }));
+        }
+    }
+}
+
+// capture what the app actually produces
+let captured = null;
+const RealBlob = window.Blob;
+window.Blob = class extends RealBlob { constructor(parts, opts) { super(parts, opts); captured = parts.join(''); } };
+const { exportCustomDrills, importCustomDrills } = await import('../js/state.js');
+try { exportCustomDrills(); } finally { window.Blob = RealBlob; }
+
+const appCsv = captured.split('\n').filter(l => l && !/^A;|^B;|^C;/.test(l)).join('\n') + '\n';
+eq('shared drill CSV export unchanged by the refactor', appCsv, expected);
+
+/* ---- 0. the preset entry point is the first thing in the editor ---- */
+openEditor('push(b)');
+ok('a labelled "add from preset" button is rendered', !!entryBtn());
+eq('it reads "Add from preset"', entryBtn()?.textContent.trim(), 'Add from preset');
+ok('it is the first element in the editor body', document.getElementById('editor-body').firstElementChild === entryBtn());
+ok('it is big enough to tap', entryBtn().getBoundingClientRect().height >= 40,
+   Math.round(entryBtn().getBoundingClientRect().height) + 'px');
+ok('it is full width', entryBtn().getBoundingClientRect().width >
+   document.querySelector('#editor-body .ball-group').getBoundingClientRect().width * 0.8);
+entryBtn().click();
+ok('tapping it opens the preset sheet', document.getElementById('preset-sheet').classList.contains('open'));
+ok('the sheet lists the presets', document.querySelectorAll('#preset-list .preset-card').length > 0);
+window.closePresetSheet();
+
+/* ---- 1. stock library ---- */
+eq('library seeded from defaults', P.getPresets().length, P.DEFAULT_PRESETS.length);
+
+/* ---- 2. insert a full sequence (3 placements x 3 depths) ---- */
+openEditor('push(b)');
+const before = groups().length;
+const added = insertPresetIntoDrill('preset_short_under', 'sequence');
+eq('sequence added 9 steps', added, 9);
+eq('editor grew by 9 groups', groups().length - before, 9);
+
+const drops = [...document.querySelectorAll('#editor-body .ball-group')]
+    .slice(-9)
+    .map(g => Number(g.querySelectorAll('.editor-field input')[4].value));
+eq('last 9 steps carry BH/Center/FH per depth', drops, [-5,0,5,-5,0,5,-5,0,5]);
+
+const heights = [...document.querySelectorAll('#editor-body .ball-group')]
+    .slice(-9)
+    .map(g => Number(g.querySelectorAll('.editor-field input')[3].value));
+eq('depths are anchored on the preset height (30)', heights, [10,10,10,30,30,30,50,50,50]);
+
+/* ---- 3. variants mode = one step, many variants ---- */
+const nBefore = groups().length;
+const vAdded = insertPresetIntoDrill('preset_short_under', 'variants');
+eq('variants added 1 step', vAdded, 1);
+eq('variants added 1 group', groups().length - nBefore, 1);
+eq('that group shows 9 variant cards', groups()[groups().length-1].querySelectorAll('.option-card').length, 9);
+ok('variant label rendered', /Variant 1/.test(groups()[groups().length-1].textContent));
+
+/* ---- 4. single mode ---- */
+const sAdded = insertPresetIntoDrill('preset_safe_push', 'single');
+eq('single added 1 step', sAdded, 1);
+eq('single is one variant', groups()[groups().length-1].querySelectorAll('.option-card').length, 1);
+
+/* ---- 5. the 20-step cap ---- */
+eq('push(b) started at 1 step', groups().length, 12);
+eq('sequence of 9 no longer fits in 8 slots', insertPresetIntoDrill('preset_short_under', 'sequence'), -1);
+eq('nothing was added', groups().length, 12);
+eq('a 1-ball preset still fits', insertPresetIntoDrill('preset_safe_push', 'single'), 1);
+eq('now 13 steps', groups().length, 13);
+
+// fill the drill to the cap and confirm it refuses to overflow
+while (insertPresetIntoDrill('preset_safe_push', 'single') > 0) { /* fill */ }
+eq('filled to the 20-step cap', groups().length, 20);
+eq('cap is enforced', insertPresetIntoDrill('preset_safe_push', 'single'), -1);
+eq('still 20 after refusal', groups().length, 20);
+
+saveDrillChanges();
+eq('push(b) saved with 20 steps', currentDrills['push(b)'][1].length, 20);
+
+/* ---- 6. sheet disables actions when the drill is full ---- */
+window.openPresetSheet();
+ok('sheet rendered a card per preset', chips().length === P.getPresets().length, chips().length);
+ok('all add buttons disabled at cap',
+    [...document.querySelectorAll('#preset-list .btn-preset-add')].every(b => b.disabled));
+
+// ...and re-enable once there is room again
+openEditor('push(f)');
+window.openPresetSheet();
+ok('add buttons enabled when there is room',
+    [...document.querySelectorAll('#preset-list .btn-preset-add')].every(b => !b.disabled));
+window.closePresetSheet();
+
+/* ---- 8. factory defaults still describe the same physics ---- */
+// the shipped push(b) ball is stored as raw RPMs; reverse-calc must be stable
+const legacy = normalizeBall([1547, 2915, 50, -5, 10, 1, 1]);
+eq('legacy push(b) -> speed 2', legacy[B.SPEED], 2);
+eq('legacy push(b) -> spin 2', legacy[B.SPIN], 2);
+eq('legacy push(b) -> back', legacy[B.TYPE], 'back');
+eq('legacy push(b) -> 36 bpm', freqToBpm(legacy[B.FREQ]), 36);
+
+/* ---- 9. makeBall agrees with the stored editor values ---- */
+const ball = makeBall({ speed: 4, spin: 1.5, type: 'top', height: 30, drop: -5, bpm: 60, reps: 1 });
+eq('makeBall drop', ball[B.DROP], -5);
+eq('makeBall speed', ball[B.SPEED], 4);
+eq('makeBall active', ball[B.ACTIVE], 1);
+
+/* ---- 10. create a preset from a ball, then find it again ---- */
+openEditor('push(f)');
+window.handleSaveBallAsPreset(0, 0);
+ok('preset editor opened from a ball', document.getElementById('preset-modal').classList.contains('open'));
+eq('seeded name field', document.getElementById('pf-name').value, 'New preset');
+// push(f) is [1547,2915,50,+5,10,1] -> speed 2, spin 2, back, height 50, drop +5
+const pfInputs = [...document.querySelectorAll('#preset-editor-body .editor-field input')];
+eq('seeded speed from the ball', pfInputs[0].value, '2');
+eq('seeded spin from the ball', pfInputs[1].value, '2');
+eq('seeded height from the ball', pfInputs[2].value, '50');
+eq('seeded drop from the ball', pfInputs[3].value, '5');
+
+const nameEl = document.getElementById('pf-name');
+nameEl.value = 'My serve';
+nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+window.handlePresetAxisStandard('placement');
+window.savePresetEditor();
+const mine = P.getPresets().find(p => p.name === 'My serve');
+ok('preset was created', !!mine, JSON.stringify(P.getPresets().map(p => p.name)));
+ok('name did not fall back to the default', !P.getPresets().some(p => p.name === 'New preset'));
+eq('it has 3 placements', mine.placements.length, 3);
+eq('and no depth axis', mine.depths.length, 0);
+ok('it is not marked built-in', mine.builtIn === false);
+eq('survives a reload from storage', JSON.parse(localStorage.getItem('nova_ball_presets')).filter(p => p.name === 'My serve').length, 1);
+
+/* ---- 11. preset file round-trip ---- */
+const json = P.serializePresetsToJSON();
+const csv = P.serializePresetsToCSV();
+eq('json round-trip', P.parsePresetsJSON(json).length, P.getPresets().length);
+eq('csv round-trip', P.parsePresetsAuto(csv).length, P.getPresets().length);
+ok('csv has the documented header', csv.startsWith('Name;Id;Speed;Spin;Type;BPM;Reps;Scatter;Height;Drop;Axis;Label;Value'));
+
+/* ---- 12. the shared drill importer still works, format untouched ---- */
+// Verbatim shape of nova_drills_v2_example.csv (header names the Freq column,
+// older files call it BPM - the importer tolerates both).
+const SHARED_CSV = [
+    'Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps',
+    'A;1;Drill A1;7.5;5;back;50;-5;60;1',
+    'A;1;Drill A1;7.5;5;back;50;5;60;1',
+    'A;2;Drill A1;7.5;5;back;50;-5;60;1',
+    'A;1;Drill A2;7.5;5;back;50;-5;10;1',
+    'B;1;Drill B1;7.5;5;back;50;-5;36;1',
+    'B;1;Drill B1;7.5;5;back;50;5;36;1',
+    '',
+].join('\n');
+
+ok('shared CSV import accepted', importCustomDrills(SHARED_CSV) === true);
+const a1 = currentDrills[userCustomDrills['custom-a'].find(d => d.name === 'Drill A1')?.key];
+ok('Drill A1 imported', !!a1);
+eq('Drill A1 has 2 steps', a1?.[1]?.length, 2);
+eq('ball 1 is backspin 7.5/5', [a1?.[1]?.[0]?.[0][7], a1?.[1]?.[0]?.[0][8], a1?.[1]?.[0]?.[0][9]], [7.5, 5, 'back']);
+eq('an in-range bpm round-trips exactly', freqToBpm(a1?.[1]?.[0]?.[0][4]), 60);
+eq('variants share a ball number', a1?.[1]?.[0]?.length, 2);
+
+const b1 = currentDrills[userCustomDrills['custom-b'].find(d => d.name === 'Drill B1')?.key];
+eq('a second in-range bpm round-trips exactly', freqToBpm(b1?.[1]?.[0]?.[0][4]), 36);
+eq('Drill B1 has 1 step', b1?.[1]?.length, 1);
+eq('Drill B1 ball has 2 variants', b1?.[1]?.[0]?.length, 2);
+// an out-of-range bpm is the one place the importer now normalises, matching
+// what the editor already did on save: 10 bpm is below the table's 30 bpm floor
+const a2 = currentDrills[userCustomDrills['custom-a'].find(d => d.name === 'Drill A2')?.key];
+eq('an out-of-range bpm is clamped to the 30 floor', freqToBpm(a2?.[1]?.[0]?.[0][4]), 30);
+
+/* ---- 13. preset-inserted balls survive a save/normalize round trip ---- */
+openEditor('loop(b)');
+insertPresetIntoDrill('preset_fast_drive', 'variants');
+saveDrillChanges();
+const loopB = currentDrills['loop(b)'][1];
+ok('loop(b) now holds the preset step', loopB.length === 2, loopB.length);
+ok('no NaN anywhere in the saved drill',
+    JSON.stringify(loopB).indexOf('null') === -1);
+// index 9 is the 'top'/'back' string; everything else is numeric
+const bad = (loopB[1] || []).flatMap((b, i) =>
+    b.map((v, j) => ({ i, j, v })).filter(x => x.j !== 9 && !Number.isFinite(x.v)));
+ok('every preset ball is numeric apart from the spin type', bad.length === 0, JSON.stringify(bad).slice(0, 300));
+eq('the variant step kept all 9 balls', loopB[1].length, 9);
+
+/* ---- 14. layout sanity (no image viewer, so assert on real geometry) ---- */
+openEditor('loop(b)');
+insertPresetIntoDrill('preset_short_under', 'sequence');
+window.openPresetSheet();
+window.handlePresetAxisStandard('depth');
+window.openPresetEditor('preset_short_under');
+
+const noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+ok('preset editor does not scroll sideways', noHScroll,
+   `doc ${document.documentElement.scrollWidth} vs win ${window.innerWidth}`);
+
+const act = [...document.querySelectorAll('#preset-editor-body .editor-field input')];
+eq('preset editor exposes its 7 numeric fields', act.length, 7);
+ok('no preset editor field is collapsed', act.every(i => i.getBoundingClientRect().width > 20));
+ok('the spin row is present', document.querySelectorAll('#preset-editor-body .spin-capsule .sc-opt').length === 2);
+ok('both axes render their rows',
+   document.querySelectorAll('#preset-editor-body .axis-block').length === 2);
+const axisBlocks = [...document.querySelectorAll('#preset-editor-body .axis-block')];
+eq('3 placement rows', axisBlocks[0].querySelectorAll('.axis-row').length, 3);
+eq('3 depth rows', axisBlocks[1].querySelectorAll('.axis-row').length, 3);
+ok('summary states the expanded size',
+   /Adds 9 balls/.test(document.getElementById('pf-summary').textContent),
+   document.getElementById('pf-summary').textContent);
+ok('delete button is hidden for a shipped preset being edited',
+   !document.querySelector('.btn-delete-preset').hidden);
+window.closePresetEditor();
+window.openPresetEditor(null);
+ok('delete button hidden when creating', document.querySelector('.btn-delete-preset').hidden);
+const freshBlocks = [...document.querySelectorAll('#preset-editor-body .axis-block')];
+ok('new preset starts with 3 placements and no depths',
+   freshBlocks[0].querySelectorAll('.axis-row').length === 3 &&
+   freshBlocks[1].querySelectorAll('.axis-row').length === 0,
+   freshBlocks.map(b => b.querySelectorAll('.axis-row').length).join('/'));
+window.closePresetEditor();
+
+ok('sheet fits the viewport', document.querySelector('#preset-sheet .modal').getBoundingClientRect().height <= window.innerHeight,
+   document.querySelector('#preset-sheet .modal').getBoundingClientRect().height + ' vs ' + window.innerHeight);
+const rowBtns = [...document.querySelectorAll('#preset-list .preset-card')[0].querySelectorAll('.btn-preset-add')];
+eq('three add actions per card', rowBtns.length, 3);
+ok('all three add actions are wide enough to read',
+   rowBtns.every(b => b.getBoundingClientRect().width > 40),
+   rowBtns.map(b => Math.round(b.getBoundingClientRect().width)).join('/'));
+ok('chips show both axes',
+   document.querySelector('#preset-list .preset-card .preset-chips').textContent.includes('BH') &&
+   document.querySelector('#preset-list .preset-card .preset-chips').textContent.includes('Short'));
+ok('no card name is clipped',
+   [...document.querySelectorAll('#preset-list .preset-name')].every(n => n.getBoundingClientRect().height > 10));
+window.closePresetSheet();
+
+/* ---- 15. every icon is explicitly painted ---- */
+// An <svg> with no fill/stroke rule renders black-filled by default, which is
+// how a star icon and a multi-subpath trash glyph both looked "broken".
+window.openPresetSheet();
+window.openPresetEditor('preset_short_under');
+const unpainted = [], blobbed = [];
+document.querySelectorAll('#preset-modal svg, #preset-list svg, #editor-body svg').forEach(sv => {
+    const cs = getComputedStyle(sv);
+    const fill = cs.fill, stroke = cs.stroke;
+    const hasFill = fill && fill !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(fill);
+    const hasStroke = stroke && stroke !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(stroke);
+    const where = (sv.parentElement.className || sv.parentElement.tagName) + ' :: ' + sv.innerHTML.slice(0, 34);
+    if (!hasFill && !hasStroke) unpainted.push(where);
+    // default fill is black; an icon relying on it is a black blob
+    else if (hasFill && /^rgb\(0, 0, 0\)$/.test(fill) && sv.querySelectorAll('path').length > 1) blobbed.push(where);
+});
+ok('no icon relies on the SVG default paint', unpainted.length === 0, unpainted.join(' | '));
+ok('no multi-path icon is default-black-filled', blobbed.length === 0, blobbed.join(' | '));
+window.closePresetEditor();
+window.closePresetSheet();
+
+/* ---- 16. the preset entry point also sits next to the "+" ---- */
+// loop(b) still has room; push(b) was filled to the 20-step cap by section 5.
+openEditor('loop(b)');
+const inline = document.querySelector('#editor-body .preset-entry-inline');
+ok('there is an inline preset button under the "+"', !!inline);
+if (inline) {
+    const plus = document.querySelector('#editor-body .swap-zone:last-of-type .btn-swap');
+    ok('it sits directly below the "+" button',
+       inline.getBoundingClientRect().top > plus.getBoundingClientRect().top);
+    ok('it is labelled', inline.textContent.trim() === 'Add from preset', inline.textContent.trim());
+    ok('it is at least 40px tall', inline.getBoundingClientRect().height >= 40,
+       Math.round(inline.getBoundingClientRect().height) + 'px');
+    inline.click();
+    ok('it opens the preset sheet', document.getElementById('preset-sheet').classList.contains('open'));
+    window.closePresetSheet();
+}
+
+/* ---- 17. accessibility of the new UI (WCAG AA, all four themes) ---- */
+const parseC = (c) => { const m = c.match(/[\d.]+/g); return m ? m.map(Number) : null; };
+const relLum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+const contrast = (a, b) => { const L1 = relLum(a), L2 = relLum(b); return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05); };
+function backdrop(el) {
+    let n = el;
+    while (n && n !== document.documentElement) {
+        const p = parseC(getComputedStyle(n).backgroundColor);
+        if (p && (p[3] === undefined || p[3] > 0.85)) return p.slice(0, 3);
+        n = n.parentElement;
+    }
+    return [255, 255, 255];
+}
+const hasOwnText = (el) => Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim());
+
+const oldTheme = document.documentElement.getAttribute('data-theme');
+const contrastFails = [];
+for (const theme of ['standard', 'ocean', 'forest', 'night']) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelectorAll('#preset-list *, #preset-editor-body *').forEach(el => {
+        if (!hasOwnText(el)) return;
+        const cs = getComputedStyle(el);
+        // skip the pre-existing editor chrome this screen merely reuses
+        if (el.classList.contains('range-hint') || el.tagName === 'LABEL' ||
+            el.classList.contains('spin-label') || el.classList.contains('sc-opt')) return;
+        // WCAG 1.4.3 exempts inactive controls, and a disabled preset button is
+        // deliberately dimmed to --text-light.
+        if (el.disabled || el.closest('[disabled]')) return;
+        const fg = parseC(cs.color);
+        if (!fg) return;
+        const r = contrast(fg.slice(0, 3), backdrop(el));
+        const px = parseFloat(cs.fontSize);
+        const need = (px >= 24 || (px >= 18.66 && parseInt(cs.fontWeight) >= 700)) ? 3 : 4.5;
+        if (r < need) contrastFails.push(`[${theme}] ${el.className || el.tagName} "${el.textContent.trim().slice(0, 18)}" ${r.toFixed(2)}:1`);
+    });
+}
+document.documentElement.setAttribute('data-theme', oldTheme || 'standard');
+ok('every new preset-UI label meets WCAG AA in all four themes', contrastFails.length === 0,
+   contrastFails.slice(0, 6).join(' | '));
+
+const cramped = [];
+document.querySelectorAll('#preset-list button, #preset-editor-body button').forEach(el => {
+    const b = el.getBoundingClientRect();
+    if (b.height > 0 && b.height < 32) cramped.push(`${el.className || el.tagName} ${Math.round(b.height)}px`);
+});
+ok('every control in the preset UI is at least 32px tall', cramped.length === 0, cramped.join(', '));
+
+const spill = [];
+document.querySelectorAll('#preset-list *, #preset-editor-body *').forEach(el => {
+    if (el.scrollWidth > el.clientWidth + 1) spill.push(`${el.className || el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
+});
+ok('nothing in the preset UI overflows horizontally', spill.length === 0, spill.join(', '));
+
+const tiny = [];
+document.querySelectorAll('#preset-list *, #preset-editor-body *').forEach(el => {
+    if (!hasOwnText(el)) return;
+    if (el.classList.contains('range-hint')) return;   // pre-existing, 0.58rem by design
+    const px = parseFloat(getComputedStyle(el).fontSize);
+    if (px < 10) tiny.push(`${el.className || el.tagName} ${px}px`);
+});
+ok('no new preset-UI text is under 10px', tiny.length === 0, [...new Set(tiny)].join(', '));
+
+/* ---- report ---- */
+} catch (err) {
+    results.push({ name: 'threw: ' + err.message, pass: false, extra: err.stack || '' });
+}
+report();
+</script>
+</body>
+</html>

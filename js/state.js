@@ -1,4 +1,6 @@
-import { DEFAULT_DRILLS, RPM_MIN, RPM_MAX, SPIN_LIMITS, CATEGORIES } from './constants.js';
+import { DEFAULT_DRILLS, CATEGORIES } from './constants.js';
+import { B, calculateRPMs, reverseCalculate, bpmToFreq, maxSpinFor } from './ball.js';
+import { loadPresets } from './presets.js';
 import { showToast } from './utils.js';
 
 export let currentDrills = {};
@@ -58,9 +60,10 @@ export function initData() {
         } catch(e) { console.error("Error loading drill order", e); }
     }
 
-    currentDrills = savedDrills ? JSON.parse(savedDrills) : 
+    currentDrills = savedDrills ? JSON.parse(savedDrills) :
                    (userDefaults ? JSON.parse(userDefaults) : JSON.parse(JSON.stringify(DEFAULT_DRILLS)));
     if (customData) userCustomDrills = JSON.parse(customData);
+    loadPresets();
     normalizeDrills();
 }
 
@@ -121,24 +124,8 @@ export function resetStats() {
 }
 
 // --- Helper Functions ---
-
-function calculateRPMs(speed, spin, type) {
-    const baseSpeed = 970 + (630.5 * speed);
-    const spinFactor = 342 * spin;
-    let top, bot;
-    if (type === 'top') { top = baseSpeed + spinFactor; bot = baseSpeed - spinFactor; } 
-    else { top = baseSpeed - spinFactor; bot = baseSpeed + spinFactor; }
-    return { top: Math.max(RPM_MIN, Math.min(RPM_MAX, Math.round(top))), bot: Math.max(RPM_MIN, Math.min(RPM_MAX, Math.round(bot))) };
-}
-
-function reverseCalculate(top, bot) {
-    const type = top >= bot ? 'top' : 'back';
-    const baseSpeed = (top + bot) / 2;
-    const speedRaw = (baseSpeed - 970) / 630.5;
-    const diff = Math.abs(top - bot) / 2;
-    const spinRaw = diff / 342;
-    return { speed: Math.round(speedRaw * 2) / 2, spin: Math.round(spinRaw * 2) / 2, type: type };
-}
+// The RPM maths lives in js/ball.js so the editor, the preset engine and this
+// module cannot drift apart.
 
 function formatNameForKey(key) {
     return key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -184,19 +171,17 @@ export function importCustomDrills(csvText) {
             let spin = parseFloat(parts[4]);
             const type = parts[5].trim().toLowerCase(); 
 
-            const maxAllowed = SPIN_LIMITS[speed.toString()] ?? 10;
+            const maxAllowed = maxSpinFor(speed);
             if (spin > maxAllowed) spin = maxAllowed;
 
             const height = parseInt(parts[6]);
             const drop = parseFloat(parts[7]);
             
             const bpm = parseInt(parts[8]);
-            const freqPercent = (bpm - 30) / 0.6;
-            
             const reps = parseInt(parts[9]);
 
             const motors = calculateRPMs(speed, spin, type);
-            const params = [motors.top, motors.bot, height, drop, freqPercent, reps, 1, speed, spin, type];
+            const params = [motors.top, motors.bot, height, drop, bpmToFreq(bpm), reps, 1, speed, spin, type];
 
             if (category.startsWith('custom')) {
                 const name = nameRaw.substring(0, 40);
@@ -267,20 +252,23 @@ export function importCustomDrills(csvText) {
 }
 
 // --- EXPORT FUNCTION (Closes Menu on Success) ---
+// NOTE: this CSV is shared with other apps - do not change the column set,
+// the order, or the ';' separator.
 export function exportCustomDrills() {
     let csvContent = "Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps\n";
-    
+
     const appendDrillToCSV = (setLabel, name, sequence) => {
          sequence.forEach((stepOptions, stepIndex) => {
              const ballNum = stepIndex + 1;
              stepOptions.forEach(ball => {
-                 let speed = ball[7], spin = ball[8], type = ball[9];
+                 let speed = ball[B.SPEED], spin = ball[B.SPIN], type = ball[B.TYPE];
                  if (speed === undefined) {
-                     const rev = reverseCalculate(ball[0], ball[1]);
+                     const rev = reverseCalculate(ball[B.TOP], ball[B.BOT]);
                      speed = rev.speed; spin = rev.spin; type = rev.type;
                  }
-                 const bpm = Math.round(30 + (ball[4] * 0.6));
-                 const row = [setLabel, ballNum, name, speed, spin, type, ball[2], ball[3], bpm, ball[5]].join(";");
+                 const bpm = Math.round(30 + (ball[B.FREQ] * 0.6));
+                 const row = [setLabel, ballNum, name, speed, spin, type,
+                              ball[B.HEIGHT], ball[B.DROP], bpm, ball[B.REPS]].join(";");
                  csvContent += row + "\n";
              });
          });

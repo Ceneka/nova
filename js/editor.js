@@ -1,5 +1,9 @@
 import { currentDrills, userCustomDrills, selectedLevel, saveDrillsToStorage } from './state.js';
-import { SPIN_LIMITS, RPM_MIN, RPM_MAX } from './constants.js';
+import {
+    B, LIMITS, calculateRPMs, reverseCalculate, makeBall, normalizeBall,
+    bpmToFreq, freqToBpm, maxSpinFor, maxScatterFor, isMultiVariant
+} from './ball.js';
+import { MAX_STEPS_PER_DRILL, getPresetById, buildVariantStep, buildSequenceSteps, buildSingleBall } from './presets.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { showToast, clamp, toggleBodyScroll } from './utils.js';
 import { uploadDrill } from './cloud.js';
@@ -21,12 +25,11 @@ export function openEditor(key) {
     if (currentDrills[key] && currentDrills[key][selectedLevel]) {
         tempDrillData = JSON.parse(JSON.stringify(currentDrills[key][selectedLevel]));
     } else {
-        const def = calculateRPMs(5, 2, 'top');
-        tempDrillData = [[[def.top, def.bot, 50, 0, 50, 1, 1, 5, 2, 'top']]];
+        tempDrillData = [[makeBall({ speed: 5, spin: 2, type: 'top', height: 50, drop: 0, bpm: 60, reps: 1 })]];
     }
 
     renderEditor();
-    
+
     const btnDel = document.querySelector('.btn-delete-drill');
     if(btnDel) {
         btnDel.disabled = !key.startsWith('cust_');
@@ -41,6 +44,7 @@ export function closeEditor() {
     document.getElementById('editor-modal').classList.remove('open');
     editingDrillKey = null;
     tempDrillData = null;
+    syncDrillContext();
     toggleBodyScroll(false);
 }
 
@@ -51,33 +55,7 @@ export function saveDrillChanges() {
     if (chk) currentDrills[editingDrillKey].random = chk.checked;
 
     tempDrillData.forEach(step => {
-        step.forEach(ball => {
-            if(ball[7] === undefined) { 
-                const r = reverseCalculate(ball[0], ball[1]);
-                ball[7]=r.speed; ball[8]=r.spin; ball[9]=r.type;
-            }
-            const maxSpin = SPIN_LIMITS[ball[7].toString()] ?? 10;
-            if(ball[8] > maxSpin) ball[8] = maxSpin;
-
-            const res = calculateRPMs(ball[7], ball[8], ball[9]);
-            ball[0] = res.top; 
-            ball[1] = res.bot;
-            
-            ball[2] = clamp(ball[2], -50, 100);  
-            ball[3] = clamp(ball[3], -10, 10);   
-            ball[4] = clamp(ball[4], 0, 100);    
-            ball[5] = clamp(ball[5], 1, 200);
-            
-            if(ball[6] === undefined) ball[6] = 1;
-            ball[6] = ball[6] === 1 ? 1 : 0; 
-            
-            // Validate Scatter (Index 10) on save
-            const currentDrop = Math.abs(ball[3]);
-            const scatter = ball[10] || 0;
-            if (currentDrop + scatter > 10) {
-                ball[10] = clamp(10 - currentDrop, 0, 10);
-            }
-        });
+        step.forEach(ball => normalizeBall(ball));
     });
 
     currentDrills[editingDrillKey][selectedLevel] = tempDrillData;
@@ -89,23 +67,56 @@ export function saveDrillChanges() {
 }
 
 // --- CORE PHYSICS LOGIC ---
+// calculateRPMs / reverseCalculate now live in js/ball.js so the preset engine
+// and the CSV exporter all use one implementation.
 
-function calculateRPMs(speed, spin, type) {
-    const baseSpeed = 970 + (630.5 * speed);
-    const spinFactor = 342 * spin;
-    let top, bot;
-    if (type === 'top') { top = baseSpeed + spinFactor; bot = baseSpeed - spinFactor; } 
-    else { top = baseSpeed - spinFactor; bot = baseSpeed + spinFactor; }
-    return { top: Math.round(clamp(top, RPM_MIN, RPM_MAX)), bot: Math.round(clamp(bot, RPM_MIN, RPM_MAX)) };
+function syncDrillContext() {
+    document.dispatchEvent(new CustomEvent('drill-editor-state', {
+        detail: {
+            open: !!tempDrillData,
+            steps: tempDrillData ? tempDrillData.length : 0,
+            max: MAX_STEPS_PER_DRILL
+        }
+    }));
 }
 
-function reverseCalculate(top, bot) {
-    const type = top >= bot ? 'top' : 'back';
-    const baseSpeed = (top + bot) / 2;
-    const speedRaw = (baseSpeed - 970) / 630.5;
-    const diff = Math.abs(top - bot) / 2;
-    const spinRaw = diff / 342;
-    return { speed: Math.round(speedRaw * 2) / 2, spin: Math.round(spinRaw * 2) / 2, type: type };
+document.addEventListener('preset-insert', (e) => {
+    const { presetId, mode } = e.detail || {};
+    insertPresetIntoDrill(presetId, mode);
+});
+
+/**
+ * Append a preset to the drill being edited.
+ * mode: 'single'   one ball, exactly as stored in the preset
+ *       'variants' one step holding every placement x depth combination,
+ *                  so the runner picks one at random on each repetition
+ *       'sequence' one step per combination, in order
+ * Returns the number of steps added, or -1 if nothing was added.
+ */
+export function insertPresetIntoDrill(presetId, mode = 'single') {
+    if (!tempDrillData) { showToast("Open a drill first"); return -1; }
+
+    const preset = getPresetById(presetId);
+    if (!preset) { showToast("Preset not found"); return -1; }
+
+    let steps;
+    if (mode === 'variants') steps = [buildVariantStep(preset)];
+    else if (mode === 'sequence') steps = buildSequenceSteps(preset);
+    else steps = [[buildSingleBall(preset)]];
+
+    const room = MAX_STEPS_PER_DRILL - tempDrillData.length;
+    if (steps.length > room) {
+        showToast(room <= 0
+            ? `Drill is full (${MAX_STEPS_PER_DRILL} balls)`
+            : `Only ${room} slot${room === 1 ? '' : 's'} left in this drill`);
+        return -1;
+    }
+
+    steps.forEach(step => tempDrillData.push(step));
+
+    renderEditor();
+    showToast(`+${steps.length} ball${steps.length === 1 ? '' : 's'} from "${preset.name}"`);
+    return steps.length;
 }
 
 // --- RENDER EDITOR ---
@@ -121,6 +132,21 @@ function renderEditor() {
     }
 
     const isConnected = bleState.isConnected;
+    syncDrillContext();
+
+    // Prominent entry point. The header star is easy to miss, and the "+"
+    // at the bottom of the list only duplicates the previous ball - which is
+    // exactly what someone reaches for when they want to add a ball, so the
+    // preset route needs to be unmissable from the top of the list too.
+    const entry = document.createElement('button');
+    entry.className = 'preset-entry';
+    entry.onclick = () => window.openPresetSheet();
+    entry.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path>
+        </svg>
+        <span>Add from preset</span>`;
+    modalBody.appendChild(entry);
 
     tempDrillData.forEach((stepOptions, stepIndex) => {
         const isActive = stepOptions[0][6] === undefined ? 1 : stepOptions[0][6];
@@ -139,8 +165,8 @@ function renderEditor() {
         
         // --- SCATTER LOGIC ---
         const currentDrop = stepOptions[0][3];
-        const currentScatter = stepOptions[0][10] || 0; 
-        const maxScatter = 10 - Math.abs(currentDrop); 
+        const currentScatter = stepOptions[0][10] || 0;
+        const maxScatter = maxScatterFor(currentDrop);
 
         const scatterHtml = isSingle ? `
             <div style="display:flex; align-items:center; gap:5px; margin-left:auto; margin-right:10px;">
@@ -176,24 +202,23 @@ function renderEditor() {
             </div>`;
 
         stepOptions.forEach((ballParams, optIndex) => {
-            if (ballParams[7] === undefined) {
-                const rev = reverseCalculate(ballParams[0], ballParams[1]);
-                ballParams[7] = clamp(rev.speed, 0, 10);
-                ballParams[8] = clamp(rev.spin, 0, 10);
-                ballParams[9] = rev.type;
+            if (ballParams[B.SPEED] === undefined) {
+                const rev = reverseCalculate(ballParams[B.TOP], ballParams[B.BOT]);
+                ballParams[B.SPEED] = clamp(rev.speed, 0, 10);
+                ballParams[B.SPIN] = clamp(rev.spin, 0, 10);
+                ballParams[B.TYPE] = rev.type;
             }
 
-            const speed = ballParams[7];
-            const spin = ballParams[8];
-            const type = ballParams[9];
-            const currentMaxSpin = SPIN_LIMITS[speed.toString()] ?? 10;
-            
+            const speed = ballParams[B.SPEED];
+            const spin = ballParams[B.SPIN];
+            const type = ballParams[B.TYPE];
+            const currentMaxSpin = maxSpinFor(speed);
+
             // --- UPDATED: Backspin Visual Logic (Red Input Field) ---
             const spinStyle = type === 'back' ? 'background:var(--danger); color:#fff; border-radius:4px;' : '';
             // -------------------------------------
-            
-            // BPM Calculation: 30 + (Percent * 0.6)
-            const bpmValue = Math.round(30 + (ballParams[4] * 0.6));
+
+            const bpmValue = freqToBpm(ballParams[B.FREQ]);
 
             const optDiv = document.createElement('div');
             optDiv.className = 'option-card';
@@ -219,48 +244,52 @@ function renderEditor() {
                     <div class="editor-field">
                         <div class="field-header"><label>Speed</label><span class="range-hint">0-10</span></div>
                         <input type="number" inputmode="decimal" id="inp-speed-${stepIndex}-${optIndex}" value="${speed}" step="0.5" min="0" max="10"
-                            onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, 7, this.value)">
+                            onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPEED}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>Spin</label><span class="range-hint" id="lbl-spin-${stepIndex}-${optIndex}">Max ${currentMaxSpin}</span></div>
                         <input type="number" inputmode="decimal" id="inp-spin-${stepIndex}-${optIndex}" value="${spin}" step="0.5" min="0" max="${currentMaxSpin}"
                             style="${spinStyle}"
-                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, 8, this.value)">
+                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPIN}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>Height</label><span class="range-hint">-50/100</span></div>
-                        <input type="number" inputmode="decimal" value="${ballParams[2]}" step="1" min="-50" max="100"
-                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, 2, this.value)">
+                        <input type="number" inputmode="decimal" value="${ballParams[B.HEIGHT]}" step="1" min="-50" max="100"
+                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.HEIGHT}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>Drop</label><span class="range-hint">L/R</span></div>
-                        <input type="number" inputmode="decimal" value="${ballParams[3]}" step="0.5" min="-10" max="10"
-                            onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, 3, this.value)">
+                        <input type="number" inputmode="decimal" value="${ballParams[B.DROP]}" step="0.5" min="-10" max="10"
+                            onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.DROP}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>BPM</label><span class="range-hint">30-90</span></div>
                         <input type="number" inputmode="decimal" value="${bpmValue}" step="1" min="30" max="90"
-                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, 4, this.value)">
+                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.FREQ}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>Reps</label><span class="range-hint">#</span></div>
-                        <input type="number" inputmode="decimal" value="${ballParams[5]}" step="1" min="1" max="100"
-                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, 5, this.value)">
+                        <input type="number" inputmode="decimal" value="${ballParams[B.REPS]}" step="1" min="1" max="200"
+                            oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.REPS}, this.value)">
                     </div>
                 </div>`;
 
             const isLastBall = tempDrillData.length === 1 && stepOptions.length === 1;
-            
+
             const actionsHtml = `
                 <div class="card-actions">
-                     <button class="btn-action btn-act-test" 
-                             onclick="window.handleTestBall(${stepIndex}, ${optIndex})" 
+                     <button class="btn-action btn-act-test"
+                             onclick="window.handleTestBall(${stepIndex}, ${optIndex})"
                              ${isConnected && isActive ? '' : 'disabled'}>Test</button>
-                     <button class="btn-action btn-act-clone" 
+                     <button class="btn-action btn-act-clone"
                              onclick="window.handleAddVariant(${stepIndex}, ${optIndex})">+ Variant</button>
-                     <button class="btn-action btn-act-del" 
-                             onclick="window.handleDeleteBall(${stepIndex}, ${optIndex})" 
+                     <button class="btn-action btn-act-del"
+                             onclick="window.handleDeleteBall(${stepIndex}, ${optIndex})"
                              ${isLastBall ? 'disabled' : ''}>Delete</button>
+                     <button class="btn-action btn-act-preset" title="Save this ball as a preset"
+                             onclick="window.handleSaveBallAsPreset(${stepIndex}, ${optIndex})">
+                         <svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path></svg>
+                     </button>
                 </div>
             `;
             
@@ -274,18 +303,31 @@ function renderEditor() {
     // --- NEW: Add Button at Bottom of Sequence ---
     const addZone = document.createElement('div');
     addZone.className = 'swap-zone';
-    addZone.style.margin = "-10px 0 20px 0"; 
+    addZone.style.margin = "-10px 0 6px 0";
     addZone.innerHTML = `
-        <button class="btn-swap" 
-                style="color:var(--primary); border-color:var(--primary); width:32px; height:32px;" 
-                onclick="window.handleAddSequenceStep(${tempDrillData.length - 1})" 
-                title="Add New Ball">
+        <button class="btn-swap"
+                style="color:var(--primary); border-color:var(--primary); width:32px; height:32px;"
+                onclick="window.handleAddSequenceStep(${tempDrillData.length - 1})"
+                title="Duplicate the last ball">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
         </button>`;
     modalBody.appendChild(addZone);
+
+    // Sitting right under the "+", so "I want another ball" leads here too.
+    // The "+" only duplicates the previous ball, which is not what people
+    // reaching for it usually want.
+    const bottomEntry = document.createElement('button');
+    bottomEntry.className = 'preset-entry-inline';
+    bottomEntry.onclick = () => window.openPresetSheet();
+    bottomEntry.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path>
+        </svg>
+        <span>Add from preset</span>`;
+    modalBody.appendChild(bottomEntry);
 }
 
 // --- HANDLERS ---
@@ -293,17 +335,17 @@ function renderEditor() {
 window.handleScatterChange = (stepIdx, value) => {
     if (!tempDrillData) return;
     const ball = tempDrillData[stepIdx][0]; // Scatter applies to the first ball (group level)
-    
+
     let val = parseFloat(value);
     if(isNaN(val)) val = 0;
-    
-    const currentDrop = Math.abs(ball[3]);
-    if (val + currentDrop > 10) {
-        val = 10 - currentDrop;
+
+    const maxAllowed = maxScatterFor(ball[3]);
+    if (val > maxAllowed) {
+        val = maxAllowed;
         showToast(`Limit is ${val} for this Drop position`);
     }
-    
-    ball[10] = clamp(val, 0, 10);
+
+    ball[10] = clamp(val, 0, maxAllowed);
     renderEditor();
 };
 
@@ -313,49 +355,67 @@ window.handleEditorInput = (stepIdx, optIdx, paramIdx, value) => {
     let val = parseFloat(value);
     if(isNaN(val)) val = 0;
 
-    if (paramIdx === 4) {
-        let percent = (val - 30) / 0.6;
-        ball[paramIdx] = clamp(percent, 0, 100);
-    } 
-    else if (paramIdx === 3) {
-        val = clamp(val, -10, 10);
-        ball[paramIdx] = val;
-        
-        const currentScatter = ball[10] || 0;
-        if (Math.abs(val) + currentScatter > 10) {
-            ball[10] = 10 - Math.abs(val);
-        }
-        renderEditor(); 
-        return; 
-    } 
+    if (paramIdx === B.FREQ) {
+        ball[paramIdx] = bpmToFreq(val);
+    }
+    else if (paramIdx === B.DROP) {
+        ball[paramIdx] = clamp(val, -10, 10);
+
+        // The drop point and the scatter share the same 20 units of table.
+        const maxAllowed = maxScatterFor(ball[B.DROP]);
+        if ((ball[B.SCATTER] || 0) > maxAllowed) ball[B.SCATTER] = maxAllowed;
+        renderEditor();
+        return;
+    }
     else {
         ball[paramIdx] = val;
     }
 
-    if (paramIdx === 7) { 
-        const maxAllowed = SPIN_LIMITS[val.toString()] ?? 10;
-        if (ball[8] > maxAllowed) ball[8] = maxAllowed;
-        
+    if (paramIdx === B.SPEED) {
+        const maxAllowed = maxSpinFor(val);
+        if (ball[B.SPIN] > maxAllowed) ball[B.SPIN] = maxAllowed;
+
         const spinInput = document.getElementById(`inp-spin-${stepIdx}-${optIdx}`);
         const spinLabel = document.getElementById(`lbl-spin-${stepIdx}-${optIdx}`);
-        if (spinInput) { spinInput.max = maxAllowed; spinInput.value = ball[8]; }
+        if (spinInput) { spinInput.max = maxAllowed; spinInput.value = ball[B.SPIN]; }
         if (spinLabel) spinLabel.textContent = `Max ${maxAllowed}`;
     }
 
-    if (paramIdx === 7 || paramIdx === 8) {
-        const res = calculateRPMs(ball[7], ball[8], ball[9]);
-        ball[0] = res.top; ball[1] = res.bot;
+    if (paramIdx === B.SPEED || paramIdx === B.SPIN) {
+        const res = calculateRPMs(ball[B.SPEED], ball[B.SPIN], ball[B.TYPE]);
+        ball[B.TOP] = res.top; ball[B.BOT] = res.bot;
     }
+};
+
+/**
+ * Open the preset editor pre-filled from a ball already in this drill, so a
+ * ball you have tuned by hand can be promoted to a reusable recipe.
+ */
+window.handleSaveBallAsPreset = (stepIdx, optIdx) => {
+    if (!tempDrillData || !tempDrillData[stepIdx] || !tempDrillData[stepIdx][optIdx]) return;
+
+    const ball = tempDrillData[stepIdx][optIdx].slice();
+    if (ball[B.SPEED] === undefined) {
+        const rev = reverseCalculate(ball[B.TOP], ball[B.BOT]);
+        ball[B.SPEED] = clamp(rev.speed, 0, 10);
+        ball[B.SPIN] = clamp(rev.spin, 0, 10);
+        ball[B.TYPE] = rev.type;
+    }
+    // Scatter only makes sense for a single-variant step, which a preset is.
+    if (!isMultiVariant(tempDrillData[stepIdx])) ball[B.SCATTER] = ball[B.SCATTER] || 0;
+    else ball[B.SCATTER] = 0;
+
+    window.openPresetEditor(null, ball);
 };
 
 window.handleTypeToggle = (stepIdx, optIdx, newType) => {
     if (!tempDrillData) return;
     const ball = tempDrillData[stepIdx][optIdx];
-    if(ball[9] === newType) return;
-    ball[9] = newType;
-    const res = calculateRPMs(ball[7], ball[8], ball[9]);
-    ball[0] = res.top; ball[1] = res.bot;
-    renderEditor(); 
+    if(ball[B.TYPE] === newType) return;
+    ball[B.TYPE] = newType;
+    const res = calculateRPMs(ball[B.SPEED], ball[B.SPIN], ball[B.TYPE]);
+    ball[B.TOP] = res.top; ball[B.BOT] = res.bot;
+    renderEditor();
 };
 
 window.handleSwapSteps = (idxA, idxB) => {
@@ -366,8 +426,8 @@ window.handleSwapSteps = (idxA, idxB) => {
 
 window.handleToggleBallActive = (stepIdx) => {
     if (!tempDrillData) return;
-    const currentVal = tempDrillData[stepIdx][0][6] === undefined ? 1 : tempDrillData[stepIdx][0][6];
-    tempDrillData[stepIdx].forEach(opt => opt[6] = currentVal === 1 ? 0 : 1);
+    const currentVal = tempDrillData[stepIdx][0][B.ACTIVE] === undefined ? 1 : tempDrillData[stepIdx][0][B.ACTIVE];
+    tempDrillData[stepIdx].forEach(opt => opt[B.ACTIVE] = currentVal === 1 ? 0 : 1);
     renderEditor();
 };
 

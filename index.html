@@ -25,6 +25,14 @@
         
         <div class="theme-item" onclick="exportCustomDrills()"><span class="color-preview" style="background:var(--text)"></span> Export Drills</div>
         <div class="theme-item" onclick="document.getElementById('csv-input').click()"><span class="color-preview" style="background:var(--text)"></span> Import Drills</div>
+
+        <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
+        <div class="menu-title">Presets</div>
+        <div class="theme-item" onclick="window.openPresetSheet()"><span class="color-preview" style="background:#f5a623"></span> Manage Presets</div>
+        <div class="theme-item" onclick="exportPresetsJSON()"><span class="color-preview" style="background:var(--text)"></span> Export Presets (JSON)</div>
+        <div class="theme-item" onclick="exportPresetsCSV()"><span class="color-preview" style="background:var(--text)"></span> Export Presets (CSV)</div>
+        <div class="theme-item" onclick="document.getElementById('preset-file-input').click()"><span class="color-preview" style="background:var(--text)"></span> Import Presets</div>
+        <div class="theme-item" onclick="window.handleResetPresets()">Reset Presets</div>
         
         <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
         <div class="menu-title">Theme</div>
@@ -43,6 +51,7 @@
     </div>
     
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVUpload(event)">
+    <input type="file" id="preset-file-input" accept=".json,.csv" style="display:none" onchange="handlePresetFileUpload(event)">
 
     <div class="settings-card">
         <div id="status-text">Disconnected</div>
@@ -121,7 +130,7 @@
 
     <div class="footer-row">
         <div id="stats-display">Balls: 0 | Drills: 0</div>
-        <div>Version 2.3a</div>
+        <div>Version 2.4a</div>
     </div>
     
     <div id="log" class="log-box"></div>
@@ -143,6 +152,9 @@
                 <button class="btn-header-share" onclick="window.handleShareDrill()" title="Share Drill">
                     <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
                 </button>
+                <button class="btn-header-presets" onclick="window.openPresetSheet()" title="Ball Presets">
+                    <svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path></svg>
+                </button>
                 <label class="random-toggle-container">
                     <span class="toggle-label">Random</span>
                     <input type="checkbox" id="chk-drill-random">
@@ -153,7 +165,12 @@
         <div id="editor-body" class="modal-body"></div>
         <div class="modal-footer">
             <button class="btn-modal btn-delete-drill" onclick="window.handleDeleteDrill()" title="Delete">
-                <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm2 3h14v13H5V9zm3-5h6v2H8V4zm9 5H7v11h10V9z"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3.5 6h17"></path>
+                    <path d="M8.7 6V4.3A1.3 1.3 0 0 1 10 3h4a1.3 1.3 0 0 1 1.3 1.3V6"></path>
+                    <path d="M18.4 6l-.85 13.1a2 2 0 0 1-2 1.9H8.45a2 2 0 0 1-2-1.9L5.6 6"></path>
+                    <path d="M10 10.5v6"></path><path d="M14 10.5v6"></path>
+                </svg>
             </button>
             <button class="btn-modal btn-test-combo" onclick="window.handleTestCombo()">Test drill</button>
             <button class="btn-modal btn-save-as" onclick="window.handleSaveAsDrill()">Save As</button>
@@ -233,6 +250,40 @@
         </div>
         <div class="modal-footer">
              <button class="btn-modal btn-save" onclick="window.performSaveAs()">Save Drill</button>
+        </div>
+    </div>
+</div>
+
+<div id="preset-sheet" class="modal-overlay">
+    <div class="modal" style="height:auto; max-height:90vh;">
+        <div class="modal-header">
+            <div class="modal-title">Ball Presets</div>
+            <div class="modal-close" onclick="window.closePresetSheet()">&times;</div>
+        </div>
+        <div class="modal-body" id="preset-list"></div>
+        <div class="modal-footer">
+            <button class="btn-modal btn-preset-new" onclick="window.openPresetEditor(null)">+ New Preset</button>
+        </div>
+    </div>
+</div>
+
+<div id="preset-modal" class="modal-overlay">
+    <div class="modal" style="height:auto; max-height:90vh;">
+        <div class="modal-header">
+            <div class="modal-title" id="preset-modal-title">New Preset</div>
+            <div class="modal-close" onclick="window.closePresetEditor()">&times;</div>
+        </div>
+        <div class="modal-body" id="preset-editor-body"></div>
+        <div class="modal-footer">
+            <button class="btn-modal btn-delete-preset" onclick="window.deleteEditingPreset()" title="Delete preset">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3.5 6h17"></path>
+                    <path d="M8.7 6V4.3A1.3 1.3 0 0 1 10 3h4a1.3 1.3 0 0 1 1.3 1.3V6"></path>
+                    <path d="M18.4 6l-.85 13.1a2 2 0 0 1-2 1.9H8.45a2 2 0 0 1-2-1.9L5.6 6"></path>
+                    <path d="M10 10.5v6"></path><path d="M14 10.5v6"></path>
+                </svg>
+            </button>
+            <button class="btn-modal btn-save" onclick="window.savePresetEditor()">Save Preset</button>
         </div>
     </div>
 </div>

@@ -10,6 +10,7 @@ import {
     getSessionSummary 
 } from './state.js';
 import { bleState } from './bluetooth.js';
+import { makeBall } from './ball.js';
 import { showToast, formatDuration } from './utils.js'; 
 import { openEditor } from './editor.js';
 
@@ -39,11 +40,15 @@ window.handleCreateNewDrill = (category) => {
 
     userCustomDrills[category].push({ name: newName, key: newKey });
 
-    currentDrills[newKey] = { 
-        1: [[[4123, 2233, 50, 0, 50, 1, 1, 5, 2, 'top']]], 
-        2: [], 
+    currentDrills[newKey] = {
+        // Speed/spin and the motor RPMs are derived together by makeBall. The
+        // old hard-coded array claimed "speed 5, spin 2" while carrying the
+        // RPMs of a different ball, so a fresh drill fired something other
+        // than what the editor displayed.
+        1: [[makeBall({ speed: 5, spin: 2, type: 'top', height: 50, drop: 0, bpm: 60, reps: 1 })]],
+        2: [],
         3: [],
-        random: false 
+        random: false
     };
 
     localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
