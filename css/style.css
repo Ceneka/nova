@@ -202,6 +202,14 @@ h1 {
     transition: background-color var(--trans-speed); 
 }
 
+.btn-connect.connecting { opacity: 0.75; cursor: progress; }
+.btn-connect:disabled { cursor: not-allowed; }
+@keyframes connect-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.55 } }
+.btn-connect.connecting { animation: connect-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+    .btn-connect.connecting { animation: none; }
+}
+
 .btn-connect { 
     width: 100%; 
     padding: 12px; 

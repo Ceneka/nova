@@ -219,8 +219,27 @@ It also enforces the UI rules that are easy to break by eye: no horizontal
 overflow, every control at least 32-40px tall, no icon relying on the SVG
 default paint, and WCAG AA contrast for the preset UI in all four themes.
 
-There is no test for Bluetooth — `bluetooth.js` is only exercisable with real
-hardware.
+### Bluetooth is tested with a fake robot
+
+`bluetooth.js` cannot be exercised with real hardware in CI, so
+`tests/integration.html` installs a fake `navigator.bluetooth` whose robot
+greets *while* `startNotifications()` is still pending, then walks the
+auth handshake. It covers the happy path, the connect/handshake watchdogs, a
+dismissed picker, a GATT failure, a device missing the write channel, and
+rapid double-taps.
+
+**Two ordering rules in `connectDevice()` are load-bearing.** Both were bugs
+that presented as "nothing happens, click Connect again":
+
+1. The `characteristicvaluechanged` listener is attached **before**
+   `startNotifications()` is awaited. The robot pushes its serial the moment
+   notifications switch on; a listener added after the await drops it.
+2. `handshakeState` is set to `"handshake"` **before** `startNotifications()`.
+   A packet handled while the state is still `"disconnected"` matches no
+   branch and is thrown away.
+
+`setConnectTimeouts()` exists so the watchdogs can be tested without a 10s
+wait. Do not remove it as "test-only cruft".
 
 ## Things that look like bugs but are not
 

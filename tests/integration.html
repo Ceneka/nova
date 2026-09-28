@@ -42,7 +42,7 @@
     <div class="settings-body" id="settings-body"></div>
 </div></div>
 <div id="preset-file-input" type="file" hidden></div>
-<div class="container" id="harness-main"><div id="stats-display"></div></div>
+<div class="container" id="harness-main"><div class="settings-card"><div id="status-text">Disconnected</div><button id="btn-connect" class="btn-connect">Connect</button></div><div id="stats-display"></div></div>
 <div id="toast"></div><div id="log" class="log-box"></div>
 <pre id="out"></pre>
 
@@ -52,6 +52,9 @@ import { openEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/edito
 import * as P from '../js/presets.js';
 import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
+import { bleState, connectDevice, setConnectTimeouts } from '../js/bluetooth.js';
+import { updateDrillButtonStates } from '../js/ui.js';
+document.addEventListener('connection-changed', updateDrillButtonStates);
 import '../js/presetUi.js';
 import '../js/settingsUi.js';
 
@@ -488,6 +491,161 @@ document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: tr
 ok('escape closes settings', !view.classList.contains('active'));
 ok('closing restores the main screen', !mainScreen.classList.contains('screen-hidden'));
 ok('closing releases the body scroll lock', document.body.style.overflow === '');
+
+/* ---- 19. connecting to the robot ---- */
+// The regression this guards: the app used to add the notify listener AFTER
+// awaiting startNotifications(). The robot pushes its serial the moment
+// notifications switch on, so that packet was dropped and the handshake could
+// never start - the UI just sat there looking disconnected until you clicked
+// Connect a second time.
+const SERIAL_TEXT = 'NOVASPRO0001ABCDEF123456';
+const btnConnect = document.getElementById('btn-connect');
+const statusText = document.getElementById('status-text');
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function installFakeRobot({ replyToHandshake = true, serialOnSubscribe = true,
+                            dropWriteChannel = false, gattError = null,
+                            pickerError = null } = {}) {
+    const notifyHandlers = [];
+    const fire = (bytes) => notifyHandlers.forEach(h => h({ target: { value: new DataView(bytes) } }));
+
+    const notifyChar = {
+        uuid: '02f00000-0000-0000-0000-00000000ff02',
+        addEventListener: (t, fn) => { if (t === 'characteristicvaluechanged') notifyHandlers.push(fn); },
+        // Fires the serial BEFORE resolving, which is the race the old code lost.
+        startNotifications: () => new Promise(resolve => {
+            setTimeout(() => {
+                if (serialOnSubscribe) fire(new TextEncoder().encode(SERIAL_TEXT).buffer);
+                resolve(true);
+            }, 0);
+        })
+    };
+    const writeChar = {
+        uuid: '02f00000-0000-0000-0000-00000000ff01',
+        addEventListener: () => {},
+        writeValue: async () => {
+            if (replyToHandshake) setTimeout(() => fire(new Uint8Array([0]).buffer), 0);
+        }
+    };
+
+    const disconnectHandlers = [];
+    const chars = dropWriteChannel ? [notifyChar] : [writeChar, notifyChar];
+    const device = {
+        addEventListener: (t, fn) => { if (t === 'gattserverdisconnected') disconnectHandlers.push(fn); },
+        gatt: {
+            connected: false,
+            connect: async () => {
+                if (gattError) throw new Error(gattError);
+                device.gatt.connected = true;
+                return { getPrimaryService: async () => ({ getCharacteristics: async () => chars }) };
+            },
+            disconnect: () => { device.gatt.connected = false; disconnectHandlers.forEach(f => f()); }
+        }
+    };
+
+    Object.defineProperty(navigator, 'bluetooth', {
+        configurable: true,
+        value: {
+            requestDevice: async () => { if (pickerError) throw pickerError; return device; }
+        }
+    });
+    return device;
+}
+
+function resetBle() {
+    bleState.isConnected = false;
+    bleState.isConnecting = false;
+    bleState.phase = 'disconnected';
+    bleState.statusText = 'Disconnected';
+    bleState.device = null;
+    bleState.writeChar = null;
+    bleState.handshakeState = 'disconnected';
+    document.dispatchEvent(new CustomEvent('connection-changed'));
+}
+
+const dismiss = Object.assign(new Error('The user aborted a request.'), { name: 'NotFoundError' });
+
+// --- the regression: serial arrives while startNotifications is still pending
+resetBle();
+installFakeRobot();
+connectDevice();
+await sleep(30);
+ok('a robot that greets during startNotifications still connects', bleState.phase === 'ready',
+   `phase=${bleState.phase} handshake=${bleState.handshakeState}`);
+ok('the button reflects the connected state', btnConnect.textContent === 'Disconnect' && statusText.textContent === 'Connected',
+   `${btnConnect.textContent} / ${statusText.textContent}`);
+
+resetBle();
+ok('reset returns the button to Connect', btnConnect.textContent === 'Connect', btnConnect.textContent);
+
+// --- the UI tells the user something is happening
+resetBle();
+let sawConnecting = false;
+document.addEventListener('connection-changed', () => {
+    if (bleState.phase === 'connecting' || bleState.phase === 'authenticating' || bleState.phase === 'picking') {
+        sawConnecting = true;
+    }
+});
+installFakeRobot({ replyToHandshake: false });
+connectDevice();
+ok('the button says Connecting while it works', btnConnect.textContent === 'Connecting…', btnConnect.textContent);
+ok('the button is disabled during the attempt', btnConnect.disabled === true);
+await sleep(30);
+ok('a connection-changed event reported progress', sawConnecting);
+
+// --- the watchdog fires when the robot never answers
+resetBle();
+setConnectTimeouts(4000, 250);        // must be set before connectDevice arms it
+installFakeRobot({ replyToHandshake: false });
+connectDevice();
+await sleep(700);
+ok('a robot that never answers times out instead of hanging', bleState.phase === 'error',
+   `phase=${bleState.phase}`);
+ok('the status line says it failed', statusText.textContent === 'Connection failed', statusText.textContent);
+ok('the button offers a retry', btnConnect.textContent === 'Retry', btnConnect.textContent);
+ok('the button is clickable again', btnConnect.disabled === false);
+ok('isConnected stayed false throughout', bleState.isConnected === false);
+setConnectTimeouts(12000, 10000);
+
+// --- dismissing the picker is not an error
+resetBle();
+installFakeRobot({ pickerError: dismiss });
+connectDevice();
+await sleep(20);
+ok('dismissing the device picker is not treated as a failure', bleState.phase === 'disconnected',
+   `phase=${bleState.phase}`);
+ok('the button is unchanged after a cancel', btnConnect.textContent === 'Connect' && !btnConnect.disabled);
+
+// --- a GATT failure is explained, not swallowed
+resetBle();
+installFakeRobot({ gattError: 'GATT error: device is already connected' });
+connectDevice();
+await sleep(30);
+ok('a GATT failure reaches the error state', bleState.phase === 'error', `phase=${bleState.phase}`);
+ok('the status line says it failed', statusText.textContent === 'Connection failed');
+
+// --- picking the wrong device is reported, not silent
+resetBle();
+installFakeRobot({ dropWriteChannel: true });
+connectDevice();
+await sleep(30);
+ok('a device without the write channel fails loudly', bleState.phase === 'error', `phase=${bleState.phase}`);
+
+// --- two rapid taps cannot start two connections
+resetBle();
+let requestDeviceCalls = 0;
+const device = installFakeRobot();
+const realRequest = navigator.bluetooth.requestDevice;
+navigator.bluetooth.requestDevice = async () => { requestDeviceCalls++; return realRequest(); };
+connectDevice();
+connectDevice();
+connectDevice();
+await sleep(30);
+ok('three rapid Connect taps open the picker once', requestDeviceCalls === 1, `${requestDeviceCalls} times`);
+ok('and still end up connected', bleState.phase === 'ready', `phase=${bleState.phase}`);
+
+resetBle();
 
 /* ---- report ---- */
 } catch (err) {

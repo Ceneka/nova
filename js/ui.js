@@ -335,18 +335,33 @@ function handleReorder(container, category) {
 export function updateDrillButtonStates() {
     const btns = document.querySelectorAll('.btn-drill');
     btns.forEach(b => {
-         b.style.opacity = bleState.isConnected ? "1" : "0.6"; 
+         b.style.opacity = bleState.isConnected ? "1" : "0.6";
     });
-    
+
     const btnConnect = document.getElementById('btn-connect');
     const statusText = document.getElementById('status-text');
-    
+
     if (btnConnect && statusText) {
+        btnConnect.classList.toggle('connecting', bleState.isConnecting);
+        btnConnect.disabled = bleState.isConnecting;
+
         if (bleState.isConnected) {
             btnConnect.textContent = "Disconnect";
             btnConnect.classList.add('connected');
             statusText.textContent = "Connected";
             statusText.style.color = "#00b894";
+        } else if (bleState.isConnecting) {
+            // Previously the button did not change at all during the whole
+            // attempt, so a connection that hung looked like no-op.
+            btnConnect.textContent = "Connecting…";
+            btnConnect.classList.remove('connected');
+            statusText.textContent = bleState.statusText || "Connecting…";
+            statusText.style.color = "var(--primary)";
+        } else if (bleState.phase === 'error') {
+            btnConnect.textContent = "Retry";
+            btnConnect.classList.remove('connected');
+            statusText.textContent = bleState.statusText || "Connection failed";
+            statusText.style.color = "var(--danger)";
         } else {
             btnConnect.textContent = "Connect";
             btnConnect.classList.remove('connected');

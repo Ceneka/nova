@@ -72,8 +72,10 @@ function setupEventListeners() {
         btnConnect.onclick = () => {
             if (bleState.isConnected) {
                 disconnectDevice();
-                showSessionSummary(); 
+                showSessionSummary();
             }
+            // connectDevice() also guards this, but the button is disabled
+            // during a connect attempt so a double tap cannot start two.
             else connectDevice();
         };
     }
