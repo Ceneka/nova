@@ -2,8 +2,9 @@ import { getPresets } from './presets.js';
 import { appStats, saveAsDefault, resetToDefault, resetStats, factoryReset } from './state.js';
 import { getTotals } from './stats.js';
 import { setTheme } from './ui.js';
-import { toggleBodyScroll } from './utils.js';
+import { toggleBodyScroll, showToast } from './utils.js';
 import { isStatsOpen, closeStatsView } from './statsUi.js';
+import { getInstallState, promptInstall, isOfflineReady } from './pwa.js';
 
 /**
  * Settings is a full screen rather than a modal: it is the one place a user
@@ -55,6 +56,60 @@ export function closeSettings() {
 
 function currentTheme() {
     return document.documentElement.getAttribute('data-theme') || 'standard';
+}
+
+/**
+ * The install row, in whichever of its four states the browser has put us in.
+ *
+ * The button only exists in the one state where it does something. A disabled
+ * "Install" is a promise the app cannot keep, and a row that is just text
+ * reads as a broken feature rather than as an answer.
+ */
+function installRowHtml() {
+    const state = getInstallState();
+
+    if (state === 'installed') {
+        return `
+            <div class="settings-row" data-row="install-app">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">Installed</div>
+                    <div class="settings-row-desc">Open Nova from your home screen. It runs without a browser or a signal.</div>
+                </div>
+            </div>`;
+    }
+
+    if (state === 'installable') {
+        return `
+            <div class="settings-row" data-row="install-app">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">Install app</div>
+                    <div class="settings-row-desc">Puts Nova on your home screen so it opens like a normal app.</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleInstallApp()">Install</button>
+            </div>`;
+    }
+
+    const declined = state === 'declined';
+    return `
+        <div class="settings-row" data-row="install-app">
+            <div class="settings-row-main">
+                <div class="settings-row-title">Install app</div>
+                <div class="settings-row-desc">${declined
+                    ? 'Not now. Your drills and settings are safe either way.'
+                    : 'This browser is not offering it. In Chrome, use the ⋮ menu &rarr; Add to Home screen.'}</div>
+            </div>
+        </div>`;
+}
+
+/**
+ * The browser's own install dialog is the only way to install - there is no
+ * API for it. The toast is there to confirm the outcome, because the dialog
+ * looks identical whether it worked or not.
+ */
+export async function handleInstallApp() {
+    if (getInstallState() !== 'installable') return;
+    const accepted = await promptInstall();
+    if (accepted) showToast('Installing Nova…');
 }
 
 /** Render the whole screen. Cheap enough to redraw after any change. */
@@ -151,6 +206,19 @@ export function renderSettings() {
         </section>
 
         <section class="settings-section">
+            <div class="settings-section-title">App</div>
+            ${installRowHtml()}
+            <div class="settings-row" data-row="offline-ready">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">Offline use</div>
+                    <div class="settings-row-desc">${isOfflineReady()
+                        ? 'Saved on this device. It opens and runs with no signal.'
+                        : 'Preparing the offline copy&hellip;'}</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="settings-section">
             <div class="settings-section-title">Data</div>
             <div class="settings-row" data-row="reset-stats">
                 <div class="settings-row-main">
@@ -201,7 +269,14 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('presets-updated', () => { if (open) renderSettings(); });
 document.addEventListener('stats-updated', () => { if (open) renderSettings(); });
 
+// The install row changes under the user: the browser fires
+// beforeinstallprompt some time after load, and the prompt is spent the moment
+// it is used. Without this the row would be frozen on whatever it said when
+// Settings happened to be opened.
+document.addEventListener('pwa-state-changed', () => { if (open) renderSettings(); });
+
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.handleSettingsTheme = handleSettingsTheme;
 window.handlePresetImportPick = handlePresetImportPick;
+window.handleInstallApp = handleInstallApp;

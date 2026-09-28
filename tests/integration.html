@@ -15,6 +15,7 @@
 <head>
     <meta charset="UTF-8">
     <title>PENDING</title>
+    <meta name="theme-color" content="#f5f6fa">
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -61,9 +62,13 @@ import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
 import { bleState, connectDevice, setConnectTimeouts } from '../js/bluetooth.js';
 import { updateDrillButtonStates } from '../js/ui.js';
+// Imported for its side effects only. Loading the PWA module on a page that is
+// not index.html - no service worker registration is made, but the theme-colour
+// observer and the install listeners all attach - is part of what is checked.
+import { isOfflineReady } from '../js/pwa.js';
 document.addEventListener('connection-changed', updateDrillButtonStates);
 import '../js/presetUi.js';
-import '../js/settingsUi.js';
+import { renderSettings } from '../js/settingsUi.js';
 import '../js/statsUi.js';
 import * as S from '../js/stats.js';
 
@@ -477,11 +482,12 @@ ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden
 ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
 eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
 eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
-eq('five sections', document.querySelectorAll('#settings-body .settings-section').length, 5);
+eq('six sections', document.querySelectorAll('#settings-body .settings-section').length, 6);
 
 const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
 for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',
-                    'reset-presets', 'save-default', 'restore-default', 'reset-stats', 'factory-reset']) {
+                    'reset-presets', 'save-default', 'restore-default',
+                    'install-app', 'offline-ready', 'reset-stats', 'factory-reset']) {
     ok(`settings has a "${want}" row`, rows.includes(want), rows.join(','));
 }
 
@@ -813,6 +819,375 @@ ok('three rapid Connect taps open the picker once', requestDeviceCalls === 1, `$
 ok('and still end up connected', bleState.phase === 'ready', `phase=${bleState.phase}`);
 
 resetBle();
+
+/* ---- 21. it is an installable app ---- */
+// Everything below runs against the files that actually ship: the real
+// manifest, the real icons, the real service worker, and the real Settings
+// row. There is no PWA-shaped stand-in anywhere in this file, because a test
+// that checks a copy of the manifest is checking nothing.
+
+const root = new URL('../', location.href);
+const text = async (p) => (await fetch(new URL(p, root))).text();
+
+/* --- the manifest --- */
+const manifest = JSON.parse(await text('manifest.webmanifest'));
+
+ok('index.html links a manifest', /<link[^>]+rel="manifest"[^>]+>/.test(await text('index.html')));
+ok('the manifest has a name and a short name',
+   !!manifest.name && !!manifest.short_name, `${manifest.name} / ${manifest.short_name}`);
+ok('the short name fits under an icon', manifest.short_name.length <= 12, manifest.short_name);
+ok('it opens without browser chrome', manifest.display === 'standalone', manifest.display);
+ok('it can fall back to a browser tab',
+   Array.isArray(manifest.display_override) && manifest.display_override.includes('browser'),
+   JSON.stringify(manifest.display_override));
+ok('it has a theme and a background colour',
+   /^#[0-9a-f]{6}$/i.test(manifest.theme_color || '') && /^#[0-9a-f]{6}$/i.test(manifest.background_color || ''),
+   `${manifest.theme_color} / ${manifest.background_color}`);
+
+// GitHub Pages serves this app from a subdirectory, so an absolute start_url
+// would launch the installed app at the domain root and 404.
+ok('start_url is relative, so the app works in a subdirectory',
+   !!manifest.start_url && !manifest.start_url.startsWith('/'), manifest.start_url);
+ok('scope is relative too', !!manifest.scope && !manifest.scope.startsWith('/'), manifest.scope);
+
+/* --- the icons are real, and are the sizes they claim to be --- */
+// The onload promise, not img.decode(): decode() and createImageBitmap() both
+// never settle in this headless build, which would hang the whole page rather
+// than fail a check.
+const decode = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`could not load ${src}`));
+    img.src = new URL(src, root).href;
+});
+const pixels = (img) => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    return { ctx, w: c.width, h: c.height, data: ctx.getImageData(0, 0, c.width, c.height).data };
+};
+// A canvas reports an image as opaque only if it really is: a "purpose: any"
+// icon with transparent corners gets rounded a second time by the launcher and
+// ends up visibly smaller than it should.
+const opaqueAt = (px, x, y) => px.data[(y * px.w + x) * 4 + 3] === 255;
+
+ok('the manifest declares at least one icon', manifest.icons.length > 0);
+ok('it includes a maskable icon for Android launchers',
+   manifest.icons.some(i => (i.purpose || '').split(/\s+/).includes('maskable')),
+   manifest.icons.map(i => `${i.src}:${i.purpose}`).join(' '));
+
+for (const icon of manifest.icons) {
+    let img;
+    try {
+        img = await decode(icon.src);
+    } catch (e) {
+        ok(`icon ${icon.src} loads`, false, e.message);
+        continue;
+    }
+    const real = `${img.naturalWidth}x${img.naturalHeight}`;
+    ok(`icon ${icon.sizes} is really ${icon.sizes}`, real === icon.sizes, real);
+
+    const px = pixels(img);
+    ok(`icon ${icon.sizes} is full-bleed`,
+       opaqueAt(px, 0, 0) && opaqueAt(px, px.w - 1, px.h - 1));
+}
+
+ok('iOS has its own home screen icon', !!(await decode('icons/apple-touch-icon.png')));
+ok('the browser tab has an icon', !!(await decode('icons/favicon-32.png')));
+
+/* --- the maskable icon survives the launcher's crop --- */
+// Android may crop 10% off every edge and some launchers take 20% off the
+// sides, so the artwork has to stay inside the middle 80% - a circle of radius
+// 0.4 * width, which is 0.8 of the half-width. The icon's artwork is the
+// white ball and the bright end of its trail; the orange gradient is not
+// artwork and is deliberately not measured. Red is ~255 throughout, so the
+// blue channel is the cleanest way to tell them apart.
+const artworkExtent = async (src) => {
+    const px = pixels(await decode(src));
+    let worst = 0, at = '';
+    for (let y = 0; y < px.h; y += 2) {
+        for (let x = 0; x < px.w; x += 2) {
+            const i = (y * px.w + x) * 4;
+            if (px.data[i + 2] < 165 || px.data[i + 1] < 150) continue;   // background
+            const dist = Math.hypot(x - px.w / 2, y - px.h / 2) / (px.w / 2);
+            if (dist > worst) { worst = dist; at = `${x},${y}`; }
+        }
+    }
+    return { worst, at };
+};
+const safe = await artworkExtent('icons/maskable-512.png');
+ok('the maskable icon keeps its artwork inside the safe zone',
+   safe.worst <= 0.8, `reaches ${(safe.worst * 100).toFixed(1)}% of the radius, limit 80%, at ${safe.at}`);
+
+/* --- the service worker --- */
+const swSource = await text('sw.js');
+
+// A real registration cannot be tested here. Under --virtual-time-budget a
+// *successful* service worker registration never settles - the page hangs
+// instead of reporting - while a failed one rejects immediately, so a
+// registration test would break the suite rather than check anything. (It is
+// the virtual clock, not headless: driven over CDP against a real browser the
+// same worker activates, precaches 27 files, and the app then boots with the
+// network switched off.) So run the real sw.js against a fake CacheStorage
+// and drive its own event handlers - that is the half that can actually rot.
+function loadWorker({ online = true } = {}) {
+    const listeners = {};
+    const stores = new Map();
+    const calls = { claimed: 0, skippedWaiting: 0, network: [] };
+
+    // Relative precache paths have to resolve against the worker's own URL,
+    // which in a real worker is sw.js at the site root - not against the test
+    // page, which would put './' in /tests/.
+    class WorkerRequest extends Request {
+        constructor(input, init) {
+            super(typeof input === 'string' ? new URL(input, root).href : input, init);
+        }
+    }
+    const keyOf = (r) => (typeof r === 'string' ? new URL(r, root) : new URL(r.url)).href;
+
+    const fakeFetch = async (request, init) => {
+        const url = keyOf(request);
+        calls.network.push(url);
+        if (!online) throw new TypeError('Failed to fetch');
+        return globalThis.fetch(url, init);
+    };
+
+    const fakeCaches = {
+        async open(name) {
+            if (!stores.has(name)) stores.set(name, new Map());
+            const entries = stores.get(name);
+            return {
+                // Real addAll is all-or-nothing, and the worker relies on that.
+                async addAll(requests) {
+                    const staged = [];
+                    for (const r of requests) {
+                        const res = await fakeFetch(r);
+                        if (!res.ok) throw new Error(`addAll failed on ${keyOf(r)}: ${res.status}`);
+                        staged.push([keyOf(r), res]);
+                    }
+                    staged.forEach(([k, v]) => entries.set(k, v));
+                },
+                async match(request) { return entries.get(keyOf(request)); },
+                async put(request, response) { entries.set(keyOf(request), response); },
+                async keys() { return [...entries.keys()].map(url => new WorkerRequest(url)); }
+            };
+        },
+        async keys() { return [...stores.keys()]; },
+        async delete(name) { return stores.delete(name); }
+    };
+
+    const fakeSelf = {
+        location: new URL(root.href),
+        addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+        skipWaiting: async () => { calls.skippedWaiting++; },
+        clients: { claim: async () => { calls.claimed++; } }
+    };
+
+    // eslint-disable-next-line no-new-func
+    new Function('self', 'caches', 'Request', 'fetch', swSource)
+        (fakeSelf, fakeCaches, WorkerRequest, fakeFetch);
+
+    // The worker only ever reacts through waitUntil/respondWith, so give it
+    // the same shape the browser would and hand the resulting promise back to
+    // the caller. Returning it (rather than awaiting it here) is what lets a
+    // test assert that an install *failed*.
+    const dispatch = (type, event) => {
+        let settled = null;
+        const e = event || {};
+        e.respondWith = (p) => { settled = p; };
+        e.waitUntil = (p) => { settled = p; };
+        for (const fn of listeners[type] || []) fn(e);
+        return settled;
+    };
+
+    // A navigation request cannot be built with `new Request` - "navigate" is
+    // reserved for the browser - so the handler gets the same plain shape it
+    // would see for real.
+    const navRequest = (path) => ({ method: 'GET', mode: 'navigate', url: new URL(path, root).href });
+    const getRequest = (path) => new WorkerRequest(path);
+
+    return { dispatch, navRequest, getRequest, stores, calls };
+}
+
+const sw = loadWorker();
+await sw.dispatch('install');
+
+const cacheName = [...sw.stores.keys()][0];
+ok('install opens one versioned shell cache', /^nova-shell-v\d+$/.test(cacheName || ''), cacheName);
+const cached = new Set([...(sw.stores.get(cacheName) || new Map()).keys()]);
+
+ok('install precaches the whole shell', cached.size >= 20, `${cached.size} entries`);
+ok('install takes over at once rather than waiting for every tab to close',
+   sw.calls.skippedWaiting === 1, `${sw.calls.skippedWaiting}`);
+
+await sw.dispatch('activate');
+ok('activate claims the pages that are already open', sw.calls.claimed === 1, `${sw.calls.claimed}`);
+
+// Both spellings of the app have to be in there: a navigation to `/` and one
+// to `/index.html` are different cache keys, and the fallback takes whichever
+// it finds.
+ok('the app shell is cached under both of its URLs',
+   cached.has(root.href) && cached.has(new URL('index.html', root).href),
+   [...cached].filter(u => !u.includes('/js/')).map(u => u.replace(root.href, '')).join(' '));
+ok('the manifest and the stylesheet are cached',
+   cached.has(new URL('manifest.webmanifest', root).href) && cached.has(new URL('css/style.css', root).href));
+ok('the converter tool is cached, since the manifest offers it as a shortcut',
+   cached.has(new URL('converter.html', root).href));
+ok('no third-party URL is precached', [...cached].every(u => u.startsWith(root.href)));
+
+/* --- the canary: every module the app loads is precached --- */
+// This is the check that matters most. A module missing from the precache list
+// installs perfectly and then fails the first time the phone loses signal,
+// which is the one situation the app exists for. Walking the real import graph
+// is what makes it impossible to forget: adding js/foo.js and importing it
+// anywhere turns this red.
+const queued = [...(await text('index.html')).matchAll(/(?:src|href)="([^"]+)"/g)]
+    .map(m => m[1])
+    .filter(u => !/^(?:https?:)?\/\/|#|data:|mailto:/.test(u) && u.endsWith('.js'))
+    .map(u => new URL(u, root).href);
+
+// './state.js' inside js/main.js means js/state.js, so every import has to be
+// resolved against the module that made it rather than against the site root.
+const graph = new Set();
+while (queued.length) {
+    const url = queued.pop();
+    if (graph.has(url)) continue;
+    graph.add(url);
+    for (const m of (await text(url)).matchAll(/\b(?:from|import)\s+['"](\.[^'"]+)['"]/g)) {
+        queued.push(new URL(m[1], url).href);
+    }
+}
+ok('the import graph was actually walked', graph.size >= 10, `${graph.size} modules`);
+
+const notCached = [...graph].filter(url => !cached.has(url));
+ok('every module the app loads is precached for offline use',
+   notCached.length === 0, notCached.map(u => u.replace(root.href, '')).join(', '));
+
+/* --- the fetch policy --- */
+const respondTo = async (request) => {
+    const answer = sw.dispatch('fetch', { request });
+    return answer ? await answer : null;
+};
+
+// The share-code API is somebody else's PocketBase instance. Not caching it
+// is both the polite thing and the correct one: a stale "code not found" is
+// worse than no answer at all.
+ok('a request to another origin is left to the browser',
+   await respondTo({ method: 'GET', mode: 'cors', url: 'https://nova.varandal.de/api/collections/x/records' }) === null);
+ok('a write is never answered from the cache',
+   await respondTo({ method: 'POST', mode: 'cors', url: new URL('js/main.js', root).href }) === null);
+
+const navResponse = await respondTo(sw.navRequest('./'));
+ok('a navigation is served from the shell without touching the network',
+   navResponse && (await navResponse.text()).includes('<title>Nova Drill Control</title>'));
+
+const assetResponse = await respondTo(sw.getRequest('js/ball.js'));
+ok('a precached module is served from the cache',
+   assetResponse && assetResponse.ok && (await assetResponse.text()).includes('export'));
+
+// A file that is not in the shell and not reachable: say so, rather than
+// serving a cached 404 body under a 200.
+const offline = loadWorker({ online: false });
+let installFailed = false;
+try { await offline.dispatch('install'); } catch { installFailed = true; }
+ok('an install that cannot reach a file does not half-fill the cache',
+   installFailed && [...offline.stores.values()].every(m => m.size === 0),
+   `threw=${installFailed} entries=${[...offline.stores.values()].map(m => m.size).join(',')}`);
+
+const emptyNav = await offline.dispatch('fetch', { request: offline.navRequest('./index.html') });
+ok('an empty cache falls through to the network', emptyNav && emptyNav.status === 503,
+   emptyNav ? String(emptyNav.status) : 'nothing answered');
+
+const emptyAsset = await offline.dispatch('fetch', { request: offline.getRequest('js/main.js') });
+ok('a module that is neither cached nor reachable reports offline',
+   emptyAsset && emptyAsset.status === 504, emptyAsset ? String(emptyAsset.status) : 'nothing answered');
+
+
+/* --- the Settings row --- */
+window.openSettings();
+const installRow = () => document.querySelector('#settings-body [data-row="install-app"]');
+const installBtn = () => document.querySelector('#settings-body [data-row="install-app"] .settings-btn');
+const offlineRow = () => document.querySelector('#settings-body [data-row="offline-ready"]');
+
+ok('settings has an install row', !!installRow());
+ok('no browser is offering a prompt, so no button is shown',
+   !installBtn(), installBtn() ? installBtn().textContent : '');
+ok('and it says how to install by hand instead of hiding',
+   /Add to Home screen/i.test(installRow()?.textContent || ''), installRow()?.textContent);
+// This page deliberately registers no service worker, so the row is showing
+// its "not yet" state here; the ready wording is what a real device gets after
+// the worker activates. Asserting the state this page is actually in is the
+// honest check - asserting the other one would mean asserting nothing.
+ok('settings does not promise offline use before the worker is up',
+   !isOfflineReady() && /preparing/i.test(offlineRow()?.textContent || ''),
+   offlineRow()?.textContent);
+
+// A stand-in for the browser's own event, with the two members pwa.js calls.
+const offerInstall = (outcome) => {
+    const ev = new Event('beforeinstallprompt', { cancelable: true });
+    ev.preventDefault = () => {};
+    ev.prompt = () => { ev.prompted = (ev.prompted || 0) + 1; };
+    ev.userChoice = Promise.resolve({ outcome });
+    window.dispatchEvent(ev);
+    return ev;
+};
+
+const offered = offerInstall('accepted');
+await sleep(0);
+ok('a prompt from the browser puts the Install button back',
+   !!installBtn(), installRow()?.textContent);
+ok('without pressing it, the row is still just an offer',
+   /home screen/i.test(installRow()?.textContent || ''));
+
+await window.handleInstallApp();
+ok('pressing Install calls the browser prompt exactly once',
+   offered.prompted === 1, `${offered.prompted} times`);
+ok('a spent prompt is not offered again',
+   !installBtn(), installRow()?.textContent);
+ok('accepting does not nag about an unsupported browser',
+   !/not offering/i.test(installRow()?.textContent || ''), installRow()?.textContent);
+
+// Declining is not the same as never having been offered, and the copy has to
+// tell them apart or a user who said "not now" thinks the app is broken.
+const declined = offerInstall('dismissed');
+await sleep(0);
+await window.handleInstallApp();
+ok('declining asks again later rather than claiming the browser cannot',
+   /not now/i.test(installRow()?.textContent || ''), installRow()?.textContent);
+
+// Running as an installed app: no button, because there is nothing to do.
+const realMatchMedia = window.matchMedia;
+window.matchMedia = (q) => /^\(display-mode: standalone\)$/.test(q)
+    ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }
+    : realMatchMedia.call(window, q);
+renderSettings();
+ok('an installed app offers nothing to install',
+   !installBtn() && /home screen/i.test(installRow()?.textContent || ''), installRow()?.textContent);
+window.matchMedia = realMatchMedia;
+renderSettings();
+
+window.closeSettings();
+ok('the install button is a usable tap target',
+   (() => { const b = installBtn(); return !b || b.getBoundingClientRect().height >= 40; })());
+
+/* --- the status bar follows the theme --- */
+const themeColor = document.querySelector('meta[name="theme-color"]');
+document.documentElement.setAttribute('data-theme', 'night');
+await sleep(0);
+ok('the status bar colour follows the theme',
+   themeColor.getAttribute('content') === '#1e272e', themeColor.getAttribute('content'));
+document.documentElement.setAttribute('data-theme', 'standard');
+await sleep(0);
+ok('and follows it back', themeColor.getAttribute('content') === '#f5f6fa',
+   themeColor.getAttribute('content'));
+
+// pwa.js must survive being loaded on a page that has no theme-color tag at
+// all, which is what the test page was until the check above added one.
+ok('a missing theme-color tag is not fatal', (() => {
+    const tag = themeColor; tag.remove();
+    try { renderSettings(); return true; } catch (e) { return false; } finally { document.head.appendChild(tag); }
+})());
 
 /* ---- report ---- */
 } catch (err) {

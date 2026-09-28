@@ -29,6 +29,10 @@ Deployed version: <https://ceneka.github.io/nova/> (from `main`, see Deployment)
 ```
 index.html          markup for every screen and modal; inline onclick handlers
 converter.html      standalone tool, unrelated to the app runtime
+manifest.webmanifest  install metadata; every path relative, see Installing
+sw.js               service worker: precache + offline. Hand-written, see Installing
+icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
+tools/make-icons.sh regenerates icons/*.png. Not part of the build
 css/style.css       all styling, one file, CSS custom properties per theme
 js/
   main.js           entry point (loaded by index.html); wires window.* bindings
@@ -40,6 +44,7 @@ js/
   stats.js          training history: session log + selectors    <- read this
   statsUi.js        the statistics screen
   settingsUi.js     full-screen settings view (themes, presets, data)
+  pwa.js           service worker registration, install prompt, theme colour
   editor.js         drill editor: renders ball cards, handles edits
   runner.js         plays a drill over Bluetooth
   ui.js             drill lists, tabs, drag-and-drop, session summary
@@ -174,6 +179,61 @@ Two traps here, both of which cost a debugging round:
 4.5:1 as text in three of the four themes. Destructive labels use the new
 `--danger-ink`, which is per-theme and does clear AA.
 
+## Installing (PWA)
+
+The app installs to the home screen and runs offline. Four files, and the
+rules that go with them:
+
+- `manifest.webmanifest`, `sw.js`, `icons/` and `js/pwa.js`. `js/pwa.js`
+  registers the worker and owns the Install row that `settingsUi.js` renders;
+  it imports nothing from the app, so the test page can load it on its own.
+- **The worker is at the site root, the module is not.** `js/pwa.js` resolves
+  it with `new URL('../sw.js', import.meta.url)`. A relative `'./sw.js'` looks
+  right in `index.html` and silently looks for `/tests/sw.js` the moment
+  anything in a subdirectory imports it.
+- **`PRECACHE` in `sw.js` is a hand-maintained list and the integration suite
+  walks the real import graph to check it.** This is the one that bites: a
+  module missing from the list installs perfectly, opens perfectly, and then
+  fails the first time the phone loses signal. Adding `js/foo.js` and
+  importing it anywhere turns the check red until you add it. It has already
+  caught `js/pwa.js` once.
+- **Every path in the manifest is relative** (`./`, `icons/...`). GitHub Pages
+  serves this from `/nova/`, and an absolute `start_url` would launch the
+  installed app at the domain root and 404.
+
+Cross-origin requests are never answered or cached - `js/cloud.js` points at
+someone else's PocketBase, and a cached "code not found" is worse than none.
+
+`sw.js` self-updates: `VERSION` is the cache name, so a deploy installs a whole
+new shell, `skipWaiting()` + `clients.claim()` mean it reaches an open page
+rather than sitting in the waiting state until every tab is closed. Bump
+`VERSION` by hand; nothing generates it.
+
+### Testing the PWA, and two things that will waste an hour
+
+A **real registration cannot be tested in the headless suite**: under
+`--virtual-time-budget` a *successful* registration never settles and the page
+hangs, while a failed one rejects immediately. (It is the virtual clock, not
+headless - over CDP against a real browser the same worker activates,
+precaches 27 files, and the app boots with the network switched off.) So
+`tests/integration.html` evaluates the real `sw.js` through `new Function` with
+a fake `self`/`caches`/`Request`/`fetch` and drives its own `install`,
+`activate` and `fetch` handlers. That covers the logic; the browser half is
+what happens the first time anyone opens the app.
+
+Two more headless traps in the same file, both of which hang rather than fail:
+
+- `img.decode()` and `createImageBitmap()` never settle. Use an `img.onload`
+  promise and draw that to a canvas.
+- A navigation `Request` cannot be constructed - `mode: 'navigate'` is reserved
+  for the browser - so the fake passes a plain `{method, mode, url}` as
+  `event.request`.
+
+The maskable icon is checked for real, by reading its pixels: a launcher may
+crop 10% off every edge, so the artwork has to stay inside the middle 80% of
+the canvas or it gets cut in half on a real home screen.
+
+
 ## Conventions
 
 - **ES modules with relative paths, no extensions issue, no aliases.**
@@ -227,8 +287,11 @@ anyway). In-range values round-trip exactly.
 `main`. There is no build step, so the "build" job copies files and that is
 deliberate — see the top of this file.
 
-**What ships** (656 KB): `index.html`, `css/`, `js/`, `images/`,
-`converter.html`, `nova_drills_v2_example.csv`, `README.md`.
+**What ships**: `index.html`, `css/`, `js/`, `images/`, `icons/`,
+`manifest.webmanifest`, `sw.js`, `converter.html`, `nova_drills_v2_example.csv`,
+`README.md`. `sw.js` and the manifest are not optional extras - without them
+the site still works in a tab but can never be installed and never opens
+offline, which is most of what it is for.
 
 **What does not**, and why — extend this list rather than reverting to "copy
 the whole repo":
@@ -237,10 +300,11 @@ the whole repo":
 | --- | --- |
 | `tests/` | development only; it stubs the page chrome the app expects |
 | `1.3/` | a frozen older release, would publish a second stale app at `/1.3/` |
+| `tools/` | the icon regeneration script; the PNGs it writes are committed |
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 177 browser checks in `tests/integration.html`, driven through
+and the 230 browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -264,12 +328,12 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (177 checks, needs the HTTP server above):
+Browser integration (230 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(177) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(230) or FAIL(n)
 ```
 
 Open it in a normal browser to see each check. It drives the real editor, the

@@ -26,6 +26,20 @@ An independent, actively developed continuation of the original
 
   * Chrome, Cromite or any other Chromium-based browser. iPhone is not supported as it uses Webkit browser engine.
 
+## Install as an app
+
+The site is a **Progressive Web App**. Open the menu → **Settings** →
+**Install app**, or use your browser's own *Add to Home screen*.
+
+Installed, it runs in its own window with no browser chrome, and **it works
+with no internet connection at all** — the whole app is cached on the device
+the first time you open it. That is the point at a table, where the wifi is
+whatever the hall happens to have. Drills, presets and history still live in
+`localStorage`, so installing changes nothing about your data.
+
+A new version is picked up automatically on the next launch. Settings also
+shows whether the offline copy is ready yet.
+
 ## Features
 
 **General**
@@ -35,6 +49,7 @@ An independent, actively developed continuation of the original
   * **Themes:** 4 options, including dark mode.
   * **Settings screen:** themes, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
   * **Statistics:** a stored history of every session you have trained, with totals, a 14-day chart, your most-played drills, and per-session delete.
+  * **Installable:** add it to the home screen and it opens like a normal app — no browser, and no signal needed.
 
 
 **Drill Management**
@@ -124,6 +139,7 @@ upstream app could not do or did not get right:
   * **Settings as a full screen** — themes, presets, statistics and data resets moved out of the hamburger menu, which now carries only drill actions.
   * **Training history** — sessions logged per robot connection, with totals, a 14-day chart, a most-played ranking, and the ability to delete a single session or all of them.
   * **Fixes** — connecting silently doing nothing, the 20-drill category cap, the Settings back button, preset field overflow, and three identical-looking preset entry points in the editor.
+  * **Installable PWA** — a web manifest, a service worker and a real icon set, so the app installs to the home screen and opens offline.
   * **Continuous deployment** — pushing to `main` runs the test suites and publishes to GitHub Pages. There is still no build step.
 
 The drill CSV format, the ball array and the Bluetooth packet format are
@@ -155,6 +171,12 @@ python3 -m http.server 8123
 ```bash
 node --test tests/presets.test.mjs        # unit tests
 ```
+
+The PWA icons are committed like every other asset. `icons/*.svg` are the
+sources; regenerate the PNGs with `tools/make-icons.sh` after editing one
+(needs ImageMagick). `sw.js` is also hand-written, not generated — when you
+add or remove a file the app loads, update its `PRECACHE` list. The integration
+suite fails if you forget.
 
 Pushing to `main` runs both suites and, if they pass, publishes to GitHub
 Pages (`.github/workflows/pages.yml`). Nothing to build — the app is served

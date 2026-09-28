@@ -1625,3 +1625,49 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     padding: 40px 14px;
     line-height: 1.6;
 }
+
+/* ==========================================================================
+   INSTALLED APP
+   The app can be installed to the home screen, which runs it in standalone
+   display mode with no browser chrome. The only layout problem that creates
+   is the cutout: Android and iOS report their status bar and notch as
+   "safe area insets", and viewport-fit=cover in index.html lets the page draw
+   straight through them, which is what makes it look like a real app. This is
+   the other half of that trade - putting the content back inside the area
+   that is actually visible.
+
+   Every inset is 0 on a device with no cutout, so all of this collapses to
+   the padding values that were already there. It is deliberately NOT wrapped
+   in a @media (display-mode: standalone) block: the same phone in a browser
+   tab has the same cutout, and the padding is right in both.
+   ========================================================================== */
+
+body {
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-right: max(15px, env(safe-area-inset-right));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(15px, env(safe-area-inset-left));
+}
+
+/* Settings and Statistics are position:fixed inset:0, so they live outside
+   body's padding box and need the top inset of their own - their sticky
+   header is what would otherwise sit under the status bar. */
+.settings-shell {
+    padding-top: env(safe-area-inset-top);
+}
+
+/* Modals are centred by flexbox, and centring treats the top of the viewport
+   as usable. border-box is required and is not global in this file: without
+   it, padding on a width:100%/height:100% element would grow the overlay past
+   the screen and the editor would gain a horizontal scrollbar. */
+.modal-overlay {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The toast is pinned near the bottom, which on a gesture-navigation phone is
+   exactly where the home indicator is drawn. */
+#toast.show {
+    bottom: calc(50px + env(safe-area-inset-bottom));
+}

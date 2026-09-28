@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maskable variant of icon.svg. Same mark, shrunk into the safe zone: Android
+  may crop up to 10% off every edge, and on some launchers up to 20% on the
+  sides, so the artwork lives inside the middle 72% of the canvas.
+  The background stays full-bleed, because a maskable icon has to fill its
+  canvas or the platform shows the wallpaper through the corners.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Nova Drill Control">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#ff8a5c"/>
+      <stop offset="0.55" stop-color="#ff6b4a"/>
+      <stop offset="1" stop-color="#ef4b21"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="0.34" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#fff6f1"/>
+      <stop offset="1" stop-color="#eec4b1"/>
+    </radialGradient>
+    <linearGradient id="trail" x1="0" y1="0.35" x2="1" y2="0.65">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.85"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7d2409" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7d2409" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <g transform="translate(27 -11)">
+      <path d="M74 420 Q178 404 234 272"
+            fill="none" stroke="url(#trail)" stroke-width="24" stroke-linecap="round"/>
+      <ellipse cx="308" cy="300" rx="104" ry="46" fill="url(#shadow)"/>
+      <circle cx="298" cy="204" r="100" fill="url(#ball)"/>
+    </g>
+  </g>
+</svg>
