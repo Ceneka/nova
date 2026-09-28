@@ -41,7 +41,12 @@ export function openSettings() {
 export function closeSettings() {
     if (!open) return;
     open = false;
-    document.getElementById('settings-view')?.classList.remove('active');
+    const view = document.getElementById('settings-view');
+    view?.classList.remove('active');
+    // openSettings() removed `hidden`; put it back. Without this the view has no
+    // display rule of its own once `active` is gone, so it stays a full-screen
+    // block at z-index 150 and keeps covering the drill list it just revealed.
+    view?.setAttribute('hidden', '');
     document.querySelector('.container')?.classList.remove('screen-hidden');
     toggleBodyScroll(false);
 }

@@ -491,6 +491,20 @@ document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: tr
 ok('escape closes settings', !view.classList.contains('active'));
 ok('closing restores the main screen', !mainScreen.classList.contains('screen-hidden'));
 ok('closing releases the body scroll lock', document.body.style.overflow === '');
+ok('closing actually takes Settings off screen', view.hasAttribute('hidden'));
+ok('the closed screen is not painted over the drill list',
+   getComputedStyle(view).display === 'none',
+   `display:${getComputedStyle(view).display}`);
+
+// The regression: closeSettings() used to drop `active` but never restore the
+// `hidden` attribute, so the view kept filling the viewport at z-index 150 and
+// the Back button looked dead. Close it the way a user does, by clicking.
+window.openSettings();
+ok('reopening shows settings again',
+   !view.hasAttribute('hidden') && getComputedStyle(view).display !== 'none');
+document.querySelector('.settings-back').click();
+ok('the Back button hides settings', view.hasAttribute('hidden'));
+ok('the Back button brings the drill list back', !mainScreen.classList.contains('screen-hidden'));
 
 /* ---- 19. connecting to the robot ---- */
 // The regression this guards: the app used to add the notify listener AFTER
