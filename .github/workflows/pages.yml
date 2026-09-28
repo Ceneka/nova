@@ -1,0 +1,130 @@
+name: Deploy to GitHub Pages
+
+# The app is plain static files with no build step, so this is a copy, a test
+# gate and a deploy. See AGENTS.md - do not introduce a bundler here.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # re-run a deploy without pushing an empty commit
+
+# Pages deploys via OIDC, so id-token: write is required as well as pages: write.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Do NOT cancel in progress: cancelling mid-deploy can
+# leave the live site in a half-updated state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Unit tests (preset engine)
+        run: node --test tests/presets.test.mjs
+
+      # The browser suite drives the real editor, importer, exporter and
+      # settings screen in headless Chrome, which the runner already has.
+      - name: Browser integration checks
+        run: |
+          set -euo pipefail
+          command -v google-chrome >/dev/null || {
+            echo "::error::google-chrome is not on this runner - drop this step or install a browser"; exit 1; }
+
+          python3 -m http.server 8123 --bind 127.0.0.1 >/dev/null 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8123/ && break
+            sleep 0.5
+          done
+          curl -sf -o /dev/null http://127.0.0.1:8123/ || { echo "::error::server never came up"; exit 1; }
+
+          RESULT=$(google-chrome --headless --no-sandbox --disable-gpu \
+                    --disable-dev-shm-usage --window-size=430,932 \
+                    --virtual-time-budget=20000 \
+                    --dump-dom http://127.0.0.1:8123/tests/integration.html \
+                    | grep -o '<title>[^<]*' || true)
+          echo "$RESULT"
+          case "$RESULT" in
+            '<title>PASS('*) ;;
+            *) echo "::error::integration checks did not pass"; exit 1 ;;
+          esac
+
+  build:
+    name: Assemble site
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Copy the app into the site root
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+
+          # Everything the browser actually loads, plus the standalone
+          # converter tool and the README.
+          cp -a index.html converter.html css js images _site/
+          cp -a nova_drills_v2_example.csv README.md _site/
+
+          # Deliberately NOT deployed:
+          #   tests/   - development only, and it stubs the page chrome
+          #   1.3/     - a frozen older release with its own index.html;
+          #              shipping it would publish a second, stale app at /1.3/
+          #   AGENTS.md - instructions for coding agents, not for users
+          #   .git/    - obvious
+          #
+          # No .nojekyll needed: Pages deploys this artifact verbatim and
+          # never runs it through Jekyll.
+
+      - name: Check index.html has no dangling local references
+        run: |
+          python3 - <<'PY'
+          import re, pathlib, sys
+          site = pathlib.Path('_site')
+          missing = []
+          for ref in re.findall(r'(?:src|href)="([^"]+)"', (site / 'index.html').read_text()):
+              if ref.startswith(('http://', 'https://', '//', '#', 'data:', 'mailto:')):
+                  continue
+              ref = ref.split('#')[0].split('?')[0]
+              if not ref or ref.startswith('/'):
+                  continue
+              if not (site / ref).exists():
+                  missing.append(ref)
+          if missing:
+              sys.exit('::error::index.html references files that were not deployed: ' + ', '.join(missing))
+          print('every local asset in index.html is present')
+          PY
+
+      - name: List what will be deployed
+        run: find _site -type f | sort
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,7 @@
+# Assembled by .github/workflows/pages.yml; never committed.
+_site/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp

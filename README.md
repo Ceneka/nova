@@ -11,7 +11,7 @@ This tool can be used as a replacement for the original app, removing the requir
 
 **Online/Offline:**
 
-  * Visit: [https://olanga.github.io/nova/](https://olanga.github.io/nova/)
+  * Visit: <https://ceneka.github.io/nova/> (deployed from `main` by GitHub Actions)
   * Self hosting: https is required
 
 **Local:**
@@ -132,6 +132,10 @@ python3 -m http.server 8123
 ```bash
 node --test tests/presets.test.mjs        # unit tests
 ```
+
+Pushing to `main` runs both suites and, if they pass, publishes to GitHub
+Pages (`.github/workflows/pages.yml`). Nothing to build — the app is served
+as-is.
 
 Browser integration checks: open `tests/integration.html` (the page title
 turns into `PASS(n)` / `FAIL(n)`). See [AGENTS.md](AGENTS.md) for the

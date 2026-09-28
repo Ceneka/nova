@@ -159,6 +159,43 @@ One intentional behaviour change: the importer now clamps the BPM column to
 30-90 (it previously stored out-of-range values that the editor clamped later
 anyway). In-range values round-trip exactly.
 
+## Deployment
+
+`.github/workflows/pages.yml` publishes to GitHub Pages on every push to
+`main`. There is no build step, so the "build" job copies files and that is
+deliberate — see the top of this file.
+
+**What ships** (656 KB): `index.html`, `css/`, `js/`, `images/`,
+`converter.html`, `nova_drills_v2_example.csv`, `README.md`.
+
+**What does not**, and why — extend this list rather than reverting to "copy
+the whole repo":
+
+| Excluded | Reason |
+| --- | --- |
+| `tests/` | development only; it stubs the page chrome the app expects |
+| `1.3/` | a frozen older release, would publish a second stale app at `/1.3/` |
+| `AGENTS.md` | instructions for coding agents, not for users |
+
+Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
+and the 120 browser checks in `tests/integration.html`, driven through
+headless Chrome in the same way as documented below. A failure blocks the
+deploy.
+
+The workflow also verifies that every local `src=`/`href=` in `index.html`
+resolves to a file that was actually copied. That is the check that catches
+"added a new module and forgot to copy the directory".
+
+**One manual step after the first push:** repo Settings -> Pages -> Build and
+deployment -> Source must be set to **GitHub Actions**. The workflow cannot do
+this itself.
+
+**The share-code feature does not belong to this repo.** `js/cloud.js` points
+at `https://nova.varandal.de/api/...`, the original author's PocketBase
+instance. Anyone using this deployment uploads and downloads drills through
+that third-party server. If you want your own, self-host PocketBase and change
+`API_URL`.
+
 ## Tests
 
 ```bash
