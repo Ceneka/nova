@@ -22,7 +22,7 @@ python3 -m http.server 8123 --bind 127.0.0.1
 # open http://127.0.0.1:8123/
 ```
 
-Deployed version: <https://olanga.github.io/nova/>
+Deployed version: <https://ceneka.github.io/nova/> (from `main`, see Deployment)
 
 ## Layout
 
