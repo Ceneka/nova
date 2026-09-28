@@ -42,6 +42,9 @@ import { showToast } from './utils.js';
 // Registers the window.* preset handlers used by index.html
 import './presetUi.js';
 
+// Registers the window.* settings-screen handlers
+import './settingsUi.js';
+
 import { 
     startDrillSequence, 
     stopRun, 

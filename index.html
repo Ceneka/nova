@@ -22,31 +22,13 @@
         <div class="theme-item" onclick="window.handleDownloadDialog()">
             <span class="color-preview" style="background:#0984e3"></span> Download Drill
         </div>
-        
+
         <div class="theme-item" onclick="exportCustomDrills()"><span class="color-preview" style="background:var(--text)"></span> Export Drills</div>
         <div class="theme-item" onclick="document.getElementById('csv-input').click()"><span class="color-preview" style="background:var(--text)"></span> Import Drills</div>
 
         <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
-        <div class="menu-title">Presets</div>
-        <div class="theme-item" onclick="window.openPresetSheet()"><span class="color-preview" style="background:#f5a623"></span> Manage Presets</div>
-        <div class="theme-item" onclick="exportPresetsJSON()"><span class="color-preview" style="background:var(--text)"></span> Export Presets (JSON)</div>
-        <div class="theme-item" onclick="exportPresetsCSV()"><span class="color-preview" style="background:var(--text)"></span> Export Presets (CSV)</div>
-        <div class="theme-item" onclick="document.getElementById('preset-file-input').click()"><span class="color-preview" style="background:var(--text)"></span> Import Presets</div>
-        <div class="theme-item" onclick="window.handleResetPresets()">Reset Presets</div>
-        
-        <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
-        <div class="menu-title">Theme</div>
-        <div class="theme-item" onclick="setTheme('standard')"><span class="color-preview" style="background:#ff6b4a"></span> Standard</div>
-        <div class="theme-item" onclick="setTheme('ocean')"><span class="color-preview" style="background:#0984e3"></span> Ocean</div>
-        <div class="theme-item" onclick="setTheme('forest')"><span class="color-preview" style="background:#00b894"></span> Forest</div>
-        <div class="theme-item" onclick="setTheme('night')"><span class="color-preview" style="background:#2d3436"></span> Dark</div>
-        
-        <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
-        
-        <div class="theme-item" onclick="resetStats()">Reset Statistics</div>
-        <div class="theme-item reset-item" onclick="factoryReset()">Factory Reset</div>
 
-        <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
+        <div class="theme-item" onclick="window.openSettings()"><span class="color-preview" style="background:#f5a623"></span> Settings</div>
         <div class="theme-item" onclick="window.openAboutModal()">About</div>
     </div>
     
@@ -134,6 +116,23 @@
     </div>
     
     <div id="log" class="log-box"></div>
+</div>
+
+<!-- Settings: a full screen, not a modal. Everything that is not a
+     drill action lives here. -->
+<div id="settings-view" class="settings-view" hidden>
+    <div class="settings-shell">
+        <header class="settings-header">
+            <button class="settings-back" onclick="window.closeSettings()" aria-label="Back to drills">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span>Drills</span>
+            </button>
+            <h1>Settings</h1>
+        </header>
+        <div class="settings-body" id="settings-body"></div>
+    </div>
 </div>
 
 <div id="toast">Notification</div>

@@ -366,10 +366,11 @@ export function toggleMenu() {
     if(m) m.classList.toggle('open');
 }
 
-export function setTheme(themeName) {
+export function setTheme(themeName, { closeMenu = true } = {}) {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem('nova_theme_pref', themeName);
-    toggleMenu();
+    // Settings picks a theme without dismissing itself, so the caller decides.
+    if (closeMenu) toggleMenu();
 }
 
 export function switchTab(catName, btn) {

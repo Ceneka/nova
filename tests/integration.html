@@ -30,7 +30,19 @@
     <div id="preset-modal-title"></div><div id="preset-editor-body"></div>
     <button class="btn-delete-preset" onclick="window.deleteEditingPreset()"></button>
 </div></div>
-<div id="theme-menu" class="theme-menu"></div>
+<div id="theme-menu" class="theme-menu">
+    <div class="theme-item" onclick="window.openSettings()">Settings</div>
+    <div class="theme-item" onclick="window.openAboutModal()">About</div>
+</div>
+<div id="settings-view" class="settings-view" hidden><div class="settings-shell">
+    <header class="settings-header">
+        <button class="settings-back" onclick="window.closeSettings()">Drills</button>
+        <h1>Settings</h1>
+    </header>
+    <div class="settings-body" id="settings-body"></div>
+</div></div>
+<div id="preset-file-input" type="file" hidden></div>
+<div class="container" id="harness-main"><div id="stats-display"></div></div>
 <div id="toast"></div><div id="log" class="log-box"></div>
 <pre id="out"></pre>
 
@@ -41,6 +53,7 @@ import * as P from '../js/presets.js';
 import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
 import '../js/presetUi.js';
+import '../js/settingsUi.js';
 
 const results = [];
 const report = () => {
@@ -424,6 +437,57 @@ document.querySelectorAll('#preset-list *, #preset-editor-body *').forEach(el =>
     if (px < 10) tiny.push(`${el.className || el.tagName} ${px}px`);
 });
 ok('no new preset-UI text is under 10px', tiny.length === 0, [...new Set(tiny)].join(', '));
+
+/* ---- 18. the settings screen ---- */
+const mainScreen = document.getElementById('harness-main');
+const view = document.getElementById('settings-view');
+ok('settings starts hidden', view.hasAttribute('hidden'));
+ok('the main screen is not hidden by default', !mainScreen.classList.contains('screen-hidden'));
+
+window.openSettings();
+ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden'));
+ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
+eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
+eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
+eq('four sections', document.querySelectorAll('#settings-body .settings-section').length, 4);
+
+const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
+for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',
+                    'reset-presets', 'save-default', 'restore-default', 'reset-stats', 'factory-reset']) {
+    ok(`settings has a "${want}" row`, rows.includes(want), rows.join(','));
+}
+
+// picking a theme must not bounce the user out of Settings
+const themeBefore = document.documentElement.getAttribute('data-theme');
+window.handleSettingsTheme(themeBefore === 'night' ? 'ocean' : 'night');
+ok('picking a theme applies it', document.documentElement.getAttribute('data-theme') !== themeBefore);
+ok('picking a theme keeps Settings open', view.classList.contains('active'));
+eq('the selection moved with it', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
+ok('picking a theme persists it', !!localStorage.getItem('nova_theme_pref'));
+document.documentElement.setAttribute('data-theme', 'standard');
+localStorage.setItem('nova_theme_pref', 'standard');
+
+// every control is a usable tap target and nothing overflows
+const smallCtl = [];
+document.querySelectorAll('#settings-body button').forEach(b => {
+    const r = b.getBoundingClientRect();
+    if (r.height > 0 && r.height < 40) smallCtl.push(`${b.className} ${Math.round(r.width)}x${Math.round(r.height)}`);
+});
+ok('every settings control is at least 40px tall', smallCtl.length === 0, smallCtl.join(', '));
+
+const spillS = [];
+document.querySelectorAll('#settings-body *').forEach(el => {
+    if (el.scrollWidth > el.clientWidth + 1) spillS.push(`${el.className || el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
+});
+ok('nothing in settings overflows horizontally', spillS.length === 0, spillS.join(', '));
+
+ok('settings does not scroll sideways', document.documentElement.scrollWidth <= window.innerWidth + 1,
+   `${document.documentElement.scrollWidth} vs ${window.innerWidth}`);
+
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+ok('escape closes settings', !view.classList.contains('active'));
+ok('closing restores the main screen', !mainScreen.classList.contains('screen-hidden'));
+ok('closing releases the body scroll lock', document.body.style.overflow === '');
 
 /* ---- report ---- */
 } catch (err) {

@@ -37,6 +37,7 @@ js/
   ball.js           the ball array: layout, RPM maths, limits   <- read this
   presets.js        ball preset model, expansion, file formats   <- read this
   presetUi.js       preset picker + preset editor UI
+  settingsUi.js     full-screen settings view (themes, presets, data)
   editor.js         drill editor: renders ball cards, handles edits
   runner.js         plays a drill over Bluetooth
   ui.js             drill lists, tabs, drag-and-drop, session summary
@@ -129,6 +130,13 @@ in the editor is not capped, as before.
   …) so all four themes work for free. Never hardcode a colour in JS.
 - **Modals** all share `.modal-overlay` at `z-index: 200`; a nested modal must
   appear **later in `index.html`** to stack on top. Toasts are `z-index: 300`.
+- **The hamburger menu carries only drill actions** (download / export /
+  import drills, Settings, About). Anything that is not an action you reach
+  for mid-session belongs in the Settings screen (`js/settingsUi.js`), which is
+  a full screen at `z-index: 150` — deliberately *below* the modals, so the
+  preset sheet still opens over it. Add new settings there, not to the menu.
+- `setTheme(name, { closeMenu = true })` — pass `closeMenu: false` when the
+  caller is Settings, which must stay open so themes can be compared.
 - Re-rendering is done by rebuilding `innerHTML` from the model, so **every
   input must write to the model on `input`/`change`** or its value is lost on
   the next render. This bit the preset name field once already.
@@ -142,7 +150,8 @@ other apps consume. **Do not change the column set, the order, the `;`
 separator, or the `Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps` header.**
 
 Ball presets deliberately have their **own** JSON/CSV format
-(`js/presets.js`) and their own menu entries, so neither can break the other.
+(`js/presets.js`) and their own rows in Settings, so neither can break the
+other.
 `tests/integration.html` asserts the drill export is byte-for-byte what the
 pre-refactor code produced — if you touch it, that check is your canary.
 
@@ -156,17 +165,22 @@ anyway). In-range values round-trip exactly.
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (76 checks, needs the HTTP server above):
+Browser integration (120 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(76) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(120) or FAIL(n)
 ```
 
-Open it in a normal browser to see each check. It stubs nothing in the app
-modules themselves; it drives the real editor, the real importer and the real
-export.
+Open it in a normal browser to see each check. It drives the real editor, the
+real importer, the real exporter and the real settings screen; only the
+surrounding page chrome (the drill list, the menu) is stubbed, because the
+app modules expect those ids to exist.
+
+It also enforces the UI rules that are easy to break by eye: no horizontal
+overflow, every control at least 32-40px tall, no icon relying on the SVG
+default paint, and WCAG AA contrast for the preset UI in all four themes.
 
 There is no test for Bluetooth — `bluetooth.js` is only exercisable with real
 hardware.

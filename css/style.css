@@ -1257,3 +1257,155 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .btn-act-preset { flex: 0 0 42px; background: var(--card-bg); color: var(--text); padding: 8px 0; }
 .btn-act-preset:hover { color: var(--primary-ink); }
 .btn-act-preset svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ==========================================================================
+   SETTINGS SCREEN
+   A full screen reached from the hamburger menu. The menu keeps only the
+   drill actions; everything else lives here.
+   ========================================================================== */
+
+.container.screen-hidden { display: none; }
+
+.settings-view {
+    position: fixed;
+    inset: 0;
+    z-index: 150;                 /* below modals (200) so overlays still win */
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.settings-view[hidden] { display: none; }
+.settings-view.active { display: block; }
+
+.settings-shell {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 0 16px 40px 16px;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 0 14px 0;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 1;
+    border-bottom: 1px solid var(--border);
+}
+.settings-header h1 { margin: 0; font-size: 1.3rem; color: var(--text); }
+
+.settings-back {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 40px;
+    padding: 8px 14px 8px 10px;
+    border: none;
+    border-radius: 22px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.settings-back:active { transform: scale(0.96); }
+.settings-back svg { flex-shrink: 0; }
+
+.settings-section { margin-top: 22px; }
+.settings-section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+    padding-left: 2px;
+}
+
+/* --- one row per setting --- */
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+.settings-row-main { flex: 1; min-width: 0; }
+.settings-row-title { font-size: 0.92rem; font-weight: 700; color: var(--text); }
+.settings-row-desc { font-size: 0.74rem; color: var(--text-light); margin-top: 2px; line-height: 1.35; }
+.danger-text { color: var(--danger); font-weight: 600; }
+
+.settings-btn {
+    flex-shrink: 0;
+    min-height: 40px;
+    min-width: 74px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 2px solid var(--primary);
+    background: transparent;
+    color: var(--primary-ink);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+.settings-btn:hover { background: var(--primary-dim); }
+.settings-btn:active { transform: scale(0.96); }
+.settings-btn.danger { border-color: var(--danger); color: var(--danger); }
+.settings-btn.danger:hover { background: rgba(214, 48, 49, 0.1); }
+
+/* --- theme picker --- */
+.theme-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.theme-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 56px;
+    padding: 12px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.2s, transform 0.1s;
+}
+.theme-card:active { transform: scale(0.98); }
+.theme-card.active { border-color: var(--primary); }
+.theme-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+}
+.theme-name { flex: 1; text-align: left; }
+.theme-check {
+    display: none;
+    color: var(--primary-ink);
+    font-weight: 800;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+.theme-card.active .theme-check { display: block; }
+
+.settings-foot {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-light);
+}

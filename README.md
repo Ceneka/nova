@@ -29,6 +29,7 @@ This tool can be used as a replacement for the original app, removing the requir
   * **Fully customizable drills** Add and remove drills and balls. Share, export and import settings.
   * **Data Persistence:** Settings and drills saved to browser local storage.
   * **Themes:** 4 options, including dark mode.
+  * **Settings screen:** themes, the preset library, drill defaults and data resets live in one place, behind the menu.
   * **Stratistics:**  accumulated counters (total balls/drills).<br>
 
 
