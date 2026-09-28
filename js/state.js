@@ -1,6 +1,7 @@
 import { DEFAULT_DRILLS, CATEGORIES } from './constants.js';
 import { B, calculateRPMs, reverseCalculate, bpmToFreq, maxSpinFor } from './ball.js';
 import { loadPresets } from './presets.js';
+import { clearSessions } from './stats.js';
 import { showToast } from './utils.js';
 
 export let currentDrills = {};
@@ -115,9 +116,13 @@ export function factoryReset() {
     }
 }
 export function resetStats() {
-    if(confirm("Reset stats?")) {
+    if(confirm("Reset stats? This clears the lifetime counters and all training history.")) {
         appStats.balls = 0; appStats.drills = 0;
         localStorage.setItem('nova_stats', JSON.stringify(appStats));
+        // The history is the same thing as "the statistics" to a user, so one
+        // reset clears both. Leaving a full history behind next to zeroed
+        // counters would just look like a bug.
+        clearSessions();
         showToast("Statistics Reset");
         document.dispatchEvent(new CustomEvent('stats-updated'));
     }

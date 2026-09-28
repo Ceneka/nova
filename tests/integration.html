@@ -41,6 +41,13 @@
     </header>
     <div class="settings-body" id="settings-body"></div>
 </div></div>
+<div id="stats-view" class="stats-view" hidden><div class="settings-shell">
+    <header class="settings-header">
+        <button class="settings-back" onclick="window.closeStatsView()">Settings</button>
+        <h1>Statistics</h1>
+    </header>
+    <div class="settings-body" id="stats-body"></div>
+</div></div>
 <div id="preset-file-input" type="file" hidden></div>
 <div class="container" id="harness-main"><div class="settings-card"><div id="status-text">Disconnected</div><button id="btn-connect" class="btn-connect">Connect</button></div><div id="stats-display"></div></div>
 <div id="toast"></div><div id="log" class="log-box"></div>
@@ -57,6 +64,8 @@ import { updateDrillButtonStates } from '../js/ui.js';
 document.addEventListener('connection-changed', updateDrillButtonStates);
 import '../js/presetUi.js';
 import '../js/settingsUi.js';
+import '../js/statsUi.js';
+import * as S from '../js/stats.js';
 
 const results = [];
 const report = () => {
@@ -468,7 +477,7 @@ ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden
 ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
 eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
 eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
-eq('four sections', document.querySelectorAll('#settings-body .settings-section').length, 4);
+eq('five sections', document.querySelectorAll('#settings-body .settings-section').length, 5);
 
 const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
 for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',
@@ -522,7 +531,135 @@ document.querySelector('.settings-back').click();
 ok('the Back button hides settings', view.hasAttribute('hidden'));
 ok('the Back button brings the drill list back', !mainScreen.classList.contains('screen-hidden'));
 
-/* ---- 19. connecting to the robot ---- */
+/* ---- 19. the statistics screen ---- */
+const statsView = document.getElementById('stats-view');
+const statsBody = document.getElementById('stats-body');
+
+S.clearSessions();
+window.openSettings();
+ok('settings offers a training history row',
+   !!document.querySelector('#settings-body [data-row="open-stats"]'));
+
+// With nothing recorded the screen has to say so rather than show an empty chart.
+window.openStatsFromSettings();
+ok('statistics opens from the settings row', !statsView.hasAttribute('hidden'));
+ok('an empty log explains itself', !!document.querySelector('#stats-body .stats-empty'));
+ok('statistics does not scroll sideways',
+   document.documentElement.scrollWidth <= window.innerWidth + 1,
+   `${document.documentElement.scrollWidth} vs ${window.innerWidth}`);
+
+// Three sessions through the real API, deliberately all inside the same
+// millisecond. That is the id-collision case: with Date.now() as the id,
+// disconnecting and reconnecting fast gave two sessions the same id, and
+// deleting one of them deleted both.
+for (const [drills, balls] of [[['push(b)', 'push(f)'], 120], [['push(b)'], 80], [['serve(1)'], 40]]) {
+    S.beginSession();
+    drills.forEach(d => S.noteSessionDrill(d));
+    S.noteSessionBalls(balls);
+    S.endSession();
+}
+const ids = S.getSessions().map(s => s.id);
+eq('every session gets a distinct id', new Set(ids).size, ids.length);
+ok('no session is left open after the last disconnect', !S.isSessionOpen());
+ok('the open-session key is cleared', !localStorage.getItem('nova_active_session'));
+
+window.renderStats();
+eq('the four totals are shown', document.querySelectorAll('#stats-body .stat-tile').length, 4);
+eq('the chart has one bar per day', document.querySelectorAll('#stats-body .chart-bar').length, 14);
+eq('every session is listed', document.querySelectorAll('#stats-body .session-row').length, 3);
+eq('the ranking covers every drill played', document.querySelectorAll('#stats-body .rank-row').length, 3);
+ok('the most played drill is ranked first',
+   document.querySelector('#stats-body .rank-name').textContent === 'Push(B)',
+   document.querySelector('#stats-body .rank-name').textContent);
+eq('totals sum the log', S.getTotals().drills, 4);
+eq('ball totals sum the log', S.getTotals().balls, 240);
+
+// Delete exactly one row, the way a user does, by clicking its button.
+const sessionRows = [...document.querySelectorAll('#stats-body .session-row')];
+sessionRows[0].querySelector('.session-del').click();
+eq('deleting a session removes exactly that one',
+   document.querySelectorAll('#stats-body .session-row').length, 2);
+eq('and the totals follow it', S.getTotals().balls, 200);
+eq('and the ranking is re-derived', S.getDrillRanking()[0].count, 2);
+ok('nothing spilled sideways after the redraw',
+   document.documentElement.scrollWidth <= window.innerWidth + 1);
+
+const smallStats = [];
+statsBody.querySelectorAll('button').forEach(b => {
+    const r = b.getBoundingClientRect();
+    if (r.height > 0 && r.height < 40) smallStats.push(`${b.className} ${Math.round(r.height)}px`);
+});
+ok('every statistics control is a usable tap target', smallStats.length === 0, smallStats.join(', '));
+
+// The statistics screen is new UI in all four themes, so it owes the same
+// WCAG AA check the preset UI gets above.
+const statsTheme = document.documentElement.getAttribute('data-theme');
+const statsContrastFails = [];
+for (const theme of ['standard', 'ocean', 'forest', 'night']) {
+    document.documentElement.setAttribute('data-theme', theme);
+    statsBody.querySelectorAll('*').forEach(el => {
+        if (!hasOwnText(el)) return;
+        if (el.disabled || el.closest('[disabled]')) return;
+        const cs = getComputedStyle(el);
+        const fg = parseC(cs.color);
+        if (!fg) return;
+        const r = contrast(fg.slice(0, 3), backdrop(el));
+        const px = parseFloat(cs.fontSize);
+        const need = (px >= 24 || (px >= 18.66 && parseInt(cs.fontWeight) >= 700)) ? 3 : 4.5;
+        if (r < need) statsContrastFails.push(`[${theme}] ${el.className || el.tagName} "${el.textContent.trim().slice(0, 18)}" ${r.toFixed(2)}:1`);
+    });
+}
+document.documentElement.setAttribute('data-theme', statsTheme || 'standard');
+ok('every statistics label meets WCAG AA in all four themes', statsContrastFails.length === 0,
+   statsContrastFails.slice(0, 6).join(' | '));
+
+// A session left open by a reload is sealed on the next start, not lost.
+S.beginSession();
+S.noteSessionDrill('loop(1)');
+S.noteSessionBalls(7);
+const beforeReload = S.getSessions().length;
+S.initStats();
+eq('a session interrupted by a reload is recovered', S.getSessions().length, beforeReload + 1);
+ok('and is closed rather than left hanging', !S.isSessionOpen());
+
+// localStorage is user-writable and survives app versions, so junk in the key
+// must cost the history and nothing else.
+localStorage.setItem('nova_sessions', '{"not":"an array"}');
+S.initStats();
+eq('unparseable history is dropped, not fatal', S.getSessions().length, 0);
+localStorage.setItem('nova_sessions', '[null,{"startedAt":"x"},7,{"startedAt":1,"drills":-5}]');
+S.initStats();
+eq('individual junk entries are skipped', S.getSessions().length, 1);
+eq('and a negative drill count is clamped', S.getTotals().drills, 0);
+
+S.clearSessions();
+window.openStatsView();
+ok('the empty state returns once the log is cleared', !!document.querySelector('#stats-body .stats-empty'));
+
+// Escape must close the topmost screen only: Settings has to be open
+// underneath first, which section 18 left closed via its Back button.
+window.openSettings();
+window.openStatsFromSettings();
+ok('statistics sits on top of settings',
+   !statsView.hasAttribute('hidden') && !view.hasAttribute('hidden'));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+ok('escape closes statistics', statsView.hasAttribute('hidden'));
+ok('escape leaves settings open underneath', !view.hasAttribute('hidden'));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+ok('a second escape closes settings', view.hasAttribute('hidden'));
+
+// The delete-all button is behind a confirm(), which headless Chrome dismisses
+// by default, so the guard is stubbed here rather than worked around.
+const realConfirm = window.confirm;
+window.confirm = () => true;
+S.beginSession(); S.noteSessionDrill('push(b)'); S.endSession();
+window.openStatsView();
+window.deleteAllSessions();
+eq('delete all empties the log', S.getSessions().length, 0);
+window.confirm = realConfirm;
+window.closeStatsView();
+
+/* ---- 20. connecting to the robot ---- */
 // The regression this guards: the app used to add the notify listener AFTER
 // awaiting startNotifications(). The robot pushes its serial the moment
 // notifications switch on, so that packet was dropped and the handshake could

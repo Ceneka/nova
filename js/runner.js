@@ -1,4 +1,5 @@
 import { currentDrills, selectedLevel, runMode, appStats, setLastPlayed } from './state.js';
+import { noteSessionDrill, noteSessionBalls } from './stats.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { log, showToast, clamp, toggleBodyScroll } from './utils.js';
 import { updateStatsUI, updateLastPlayedHighlight } from './ui.js';
@@ -91,6 +92,7 @@ export function beginDrillExecution() {
     // --- FIX: Increment Drill Count ONCE per session, not per rep ---
     appStats.drills += 1;
     localStorage.setItem('nova_stats', JSON.stringify(appStats));
+    noteSessionDrill(drillName); // ...and record it in the training history
     updateStatsUI();
     // ---------------------------------------------------------------
 
@@ -181,6 +183,7 @@ async function runIteration() {
     // --- FIX: Only increment BALLS here ---
     appStats.balls += balls.length;
     localStorage.setItem('nova_stats', JSON.stringify(appStats));
+    noteSessionBalls(balls.length); // ...and in the training history
     updateStatsUI();
     // --------------------------------------
 

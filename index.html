@@ -2,8 +2,24 @@
 <html lang="en" data-theme="standard">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- viewport-fit=cover lets the installed app draw under the status bar and
+         notch; css/style.css pads it back out with env(safe-area-inset-*). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Nova Drill Control</title>
+
+    <!-- Installable app. The manifest carries one static theme_color, so
+         js/pwa.js rewrites the meta tag below to follow the chosen theme. -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#f5f6fa">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+    <!-- iOS ignores the manifest for these three; ignored elsewhere. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Nova">
+
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -132,6 +148,24 @@
             <h1>Settings</h1>
         </header>
         <div class="settings-body" id="settings-body"></div>
+    </div>
+</div>
+
+<!-- Statistics: a full screen above Settings, reached from a row in Settings.
+     Same treatment as #settings-view, and later in the file so it stacks on
+     top of it. -->
+<div id="stats-view" class="stats-view" hidden>
+    <div class="settings-shell">
+        <header class="settings-header">
+            <button class="settings-back" onclick="window.closeStatsView()" aria-label="Back to settings">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span>Settings</span>
+            </button>
+            <h1>Statistics</h1>
+        </header>
+        <div class="settings-body" id="stats-body"></div>
     </div>
 </div>
 

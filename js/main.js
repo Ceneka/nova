@@ -15,6 +15,8 @@ import {
     selectedLevel 
 } from './state.js';
 
+import { initStats } from './stats.js';
+
 import { 
     connectDevice, 
     disconnectDevice, 
@@ -39,11 +41,17 @@ import {
 
 import { showToast } from './utils.js';
 
+// Registers the service worker and the install prompt
+import { registerServiceWorker } from './pwa.js';
+
 // Registers the window.* preset handlers used by index.html
 import './presetUi.js';
 
 // Registers the window.* settings-screen handlers
 import './settingsUi.js';
+
+// Registers the window.* statistics-screen handlers
+import './statsUi.js';
 
 import { 
     startDrillSequence, 
@@ -58,9 +66,13 @@ import { downloadDrill } from './cloud.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initData();
+    initStats(); // seals any session a previous page left open
     renderDrillButtons();
     updateStatsUI();
     setupEventListeners();
+    // Last, and deliberately so: the precache competes for the same connection
+    // as the app's own modules, and the app has to boot first either way.
+    registerServiceWorker();
     console.log("Nova Drill Control: Modules Loaded");
 });
 

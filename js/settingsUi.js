@@ -1,7 +1,9 @@
 import { getPresets } from './presets.js';
 import { appStats, saveAsDefault, resetToDefault, resetStats, factoryReset } from './state.js';
+import { getTotals } from './stats.js';
 import { setTheme } from './ui.js';
 import { toggleBodyScroll } from './utils.js';
+import { isStatsOpen, closeStatsView } from './statsUi.js';
 
 /**
  * Settings is a full screen rather than a modal: it is the one place a user
@@ -62,6 +64,7 @@ export function renderSettings() {
 
     const active = currentTheme();
     const presetCount = getPresets().length;
+    const sessionCount = getTotals().sessions;
 
     const themeCards = THEMES.map(t => `
         <button class="theme-card ${t.id === active ? 'active' : ''}"
@@ -137,11 +140,22 @@ export function renderSettings() {
         </section>
 
         <section class="settings-section">
+            <div class="settings-section-title">Statistics</div>
+            <div class="settings-row" data-row="open-stats">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">Training history</div>
+                    <div class="settings-row-desc">${sessionCount} session${sessionCount === 1 ? '' : 's'} recorded.</div>
+                </div>
+                <button class="settings-btn" onclick="window.openStatsFromSettings()">Open</button>
+            </div>
+        </section>
+
+        <section class="settings-section">
             <div class="settings-section-title">Data</div>
             <div class="settings-row" data-row="reset-stats">
                 <div class="settings-row-main">
                     <div class="settings-row-title">Reset statistics</div>
-                    <div class="settings-row-desc">${appStats.balls} balls &middot; ${appStats.drills} drills counted so far.</div>
+                    <div class="settings-row-desc danger-text">${appStats.balls} balls &middot; ${appStats.drills} drills &middot; clears the history too.</div>
                 </div>
                 <button class="settings-btn" onclick="window.resetStats()">Reset</button>
             </div>
@@ -170,9 +184,16 @@ export function handlePresetImportPick() {
     document.getElementById('preset-file-input')?.click();
 }
 
-// Escape closes Settings, matching every other overlay in the app.
+// Escape closes the topmost full screen, matching every other overlay in the
+// app. This is the only Escape handler in the stack: Statistics sits above
+// Settings, and two listeners would both fire on one keypress. It cannot live
+// in statsUi.js either, because Settings imports that module - its dependency
+// is evaluated first, so a listener there would close Statistics before this
+// one got to look, and one Escape would close both.
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && open) closeSettings();
+    if (e.key !== 'Escape') return;
+    if (isStatsOpen()) { closeStatsView(); return; }
+    if (open) closeSettings();
 });
 
 // The preset count and the statistics line both go stale while this screen is

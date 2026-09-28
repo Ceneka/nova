@@ -2,6 +2,10 @@ import { SERVICE_UUID, UUID_S, UUID_N, UUID_W, SALT, MSG_DONE } from './constant
 import { log, showToast, MD5, clamp } from './utils.js';
 import { handleDone } from './runner.js';
 import { startSession } from './state.js'; // <--- ADDED IMPORT
+// Aliased: state.js already has a startSession() that snapshots the counters
+// for the summary modal. These two are the start/end of the *stored* training
+// session, and they happen at exactly the same two moments.
+import { beginSession as beginStatsSession, endSession as endStatsSession } from './stats.js';
 
 export const bleState = {
     isConnected: false,
@@ -165,6 +169,10 @@ export function disconnectDevice() {
 
 function onDisconnect() {
     clearWatchdog();
+    // Every path that ends a connection funnels through here, including an
+    // unexpected drop, so this is the one place the session has to be sealed.
+    // It is a no-op when no session was ever opened (a failed connect).
+    endStatsSession();
     bleState.device = null;
     bleState.writeChar = null;
     bleState.handshakeState = 'disconnected';
@@ -215,6 +223,7 @@ function onNotify(e) {
         clearWatchdog();
         bleState.handshakeState = "ready";
         startSession(); // <--- ADDED: Capture stats snapshot on connect
+        beginStatsSession(); // Open the stored training session (js/stats.js)
         log("Ready");
         showToast("Connected");
         setPhase('ready', 'Connected');

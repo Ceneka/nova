@@ -37,6 +37,8 @@ js/
   ball.js           the ball array: layout, RPM maths, limits   <- read this
   presets.js        ball preset model, expansion, file formats   <- read this
   presetUi.js       preset picker + preset editor UI
+  stats.js          training history: session log + selectors    <- read this
+  statsUi.js        the statistics screen
   settingsUi.js     full-screen settings view (themes, presets, data)
   editor.js         drill editor: renders ball cards, handles edits
   runner.js         plays a drill over Bluetooth
@@ -113,6 +115,65 @@ rather than snapping back to fixed values.
 `MAX_STEPS_PER_DRILL` (20) is enforced on insert only — the manual "+" button
 in the editor is not capped, as before.
 
+## Training history
+
+`nova_stats` is two lifetime counters and always was. `js/stats.js` adds a log
+of **sessions** on top of it, and `js/statsUi.js` renders the statistics
+screen.
+
+**A session is one robot connection**: handshake completes → link drops. Every
+drill started in between folds into that one entry, so the history reads as
+"14 drills last Tuesday" rather than 14 near-identical rows. `bluetooth.js`
+opens the session on handshake-ready and seals it in `onDisconnect()`, which is
+the single funnel for both expected and unexpected disconnects.
+
+Rules that have bitten people before:
+
+- **The open session is written to `nova_active_session` on every drill**, not
+  held in memory. A reload, a crash or a phone locking mid-session must not
+  lose the training that actually happened; `initStats()` seals anything left
+  open on the next start, ending it at `lastActivity` so a tab left shut
+  overnight does not read as an all-nighter.
+- **Session ids are not `Date.now()`.** Disconnect/reconnect inside one
+  millisecond produced two sessions with the same id, and `deleteSession()`
+  then deleted *both*. `nextId()` nudges the id forward instead. There is a
+  check for this; it was a real bug.
+- **Nothing in `stats.js` throws.** Stats are the least important data the app
+  holds, so a full or hand-edited `localStorage` costs the history and nothing
+  else. It must never break a drill run.
+- **Every entry is treated as hostile input.** `normalize()` drops records
+  without a numeric `startedAt` and clamps a negative drill count.
+- **The totals, the chart and the ranking are all derived** from the stored
+  log on every render (`getTotals`, `getDailySeries`, `getDrillRanking`). Do
+  not cache or denormalise them: deleting one session has to move the totals
+  and the ranking too, and a second copy of the numbers is how that breaks.
+- `MAX_SESSIONS` (500) is ~100 KB, deliberately a fraction of the ~5 MB
+  budget that has to stay free for drills and presets.
+
+`resetStats()` in `state.js` clears the counters **and** the history — one
+"reset statistics", not two knobs that can disagree.
+
+### The statistics screen
+
+`#stats-view` is a full screen at `z-index: 160`: above Settings (150), below
+modals (200), reached from a **row in Settings** rather than the hamburger
+menu, per the rule that non-drill-action surfaces belong in Settings.
+
+Two traps here, both of which cost a debugging round:
+
+- **`openStatsView()` must remove `hidden`, `closeStatsView()` must put it
+  back.** `.stats-view` declares no `display` of its own, so without the
+  attribute it falls back to `display: block` and keeps covering the screen
+  beneath. This is the same bug that hit `closeSettings()`.
+- **Escape is handled in exactly one place, `settingsUi.js`.** It cannot live
+  in `statsUi.js`: Settings *imports* that module, so a listener there is
+  registered first, closes Statistics, and then Settings sees a closed
+  Statistics and closes itself too — one keypress, both screens.
+
+`--danger` is a *fill* colour (white text sits on top of it) and falls under
+4.5:1 as text in three of the four themes. Destructive labels use the new
+`--danger-ink`, which is per-theme and does clear AA.
+
 ## Conventions
 
 - **ES modules with relative paths, no extensions issue, no aliases.**
@@ -125,7 +186,8 @@ in the editor is not capped, as before.
   an import cycle.
 - **Storage keys**: `custom_drills`, `custom_data`, `drill_order`,
   `user_defaults`, `nova_stats`, `nova_theme_pref`, `nova_last_played`,
-  `nova_ball_presets`. `factoryReset()` wipes all of them.
+  `nova_ball_presets`, `nova_sessions`, `nova_active_session`.
+  `factoryReset()` wipes all of them.
 - **Styling**: CSS custom properties (`--primary`, `--surface`, `--danger`,
   …) so all four themes work for free. Never hardcode a colour in JS.
 - **Modals** all share `.modal-overlay` at `z-index: 200`; a nested modal must
@@ -178,7 +240,7 @@ the whole repo":
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 146 browser checks in `tests/integration.html`, driven through
+and the 177 browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -202,22 +264,23 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (146 checks, needs the HTTP server above):
+Browser integration (177 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(146) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(177) or FAIL(n)
 ```
 
 Open it in a normal browser to see each check. It drives the real editor, the
-real importer, the real exporter and the real settings screen; only the
-surrounding page chrome (the drill list, the menu) is stubbed, because the
-app modules expect those ids to exist.
+real importer, the real exporter, the real settings screen and the real
+statistics screen; only the surrounding page chrome (the drill list, the menu)
+is stubbed, because the app modules expect those ids to exist.
 
 It also enforces the UI rules that are easy to break by eye: no horizontal
 overflow, every control at least 32-40px tall, no icon relying on the SVG
-default paint, and WCAG AA contrast for the preset UI in all four themes.
+default paint, and WCAG AA contrast for the preset and statistics UI in all
+four themes.
 
 ### Bluetooth is tested with a fake robot
 
