@@ -43,7 +43,6 @@ import { showToast } from './utils.js';
 
 // Registers the service worker and the install prompt
 import { registerServiceWorker } from './pwa.js';
-
 // Registers the window.* preset handlers used by index.html
 import './presetUi.js';
 
@@ -62,9 +61,16 @@ import {
 
 import { downloadDrill } from './cloud.js';
 
+import { initI18n, applyI18n, t } from './i18n.js';
+
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
+    // First, and before anything renders: the drill list, the connection card
+    // and every Settings row all label themselves with t(), so a language
+    // decided here has to be decided before the first draw.
+    initI18n();
+    applyI18n();
     initData();
     initStats(); // seals any session a previous page left open
     renderDrillButtons();
@@ -134,7 +140,20 @@ function setupEventListeners() {
     document.addEventListener('stats-updated', () => {
         updateStatsUI();
     });
-    
+
+    // Switching language has to redraw everything that is currently on screen.
+    // applyI18n() handles the static markup that index.html ships; the rest is
+    // built at render time and is rebuilt here. Settings, Statistics, the
+    // editor and the preset sheet listen for the same event themselves - each
+    // module owns the drawing of its own screen, and only the drill list and
+    // the connection card are this module's business.
+    document.addEventListener('locale-changed', () => {
+        applyI18n();
+        renderDrillButtons();
+        updateDrillButtonStates();
+        updateStatsUI();
+    });
+
     document.addEventListener('connection-changed', () => {
         updateDrillButtonStates();
         const editorModal = document.getElementById('editor-modal');
@@ -202,7 +221,7 @@ window.stopRun = stopRun;
 
 window.handleDrillClick = (key, btn) => {
     if (!bleState.isConnected) {
-        showToast("Device not connected");
+        showToast(t('toast.notConnected'));
         return;
     }
     document.querySelectorAll('.btn-drill').forEach(b => b.classList.remove('running'));
@@ -262,7 +281,7 @@ window.performDownload = async () => {
     const code = codeInput.value.trim().toUpperCase();
 
     if (code.length !== 6) {
-        showToast("Invalid code (Must be 6 chars)");
+        showToast(t('toast.invalidCode'));
         return;
     }
 
@@ -270,16 +289,16 @@ window.performDownload = async () => {
     // UPDATED LIMIT: 100
     if (userCustomDrills[selectedDownloadCat].length >= 100) {
         const catChar = selectedDownloadCat.split('-')[1].toUpperCase();
-        showToast(`Bank ${catChar} is full!`);
+        showToast(t('toast.bankFull', { bank: catChar }));
         return;
     }
 
-    showToast("Searching...");
+    showToast(t('toast.searching'));
 
     try {
         const data = await downloadDrill(code);
         if (!data) {
-            showToast("Code not found");
+            showToast(t('toast.codeNotFound'));
             return;
         }
 
@@ -312,11 +331,11 @@ window.performDownload = async () => {
         const tabBtn = document.querySelector(`.tab-btn[onclick*="${selectedDownloadCat}"]`);
         if (tabBtn) switchTab(selectedDownloadCat, tabBtn);
 
-        showToast(`Imported to ${catChar}`);
+        showToast(t('toast.importedTo', { bank: catChar }));
         toggleMenu(); // Close main menu if it was open behind modal
 
     } catch (e) {
         console.error(e);
-        showToast("Download Error");
+        showToast(t('toast.downloadError'));
     }
 };

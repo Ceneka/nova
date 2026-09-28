@@ -6,6 +6,7 @@ import { startSession } from './state.js'; // <--- ADDED IMPORT
 // for the summary modal. These two are the start/end of the *stored* training
 // session, and they happen at exactly the same two moments.
 import { beginSession as beginStatsSession, endSession as endStatsSession } from './stats.js';
+import { t } from './i18n.js';
 
 export const bleState = {
     isConnected: false,
@@ -13,7 +14,7 @@ export const bleState = {
     // UI-facing lifecycle: disconnected | picking | connecting |
     // authenticating | ready | error
     phase: 'disconnected',
-    statusText: 'Disconnected',
+    statusText: t('status.disconnected'),
     device: null,
     writeChar: null,
     handshakeState: "disconnected"
@@ -57,15 +58,15 @@ function clearWatchdog() {
 function describeConnectError(e) {
     const msg = (e && e.message) || String(e);
     if (/already connected/i.test(msg)) {
-        return 'That robot is still connected to another tab. Disconnect it and try again.';
+        return t('ble.alreadyConnected');
     }
     if (/NotFoundError/i.test(e && e.name)) {
-        return 'That device does not look like a Nova robot.';
+        return t('ble.notNova');
     }
     if (/write channel|notify channel|service/i.test(msg)) {
-        return 'The robot answered but did not offer the Nova service. Check you picked the right device.';
+        return t('ble.noService');
     }
-    return `Could not connect: ${msg}`;
+    return t('ble.generic', { reason: msg });
 }
 
 function failConnect(message) {
@@ -83,14 +84,14 @@ function failConnect(message) {
     bleState.handshakeState = 'disconnected';
 
     log("Connect Error: " + message);
-    setPhase('error', 'Connection failed');
+    setPhase('error', t('status.failed'));
     showToast(message);
 }
 
 export async function connectDevice() {
     if (bleState.isConnected || bleState.isConnecting) return;
 
-    setPhase('picking', 'Pick your robot…');
+    setPhase('picking', t('status.picking'));
     log("Scanning...");
 
     let device;
@@ -104,9 +105,9 @@ export async function connectDevice() {
         // Dismissing the chooser is a normal thing to do, not a failure.
         if (e && e.name === 'NotFoundError') {
             log("Device picker dismissed");
-            setPhase('disconnected', 'Disconnected');
+            setPhase('disconnected', t('status.disconnected'));
         } else {
-            failConnect('Could not open the device picker');
+            failConnect(t('ble.pickerFailed'));
         }
         return;
     }
@@ -114,8 +115,8 @@ export async function connectDevice() {
     device.addEventListener('gattserverdisconnected', onDisconnect);
     bleState.device = device;
 
-    setPhase('connecting', 'Connecting…');
-    startWatchdog(CONNECT_TIMEOUT, 'The robot did not answer. Move it closer, make sure it is on, then try again.');
+    setPhase('connecting', t('status.connecting'));
+    startWatchdog(CONNECT_TIMEOUT, t('ble.noAnswer'));
 
     try {
         const server = await device.gatt.connect();
@@ -146,8 +147,8 @@ export async function connectDevice() {
         // while handshakeState is still "disconnected" matches no branch and
         // is thrown away - the same "nothing happened" symptom.
         bleState.handshakeState = "handshake";
-        setPhase('authenticating', 'Authorising…');
-        startWatchdog(HANDSHAKE_TIMEOUT, 'Connected to the robot but it did not finish authorising. Try again.');
+        setPhase('authenticating', t('status.authorising'));
+        startWatchdog(HANDSHAKE_TIMEOUT, t('ble.noAuthorise'));
 
         await notifyChar.startNotifications();
         await sendPacket([0x07, 0, 0, 0]); // Start handshake
@@ -178,13 +179,13 @@ function onDisconnect() {
     bleState.handshakeState = 'disconnected';
 
     if (teardownExpected) {
-        setPhase('disconnected', 'Disconnected');
+        setPhase('disconnected', t('status.disconnected'));
         return;
     }
 
     log("Disconnected");
-    showToast("Disconnected");
-    setPhase('disconnected', 'Disconnected');
+    showToast(t('status.disconnected'));
+    setPhase('disconnected', t('status.disconnected'));
 }
 
 export function sendPacket(data) {
@@ -225,8 +226,8 @@ function onNotify(e) {
         startSession(); // <--- ADDED: Capture stats snapshot on connect
         beginStatsSession(); // Open the stored training session (js/stats.js)
         log("Ready");
-        showToast("Connected");
-        setPhase('ready', 'Connected');
+        showToast(t('status.connected'));
+        setPhase('ready', t('status.connected'));
     }
 
     // Drill execution callback

@@ -5,7 +5,7 @@
     <!-- viewport-fit=cover lets the installed app draw under the status bar and
          notch; css/style.css pads it back out with env(safe-area-inset-*). -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Nova Drill Control</title>
+    <title data-i18n="app.title">Nova Drill Control</title>
 
     <!-- Installable app. The manifest carries one static theme_color, so
          js/pwa.js rewrites the meta tag below to follow the chosen theme. -->
@@ -27,36 +27,36 @@
 <div class="container">
     
     <header>
-        <h1>Nova Drill Control</h1>
+        <h1 data-i18n="app.title">Nova Drill Control</h1>
         <div class="menu-btn" onclick="toggleMenu()">
             <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </div>
     </header>
 
     <div id="theme-menu" class="theme-menu">
-        <div class="menu-title">Drill</div>
+        <div class="menu-title" data-i18n="menu.drill">Drill</div>
         <div class="theme-item" onclick="window.handleDownloadDialog()">
-            <span class="color-preview" style="background:#0984e3"></span> Download Drill
+            <span class="color-preview" style="background:#0984e3"></span> <span data-i18n="menu.downloadDrill">Download Drill</span>
         </div>
 
-        <div class="theme-item" onclick="exportCustomDrills()"><span class="color-preview" style="background:var(--text)"></span> Export Drills</div>
-        <div class="theme-item" onclick="document.getElementById('csv-input').click()"><span class="color-preview" style="background:var(--text)"></span> Import Drills</div>
+        <div class="theme-item" onclick="exportCustomDrills()"><span class="color-preview" style="background:var(--text)"></span> <span data-i18n="menu.exportDrills">Export Drills</span></div>
+        <div class="theme-item" onclick="document.getElementById('csv-input').click()"><span class="color-preview" style="background:var(--text)"></span> <span data-i18n="menu.importDrills">Import Drills</span></div>
 
         <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
 
-        <div class="theme-item" onclick="window.openSettings()"><span class="color-preview" style="background:#f5a623"></span> Settings</div>
-        <div class="theme-item" onclick="window.openAboutModal()">About</div>
+        <div class="theme-item" onclick="window.openSettings()"><span class="color-preview" style="background:#f5a623"></span> <span data-i18n="menu.settings">Settings</span></div>
+        <div class="theme-item" onclick="window.openAboutModal()" data-i18n="menu.about">About</div>
     </div>
     
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVUpload(event)">
     <input type="file" id="preset-file-input" accept=".json,.csv" style="display:none" onchange="handlePresetFileUpload(event)">
 
     <div class="settings-card">
-        <div id="status-text">Disconnected</div>
-        <button id="btn-connect" class="btn-connect">Connect</button>
+        <div id="status-text" data-i18n="status.disconnected">Disconnected</div>
+        <button id="btn-connect" class="btn-connect" data-i18n="action.connect">Connect</button>
 
         <div class="control-group" id="grp-difficulty">
-            <div style="text-align:center; font-size:0.65rem; color:var(--text-light); margin-bottom:5px; font-weight:700;">DIFFICULTY LEVEL</div>
+            <div style="text-align:center; font-size:0.65rem; color:var(--text-light); margin-bottom:5px; font-weight:700;" data-i18n="label.difficulty">DIFFICULTY LEVEL</div>
             <div class="level-select">
                 <div class="lvl-dot active" onclick="setLevel(1, this)">1</div>
                 <div class="lvl-dot" onclick="setLevel(2, this)">2</div>
@@ -66,56 +66,56 @@
 
         <div class="control-pill" style="margin-bottom: 10px; box-shadow:none; background:transparent; padding:0;">
             <div class="mode-switch">
-                <div class="mode-option active" onclick="setMode('reps', this)">Reps</div>
-                <div class="mode-option" onclick="setMode('time', this)">Time</div>
+                <div class="mode-option active" onclick="setMode('reps', this)" data-i18n="mode.reps">Reps</div>
+                <div class="mode-option" onclick="setMode('time', this)" data-i18n="mode.time">Time</div>
             </div>
         </div>
 
         <div class="controls-row">
             <div class="control-pill" id="ui-reps">
-                <label>Count</label>
+                <label data-i18n="label.count">Count</label>
                 <input type="number" id="input-reps" value="10">
             </div>
             <div class="control-pill hidden" id="ui-time">
-                <label>Time (s)</label>
+                <label data-i18n="label.timeSeconds">Time (s)</label>
                 <input type="number" id="input-time" value="60" step="10">
             </div>
                 <div class="control-pill">
-                    <label>Pause (s)</label> <input type="number" id="input-pause" value="0.0" step="0.1">
+                    <label data-i18n="label.pauseSeconds">Pause (s)</label> <input type="number" id="input-pause" value="0.0" step="0.1">
                 </div>
         </div>
     </div>
 
-    <div class="section-label">Drill Selection</div>
+    <div class="section-label" data-i18n="label.drillSelection">Drill Selection</div>
     
     <div class="tabs-container">
         <div class="tab-btn active" onclick="switchTab('basic', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Basic
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.basic">Basic</span>
         </div>
         <div class="tab-btn" onclick="switchTab('combined', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Combined
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.combined">Combined</span>
         </div>
         <div class="tab-btn" onclick="switchTab('complex', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Complex
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.complex">Complex</span>
         </div>
         
         <div class="tab-btn" 
              onclick="switchTab('custom-a', this)"
              ondrop="window.handleTabDrop(event, 'custom-a')" 
              ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Custom A
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-a">Custom A</span>
         </div>
         <div class="tab-btn" 
              onclick="switchTab('custom-b', this)"
              ondrop="window.handleTabDrop(event, 'custom-b')" 
              ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Custom B
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-b">Custom B</span>
         </div>
         <div class="tab-btn" 
              onclick="switchTab('custom-c', this)"
              ondrop="window.handleTabDrop(event, 'custom-c')" 
              ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> Custom C
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-c">Custom C</span>
         </div>
     </div>
 
@@ -128,7 +128,7 @@
 
     <div class="footer-row">
         <div id="stats-display">Balls: 0 | Drills: 0</div>
-        <div>Version 2.4a</div>
+        <div data-i18n="footer.version">Version 2.4a</div>
     </div>
     
     <div id="log" class="log-box"></div>
@@ -139,13 +139,13 @@
 <div id="settings-view" class="settings-view" hidden>
     <div class="settings-shell">
         <header class="settings-header">
-            <button class="settings-back" onclick="window.closeSettings()" aria-label="Back to drills">
+            <button class="settings-back" onclick="window.closeSettings()" data-i18n-attr="aria-label:a11y.backToDrills">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
-                <span>Drills</span>
+                <span data-i18n="menu.drill">Drills</span>
             </button>
-            <h1>Settings</h1>
+            <h1 data-i18n="menu.settings">Settings</h1>
         </header>
         <div class="settings-body" id="settings-body"></div>
     </div>
@@ -157,36 +157,36 @@
 <div id="stats-view" class="stats-view" hidden>
     <div class="settings-shell">
         <header class="settings-header">
-            <button class="settings-back" onclick="window.closeStatsView()" aria-label="Back to settings">
+            <button class="settings-back" onclick="window.closeStatsView()" data-i18n-attr="aria-label:a11y.backToSettings">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
-                <span>Settings</span>
+                <span data-i18n="menu.settings">Settings</span>
             </button>
-            <h1>Statistics</h1>
+            <h1 data-i18n="menu.statistics">Statistics</h1>
         </header>
         <div class="settings-body" id="stats-body"></div>
     </div>
 </div>
 
-<div id="toast">Notification</div>
+<div id="toast" data-i18n="toast.default">Notification</div>
 
 <div id="editor-modal" class="modal-overlay">
     <div class="modal">
         <div class="modal-header">
             <div class="header-top">
                 <div class="title-container" onclick="window.handleRenameDrill()">
-                    <span id="editor-drill-name">Drill Name</span>
+                    <span id="editor-drill-name" data-i18n="editor.drillName">Drill Name</span>
                     <span id="editor-drill-edit-icon">✎</span>
                 </div>
                 <div class="modal-close" onclick="closeEditor()">×</div>
             </div>
             <div class="header-actions">
-                <button class="btn-header-share" onclick="window.handleShareDrill()" title="Share Drill">
+                <button class="btn-header-share" onclick="window.handleShareDrill()" data-i18n-attr="title:editor.shareDrill">
                     <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
                 </button>
                 <label class="random-toggle-container">
-                    <span class="toggle-label">Random</span>
+                    <span class="toggle-label" data-i18n="editor.random">Random</span>
                     <input type="checkbox" id="chk-drill-random">
                     <div class="toggle-switch"></div>
                 </label>
@@ -194,7 +194,7 @@
         </div>
         <div id="editor-body" class="modal-body"></div>
         <div class="modal-footer">
-            <button class="btn-modal btn-delete-drill" onclick="window.handleDeleteDrill()" title="Delete">
+            <button class="btn-modal btn-delete-drill" onclick="window.handleDeleteDrill()" data-i18n-attr="title:a11y.deleteDrill">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3.5 6h17"></path>
                     <path d="M8.7 6V4.3A1.3 1.3 0 0 1 10 3h4a1.3 1.3 0 0 1 1.3 1.3V6"></path>
@@ -202,9 +202,9 @@
                     <path d="M10 10.5v6"></path><path d="M14 10.5v6"></path>
                 </svg>
             </button>
-            <button class="btn-modal btn-test-combo" onclick="window.handleTestCombo()">Test drill</button>
-            <button class="btn-modal btn-save-as" onclick="window.handleSaveAsDrill()">Save As</button>
-            <button class="btn-modal btn-save" onclick="saveDrillChanges()">Save</button>
+            <button class="btn-modal btn-test-combo" onclick="window.handleTestCombo()" data-i18n="editor.testDrill">Test drill</button>
+            <button class="btn-modal btn-save-as" onclick="window.handleSaveAsDrill()" data-i18n="action.saveAs">Save As</button>
+            <button class="btn-modal btn-save" onclick="saveDrillChanges()" data-i18n="action.save">Save</button>
         </div>
     </div>
 </div>
@@ -219,12 +219,12 @@
                 </svg>
                 <div class="center-text">
                     <div class="count-val" id="run-display">4</div>
-                    <div class="status-label" id="run-label">GET READY</div>
+                    <div class="status-label" id="run-label" data-i18n="run.getReady">GET READY</div>
                 </div>
             </div>
             <div class="run-controls">
-                <button id="btn-pause" class="btn-run-ctrl btn-pause" onclick="togglePause()">PAUSE</button>
-                <button class="btn-run-ctrl btn-stop-run" onclick="stopRun()">STOP</button>
+                <button id="btn-pause" class="btn-run-ctrl btn-pause" onclick="togglePause()" data-i18n="run.pause">PAUSE</button>
+                <button class="btn-run-ctrl btn-stop-run" onclick="stopRun()" data-i18n="run.stop">STOP</button>
             </div>
         </div>
     </div>
@@ -233,26 +233,26 @@
 <div id="download-modal" class="modal-overlay">
     <div class="modal" style="height:auto; min-height:300px;">
         <div class="modal-header">
-            <div class="modal-title">Import Drill</div>
+            <div class="modal-title" data-i18n="modal.importDrill">Import Drill</div>
             <div class="modal-close" onclick="window.closeDownloadModal()">×</div>
         </div>
         <div class="modal-body" style="display:flex; flex-direction:column; gap:20px; padding-top:15px;">
             <div class="control-pill" style="box-shadow:none; border:1px solid var(--border);">
-                <label>Share Code</label>
-                <input type="text" id="dl-code" placeholder="ABC123" maxlength="6" 
+                <label data-i18n="label.shareCode">Share Code</label>
+                <input type="text" id="dl-code" data-i18n-attr="placeholder:placeholder.shareCode" placeholder="ABC123" maxlength="6" 
                        style="text-align:center; letter-spacing:4px; text-transform:uppercase; font-size:1.6rem; color:var(--primary); font-weight:800;">
             </div>
             <div>
-                <div class="section-label" style="text-align:center; margin-bottom:8px;">Select Destination</div>
+                <div class="section-label" style="text-align:center; margin-bottom:8px;" data-i18n="label.selectDestination">Select Destination</div>
                 <div class="mode-switch" id="dl-cat-switch">
-                    <div class="mode-option active" onclick="window.selectDlCategory('custom-a', this)">Custom A</div>
-                    <div class="mode-option" onclick="window.selectDlCategory('custom-b', this)">Custom B</div>
-                    <div class="mode-option" onclick="window.selectDlCategory('custom-c', this)">Custom C</div>
+                    <div class="mode-option active" onclick="window.selectDlCategory('custom-a', this)" data-i18n="tab.custom-a">Custom A</div>
+                    <div class="mode-option" onclick="window.selectDlCategory('custom-b', this)" data-i18n="tab.custom-b">Custom B</div>
+                    <div class="mode-option" onclick="window.selectDlCategory('custom-c', this)" data-i18n="tab.custom-c">Custom C</div>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-             <button class="btn-modal btn-save" onclick="window.performDownload()">Download & Import</button>
+             <button class="btn-modal btn-save" onclick="window.performDownload()" data-i18n="action.downloadImport">Download & Import</button>
         </div>
     </div>
 </div>
@@ -260,26 +260,26 @@
 <div id="save-as-modal" class="modal-overlay">
     <div class="modal" style="height:auto; min-height:300px;">
         <div class="modal-header">
-            <div class="modal-title">Save As New Drill</div>
+            <div class="modal-title" data-i18n="modal.saveAsNew">Save As New Drill</div>
             <div class="modal-close" onclick="window.closeSaveAsModal()">×</div>
         </div>
         <div class="modal-body" style="display:flex; flex-direction:column; gap:20px; padding-top:15px;">
             <div class="control-pill" style="box-shadow:none; border:1px solid var(--border);">
-                <label>Drill Name (Max 40)</label>
-                <input type="text" id="save-name" placeholder="My New Drill" maxlength="40" 
+                <label data-i18n="label.drillNameMax40">Drill Name (Max 40)</label>
+                <input type="text" id="save-name" data-i18n-attr="placeholder:placeholder.myNewDrill" placeholder="My New Drill" maxlength="40" 
                        style="text-align:center; font-size:1.2rem; color:var(--primary); font-weight:800; background:transparent;">
             </div>
             <div>
-                <div class="section-label" style="text-align:center; margin-bottom:8px;">Select Destination</div>
+                <div class="section-label" style="text-align:center; margin-bottom:8px;" data-i18n="label.selectDestination">Select Destination</div>
                 <div class="mode-switch" id="save-cat-switch">
-                    <div class="mode-option active" onclick="window.selectSaveCategory('custom-a', this)">Custom A</div>
-                    <div class="mode-option" onclick="window.selectSaveCategory('custom-b', this)">Custom B</div>
-                    <div class="mode-option" onclick="window.selectSaveCategory('custom-c', this)">Custom C</div>
+                    <div class="mode-option active" onclick="window.selectSaveCategory('custom-a', this)" data-i18n="tab.custom-a">Custom A</div>
+                    <div class="mode-option" onclick="window.selectSaveCategory('custom-b', this)" data-i18n="tab.custom-b">Custom B</div>
+                    <div class="mode-option" onclick="window.selectSaveCategory('custom-c', this)" data-i18n="tab.custom-c">Custom C</div>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-             <button class="btn-modal btn-save" onclick="window.performSaveAs()">Save Drill</button>
+             <button class="btn-modal btn-save" onclick="window.performSaveAs()" data-i18n="action.saveDrill">Save Drill</button>
         </div>
     </div>
 </div>
@@ -287,12 +287,12 @@
 <div id="preset-sheet" class="modal-overlay">
     <div class="modal" style="height:auto; max-height:90vh;">
         <div class="modal-header">
-            <div class="modal-title">Ball Presets</div>
+            <div class="modal-title" data-i18n="modal.ballPresets">Ball Presets</div>
             <div class="modal-close" onclick="window.closePresetSheet()">&times;</div>
         </div>
         <div class="modal-body" id="preset-list"></div>
         <div class="modal-footer">
-            <button class="btn-modal btn-preset-new" onclick="window.openPresetEditor(null)">+ New Preset</button>
+            <button class="btn-modal btn-preset-new" onclick="window.openPresetEditor(null)" data-i18n="action.newPreset">+ New Preset</button>
         </div>
     </div>
 </div>
@@ -300,12 +300,12 @@
 <div id="preset-modal" class="modal-overlay">
     <div class="modal" style="height:auto; max-height:90vh;">
         <div class="modal-header">
-            <div class="modal-title" id="preset-modal-title">New Preset</div>
+            <div class="modal-title" id="preset-modal-title" data-i18n="modal.newPreset">New Preset</div>
             <div class="modal-close" onclick="window.closePresetEditor()">&times;</div>
         </div>
         <div class="modal-body" id="preset-editor-body"></div>
         <div class="modal-footer">
-            <button class="btn-modal btn-delete-preset" onclick="window.deleteEditingPreset()" title="Delete preset">
+            <button class="btn-modal btn-delete-preset" onclick="window.deleteEditingPreset()" data-i18n-attr="title:a11y.deletePreset">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3.5 6h17"></path>
                     <path d="M8.7 6V4.3A1.3 1.3 0 0 1 10 3h4a1.3 1.3 0 0 1 1.3 1.3V6"></path>
@@ -313,7 +313,7 @@
                     <path d="M10 10.5v6"></path><path d="M14 10.5v6"></path>
                 </svg>
             </button>
-            <button class="btn-modal btn-save" onclick="window.savePresetEditor()">Save Preset</button>
+            <button class="btn-modal btn-save" onclick="window.savePresetEditor()" data-i18n="action.savePreset">Save Preset</button>
         </div>
     </div>
 </div>
@@ -321,14 +321,14 @@
 <div id="about-modal" class="modal-overlay">
     <div class="modal" style="height:auto; width:85%; max-width:320px;">
         <div class="modal-header">
-            <div class="modal-title">About</div>
+            <div class="modal-title" data-i18n="modal.about">About</div>
             <div class="modal-close" onclick="window.closeAboutModal()">×</div>
         </div>
         <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:15px; padding:20px 0;">
-            <h3 style="margin:0; color:var(--text);">Nova Drill Control</h3>
+            <h3 style="margin:0; color:var(--text);" data-i18n="app.title">Nova Drill Control</h3>
             <a href="https://github.com/olanga/nova" target="_blank" 
                style="color:var(--primary); font-weight:700; text-decoration:none; padding:10px 20px; border:2px solid var(--primary); border-radius:12px; transition:0.2s;">
-               View on GitHub
+               <span data-i18n="about.viewOnGithub">View on GitHub</span>
             </a>
         </div>
     </div>
@@ -337,29 +337,29 @@
 <div id="summary-modal" class="modal-overlay">
     <div class="modal" style="height:auto; width:90%; max-width:380px;">
         <div class="modal-header">
-            <div class="modal-title">Session Summary</div>
+            <div class="modal-title" data-i18n="modal.sessionSummary">Session Summary</div>
         </div>
         <div class="modal-body" style="display:flex; flex-direction:column; gap:15px; padding:15px 0;">
             <div style="text-align:center; color:var(--text-light); font-size:0.9rem; margin-bottom:10px;">
-                Training session complete!
+                <span data-i18n="summary.complete">Training session complete!</span>
             </div>
             <div style="display:flex; gap:10px; justify-content:center;">
                 <div class="control-pill">
-                    <label>Drills</label>
+                    <label data-i18n="unit.drills">Drills</label>
                     <div id="sum-drills-val" style="font-size:1.8rem; font-weight:800; color:var(--primary); line-height:1;">0</div>
                 </div>
                 <div class="control-pill">
-                    <label>Balls</label>
+                    <label data-i18n="unit.balls">Balls</label>
                     <div id="sum-balls-val" style="font-size:1.8rem; font-weight:800; color:var(--primary); line-height:1;">0</div>
                 </div>
                 <div class="control-pill">
-                    <label>Time</label>
+                    <label data-i18n="unit.time">Time</label>
                     <div id="sum-time-val" style="font-size:1.8rem; font-weight:800; color:var(--text); line-height:1;">0:00</div>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-             <button class="btn-modal btn-save" onclick="window.closeSummaryModal()">Close</button>
+             <button class="btn-modal btn-save" onclick="window.closeSummaryModal()" data-i18n="action.close">Close</button>
         </div>
     </div>
 </div>

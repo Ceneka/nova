@@ -13,25 +13,26 @@ import { bleState } from './bluetooth.js';
 import { makeBall } from './ball.js';
 import { showToast, formatDuration } from './utils.js'; 
 import { openEditor } from './editor.js';
+import { t, drillDisplayName } from './i18n.js';
 
 // --- NEW: Handle Create New Drill ---
 window.handleCreateNewDrill = (category) => {
     // UPDATED LIMIT: 100
     if (userCustomDrills[category].length >= 100) {
-        showToast("Category is full (Max 100)");
+        showToast(t('toast.categoryFull'));
         return;
     }
 
-    const newName = prompt("Enter Name for New Drill:");
+    const newName = prompt(t('prompt.newDrillName'));
     if (!newName) return;
 
     if (newName.length > 25) { 
-        showToast("Name too long (Max 25)"); 
+        showToast(t('toast.nameTooLong25')); 
         return; 
     }
     
     if (!/^[a-zA-Z0-9.\-#\[\]><\+\)\( ]+$/.test(newName)) { 
-        showToast("Invalid characters"); 
+        showToast(t('toast.invalidCharacters')); 
         return; 
     }
 
@@ -55,7 +56,7 @@ window.handleCreateNewDrill = (category) => {
     saveDrillsToStorage();
 
     renderDrillButtons();
-    showToast(`Created ${newName}`);
+    showToast(t('toast.created', { name: newName }));
     openEditor(newKey);
 };
 
@@ -88,7 +89,7 @@ window.handleTabDrop = (e, targetCat) => {
     
     // UPDATED LIMIT: 100
     if (userCustomDrills[targetCat].length >= 100) {
-        showToast(`Bank ${targetCat.split('-')[1].toUpperCase()} is full!`);
+        showToast(t('toast.bankFull', { bank: targetCat.split('-')[1].toUpperCase() }));
         return;
     }
 
@@ -113,7 +114,7 @@ window.handleTabDrop = (e, targetCat) => {
     saveDrillsToStorage();
 
     renderDrillButtons(); 
-    showToast(`Moved to ${targetChar}`);
+    showToast(t('toast.movedTo', { bank: targetChar }));
     
     const targetBtn = document.querySelector(`.tab-btn[onclick*="${targetCat}"]`);
     if(targetBtn) switchTab(targetCat, targetBtn);
@@ -130,7 +131,7 @@ export function renderDrillButtons() {
         if (drillOrder[cat]) {
             drillOrder[cat].forEach(key => {
                 if (!currentDrills[key]) return; 
-                createButton(container, key, formatDrillName(key), true, cat); 
+                createButton(container, key, drillDisplayName(key), true, cat);
             });
         }
     });
@@ -150,7 +151,7 @@ export function renderDrillButtons() {
         const addBtn = document.createElement('button');
         addBtn.className = 'btn-swap'; 
         addBtn.style.cssText = "width:40px; height:40px; color:var(--primary); border-color:var(--primary); font-size:1.2rem; box-shadow:0 2px 5px rgba(0,0,0,0.1);";
-        addBtn.title = "Create New Drill";
+        addBtn.title = t('a11y.createNewDrill');
         
         addBtn.innerHTML = `
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -204,7 +205,7 @@ function createButton(container, key, label, allowSort, category) {
         const grip = document.createElement('div');
         grip.className = 'drill-grab-handle';
         grip.innerHTML = '≡'; 
-        grip.title = "Drag to reorder";
+        grip.title = t('a11y.dragToReorder');
         
         btn.draggable = false; 
 
@@ -346,26 +347,26 @@ export function updateDrillButtonStates() {
         btnConnect.disabled = bleState.isConnecting;
 
         if (bleState.isConnected) {
-            btnConnect.textContent = "Disconnect";
+            btnConnect.textContent = t('action.disconnect');
             btnConnect.classList.add('connected');
-            statusText.textContent = "Connected";
+            statusText.textContent = t('status.connected');
             statusText.style.color = "#00b894";
         } else if (bleState.isConnecting) {
             // Previously the button did not change at all during the whole
             // attempt, so a connection that hung looked like no-op.
-            btnConnect.textContent = "Connecting…";
+            btnConnect.textContent = t('status.connecting');
             btnConnect.classList.remove('connected');
-            statusText.textContent = bleState.statusText || "Connecting…";
+            statusText.textContent = bleState.statusText || t('status.connecting');
             statusText.style.color = "var(--primary)";
         } else if (bleState.phase === 'error') {
-            btnConnect.textContent = "Retry";
+            btnConnect.textContent = t('action.retry');
             btnConnect.classList.remove('connected');
-            statusText.textContent = bleState.statusText || "Connection failed";
+            statusText.textContent = bleState.statusText || t('status.failed');
             statusText.style.color = "var(--danger)";
         } else {
-            btnConnect.textContent = "Connect";
+            btnConnect.textContent = t('action.connect');
             btnConnect.classList.remove('connected');
-            statusText.textContent = "Disconnected";
+            statusText.textContent = t('status.disconnected');
             statusText.style.color = "var(--text-light)";
         }
     }
@@ -373,7 +374,7 @@ export function updateDrillButtonStates() {
 
 export function updateStatsUI() {
     const el = document.getElementById('stats-display');
-    if(el) el.textContent = `Balls: ${appStats.balls} | Drills: ${appStats.drills}`;
+    if(el) el.textContent = t('footer.totals', { balls: appStats.balls, drills: appStats.drills });
 }
 
 export function toggleMenu() {
@@ -404,11 +405,6 @@ export function switchTab(catName, btn) {
     if(diffGroup) {
         diffGroup.style.display = ['custom-a', 'custom-b', 'custom-c'].includes(catName) ? 'none' : 'flex';
     }
-}
-
-function formatDrillName(key) {
-    if (key.startsWith('cust_')) return key; 
-    return key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 // --- NEW: About Modal Handlers ---

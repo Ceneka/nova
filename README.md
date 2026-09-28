@@ -47,7 +47,8 @@ shows whether the offline copy is ready yet.
   * **Fully customizable drills** Add and remove drills and balls. Share, export and import settings.
   * **Data Persistence:** Settings and drills saved to browser local storage.
   * **Themes:** 4 options, including dark mode.
-  * **Settings screen:** themes, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
+  * **Languages:** English and Spanish, switchable in Settings. The first visit follows your browser's language; after that the app remembers your choice.
+  * **Settings screen:** themes, language, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
   * **Statistics:** a stored history of every session you have trained, with totals, a 14-day chart, your most-played drills, and per-session delete.
   * **Installable:** add it to the home screen and it opens like a normal app — no browser, and no signal needed.
 
@@ -136,7 +137,8 @@ Work done here on top of the original, most of it driven by things the
 upstream app could not do or did not get right:
 
   * **Ball presets** — a library of named ball recipes dropped into any drill with placement and depth variations expanded, in their own JSON/CSV format so they cannot break the shared drill CSV.
-  * **Settings as a full screen** — themes, presets, statistics and data resets moved out of the hamburger menu, which now carries only drill actions.
+  * **Settings as a full screen** — themes, language, presets, statistics and data resets moved out of the hamburger menu, which now carries only drill actions.
+  * **Translations** — English and Spanish, with a hand-rolled i18n layer rather than a dependency, so the app still installs from a plain file download with no build step. Your drills, presets and shared CSV stay in the language you typed them in; only the interface around them is translated.
   * **Training history** — sessions logged per robot connection, with totals, a 14-day chart, a most-played ranking, and the ability to delete a single session or all of them.
   * **Fixes** — connecting silently doing nothing, the 20-drill category cap, the Settings back button, preset field overflow, and three identical-looking preset entry points in the editor.
   * **Installable PWA** — a web manifest, a service worker and a real icon set, so the app installs to the home screen and opens offline.

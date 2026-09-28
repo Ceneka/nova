@@ -1,4 +1,5 @@
 import { B, LIMITS, freqToBpm, maxSpinFor, maxScatterFor, normalizeSpin } from './ball.js';
+import { t, axisLabel } from './i18n.js';
 import {
     MAX_STEPS_PER_DRILL, getPresets, getPresetById, addPreset, updatePreset, deletePreset,
     resetPresetsToDefaults, normalizePreset, presetBallCount, standardPlacements, standardDepths,
@@ -61,8 +62,7 @@ function renderPresetSheet() {
 
     if (!all.length) {
         list.innerHTML = `<div class="preset-empty">
-            No presets yet.<br>
-            Create one here, or save any ball from the drill editor as a preset.
+            ${t('preset.empty')}
         </div>`;
         return;
     }
@@ -73,34 +73,34 @@ function renderPresetSheet() {
 
         const chips = [];
         if (p.placements.length) {
-            chips.push(`<span class="preset-chip preset-chip-axis">Placement</span>` +
-                p.placements.map(pl => `<span class="preset-chip placement">${esc(pl.label)} <b>${pl.drop}</b></span>`).join(''));
+            chips.push(`<span class="preset-chip preset-chip-axis">${t('preset.placement')}</span>` +
+                p.placements.map(pl => `<span class="preset-chip placement">${esc(axisLabel(pl.label))} <b>${pl.drop}</b></span>`).join(''));
         }
         if (p.depths.length) {
-            chips.push(`<span class="preset-chip preset-chip-axis">Depth</span>` +
-                p.depths.map(d => `<span class="preset-chip">${esc(d.label)} <b>${d.height}</b></span>`).join(''));
+            chips.push(`<span class="preset-chip preset-chip-axis">${t('preset.depth')}</span>` +
+                p.depths.map(d => `<span class="preset-chip">${esc(axisLabel(d.label))} <b>${d.height}</b></span>`).join(''));
         }
 
         const full = canAdd && free < needs;
         const dis = canAdd ? '' : 'disabled';
-        const title = !drillCtx.open ? 'Open a drill to add presets'
-            : free <= 0 ? `Drill is full (${drillCtx.max} balls)`
-            : full ? `Only ${free} ball${free === 1 ? '' : 's'} left in this drill` : '';
+        const title = !drillCtx.open ? t('preset.titleOpenDrill')
+            : free <= 0 ? t('preset.titleDrillFull', { max: drillCtx.max })
+            : full ? t('toast.onlyLeft', { n: free }) : '';
 
         return `
         <div class="preset-card">
             <div class="preset-card-top">
                 <div style="flex:1; min-width:0;">
                     <div class="preset-name">${esc(p.name)}</div>
-                    <div class="preset-sub">${esc(describePreset(p))} &middot; ${count} ball${count === 1 ? '' : 's'}</div>
+                    <div class="preset-sub">${esc(describePreset(p))} &middot; ${t('unit.countBalls', { n: count })}</div>
                 </div>
-                <button class="preset-edit-btn" onclick="window.openPresetEditor('${p.id}')" title="Edit preset">${ICON_EDIT}</button>
+                <button class="preset-edit-btn" onclick="window.openPresetEditor('${p.id}')" title="${t('preset.editTitle')}">${ICON_EDIT}</button>
             </div>
             ${chips.length ? `<div class="preset-chips">${chips.join('')}</div>` : ''}
             <div class="preset-actions">
-                <button class="btn-preset-add" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','single')">+ Ball</button>
-                <button class="btn-preset-add" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','variants')">Variants</button>
-                <button class="btn-preset-add solid" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','sequence')">Sequence</button>
+                <button class="btn-preset-add" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','single')">${t('preset.addBall')}</button>
+                <button class="btn-preset-add" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','variants')">${t('preset.variants')}</button>
+                <button class="btn-preset-add solid" ${dis} title="${esc(title)}" onclick="window.handleInsertPreset('${p.id}','sequence')">${t('preset.sequence')}</button>
             </div>
         </div>`;
     }).join('');
@@ -114,7 +114,7 @@ let isNew = false;
 function blankPreset() {
     return normalizePreset({
         id: '',
-        name: 'New preset',
+        name: t('preset.newName'),
         speed: 4, spin: 1.5, type: 'top',
         height: 50, drop: 0, bpm: 60, reps: 1, scatter: 0,
         placements: standardPlacements(0),
@@ -132,14 +132,14 @@ export function openPresetEditor(presetId, seedBall) {
 
     if (presetId) {
         const found = getPresetById(presetId);
-        if (!found) { showToast("Preset not found"); return; }
+        if (!found) { showToast(t('toast.presetNotFound')); return; }
         working = JSON.parse(JSON.stringify(found));
         isNew = false;
-        if (titleEl) titleEl.textContent = 'Edit Preset';
+        if (titleEl) titleEl.textContent = t('modal.editPreset');
     } else {
         working = seedBall ? seedFromBall(seedBall) : blankPreset();
         isNew = true;
-        if (titleEl) titleEl.textContent = 'New Preset';
+        if (titleEl) titleEl.textContent = t('modal.newPreset');
     }
 
     if (delBtn) delBtn.hidden = isNew;
@@ -154,7 +154,7 @@ export function openPresetEditor(presetId, seedBall) {
 function seedFromBall(ball) {
     return normalizePreset({
         id: '',
-        name: 'New preset',
+        name: t('preset.newName'),
         speed: ball[B.SPEED] ?? 5,
         spin: ball[B.SPIN] ?? 0,
         type: ball[B.TYPE] ?? 'top',
@@ -177,8 +177,8 @@ export function savePresetEditor() {
     if (!working) return;
 
     const name = (document.getElementById('pf-name')?.value || '').trim();
-    if (!name) { showToast("Give the preset a name"); return; }
-    if (name.length > 30) { showToast("Name too long (max 30)"); return; }
+    if (!name) { showToast(t('toast.givePresetName')); return; }
+    if (name.length > 30) { showToast(t('toast.nameTooLong30')); return; }
 
     working.name = name;
 
@@ -187,7 +187,7 @@ export function savePresetEditor() {
 
     closePresetEditor();
     document.dispatchEvent(new CustomEvent('presets-updated'));
-    showToast(`Preset "${name}" saved`);
+    showToast(t('toast.presetSaved', { name }));
 }
 
 function renderPresetForm() {
@@ -199,44 +199,48 @@ function renderPresetForm() {
     const spinStyle = p.type === 'back' ? 'background:var(--danger); color:#fff; border-radius:4px;' : '';
     const scatterMax = maxScatterFor(p.drop);
 
+    // The label input shows the STORED label, never axisLabel() of it. This
+    // field writes back to the model on every keystroke, so a translated
+    // display value would overwrite the user's "BH" with "Rev." the moment
+    // they touched it. The chips above are read-only and do get translated.
     const axisRows = (items, axis) => items.map((it, i) => `
         <div class="axis-row">
-            <input class="axis-label-input" type="text" maxlength="12" placeholder="Label" value="${esc(it.label)}"
+            <input class="axis-label-input" type="text" maxlength="12" placeholder="${t('placeholder.label')}" value="${esc(it.label)}"
                    oninput="window.handlePresetAxisInput(${i}, '${axis}', 'label', this.value)">
             <input class="axis-value-input" type="number" inputmode="decimal" step="0.5"
                    min="${axis === 'placement' ? -10 : -50}" max="${axis === 'placement' ? 10 : 100}"
                    value="${axis === 'placement' ? it.drop : it.height}"
                    onchange="window.handlePresetAxisInput(${i}, '${axis}', 'value', this.value)">
-            <button class="axis-del-btn" onclick="window.handlePresetAxisRemove(${i}, '${axis}')" title="Remove">${ICON_TRASH}</button>
+            <button class="axis-del-btn" onclick="window.handlePresetAxisRemove(${i}, '${axis}')" title="${t('action.remove')}">${ICON_TRASH}</button>
         </div>`).join('');
 
     body.innerHTML = `
-        <input class="preset-name-input" type="text" id="pf-name" maxlength="30" placeholder="Preset name" value="${esc(p.name)}"
+        <input class="preset-name-input" type="text" id="pf-name" maxlength="30" placeholder="${t('placeholder.presetName')}" value="${esc(p.name)}"
                oninput="window.handlePresetName(this.value)">
 
         <div class="spin-row">
-            <span class="spin-label">Rotation:</span>
+            <span class="spin-label">${t('editor.rotation')}</span>
             <div class="spin-capsule">
                 <div class="sc-opt ${p.type === 'top' ? 'active' : ''}" style="${p.type === 'top' ? 'background:#0984e3' : ''}"
-                     onclick="window.handlePresetType('top')">TOP</div>
+                     onclick="window.handlePresetType('top')">${t('unit.top')}</div>
                 <div class="sc-opt ${p.type === 'back' ? 'active' : ''}" style="${p.type === 'back' ? 'background:var(--danger)' : ''}"
-                     onclick="window.handlePresetType('back')">BACK</div>
+                     onclick="window.handlePresetType('back')">${t('unit.back')}</div>
             </div>
         </div>
 
         <div class="editor-grid">
             <div class="editor-field">
-                <div class="field-header"><label>Speed</label><span class="range-hint">0-10</span></div>
+                <div class="field-header"><label>${t('field.speed')}</label><span class="range-hint">0-10</span></div>
                 <input type="number" inputmode="decimal" value="${p.speed}" step="0.5" min="0" max="10"
                     onchange="window.handlePresetField('speed', this.value)">
             </div>
             <div class="editor-field">
-                <div class="field-header"><label>Spin</label><span class="range-hint" id="pf-spin-max">Max ${maxSpin}</span></div>
+                <div class="field-header"><label>${t('field.spin')}</label><span class="range-hint" id="pf-spin-max">${t('unit.max', { n: maxSpin })}</span></div>
                 <input type="number" inputmode="decimal" id="pf-spin" value="${p.spin}" step="0.5" min="0" max="${maxSpin}"
                     style="${spinStyle}" onchange="window.handlePresetField('spin', this.value)">
             </div>
             <div class="editor-field">
-                <div class="field-header"><label>Height</label><span class="range-hint">-50/100</span></div>
+                <div class="field-header"><label>${t('field.height')}</label><span class="range-hint">-50/100</span></div>
                 <input type="number" inputmode="decimal" id="pf-height" value="${p.height}" step="1" min="-50" max="100"
                     onchange="window.handlePresetField('height', this.value)">
             </div>
@@ -244,43 +248,42 @@ function renderPresetForm() {
 
         <div class="editor-grid">
             <div class="editor-field">
-                <div class="field-header"><label>Drop</label><span class="range-hint">L/R</span></div>
+                <div class="field-header"><label>${t('field.drop')}</label><span class="range-hint">${t('field.dropHint')}</span></div>
                 <input type="number" inputmode="decimal" value="${p.drop}" step="0.5" min="-10" max="10"
                     onchange="window.handlePresetField('drop', this.value)">
             </div>
             <div class="editor-field">
-                <div class="field-header"><label>BPM</label><span class="range-hint">30-90</span></div>
+                <div class="field-header"><label>${t('field.bpm')}</label><span class="range-hint">30-90</span></div>
                 <input type="number" inputmode="decimal" value="${p.bpm}" step="1" min="30" max="90"
                     onchange="window.handlePresetField('bpm', this.value)">
             </div>
             <div class="editor-field">
-                <div class="field-header"><label>Reps</label><span class="range-hint">#</span></div>
+                <div class="field-header"><label>${t('field.reps')}</label><span class="range-hint">#</span></div>
                 <input type="number" inputmode="decimal" value="${p.reps}" step="1" min="1" max="200"
                     onchange="window.handlePresetField('reps', this.value)">
             </div>
         </div>
 
         <div class="editor-field" style="margin-bottom:10px;">
-            <div class="field-header"><label>Scatter</label><span class="range-hint" id="pf-scatter-max">Max ${scatterMax}</span></div>
+            <div class="field-header"><label>${t('field.scatter')}</label><span class="range-hint" id="pf-scatter-max">${t('unit.max', { n: scatterMax })}</span></div>
             <input type="number" inputmode="decimal" id="pf-scatter" value="${p.scatter}" step="0.5" min="0" max="${scatterMax}"
                 onchange="window.handlePresetField('scatter', this.value)">
         </div>
 
         <div class="axis-block">
-            <div class="axis-head"><span class="axis-title">Placement (Drop L/R)</span></div>
-            <div class="axis-hint">Sideways target. Named from the receiver's view, right-handed:
-                backhand is a negative drop, forehand positive.</div>
+            <div class="axis-head"><span class="axis-title">${t('preset.placementAxis')}</span></div>
+            <div class="axis-hint">${t('preset.placementHint')}</div>
             ${axisRows(p.placements, 'placement')}
-            <button class="btn-axis-add" onclick="window.handlePresetAxisAdd('placement')">+ Add placement</button>
-            <button class="axis-standard-btn" onclick="window.handlePresetAxisStandard('placement')">Use BH / Center / FH</button>
+            <button class="btn-axis-add" onclick="window.handlePresetAxisAdd('placement')">${t('preset.addPlacement')}</button>
+            <button class="axis-standard-btn" onclick="window.handlePresetAxisStandard('placement')">${t('preset.useStandardPlacements')}</button>
         </div>
 
         <div class="axis-block">
-            <div class="axis-head"><span class="axis-title">Depth (Height)</span></div>
-            <div class="axis-hint">How far the ball carries. Use this to go short / mid / long off the same serve.</div>
+            <div class="axis-head"><span class="axis-title">${t('preset.depthAxis')}</span></div>
+            <div class="axis-hint">${t('preset.depthHint')}</div>
             ${axisRows(p.depths, 'depth')}
-            <button class="btn-axis-add" onclick="window.handlePresetAxisAdd('depth')">+ Add depth</button>
-            <button class="axis-standard-btn" onclick="window.handlePresetAxisStandard('depth')">Use Short / Mid / Long</button>
+            <button class="btn-axis-add" onclick="window.handlePresetAxisAdd('depth')">${t('preset.addDepth')}</button>
+            <button class="axis-standard-btn" onclick="window.handlePresetAxisStandard('depth')">${t('preset.useStandardDepths')}</button>
         </div>
 
         <div class="preset-sub" style="text-align:center; margin-top:2px;" id="pf-summary"></div>
@@ -294,8 +297,12 @@ function updatePresetSummary() {
     if (!el || !working) return;
     const count = presetBallCount(working);
     el.textContent = count === 1
-        ? 'Adds 1 ball'
-        : `Adds ${count} balls (${working.placements.length || 1} placement${working.placements.length === 1 ? '' : 's'} x ${working.depths.length || 1} depth${working.depths.length === 1 ? '' : 's'})`;
+        ? t('preset.addsOneBall')
+        : t('preset.addsBalls', {
+            n: count,
+            placements: working.placements.length || 1,
+            depths: working.depths.length || 1
+        });
 }
 
 const toNum = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
@@ -312,7 +319,7 @@ export function handlePresetField(field, value) {
         const spinInput = document.getElementById('pf-spin');
         if (spinInput) { spinInput.max = max; spinInput.value = working.spin; }
         const spinMax = document.getElementById('pf-spin-max');
-        if (spinMax) spinMax.textContent = `Max ${max}`;
+        if (spinMax) spinMax.textContent = t('unit.max', { n: max });
     } else if (field === 'spin') {
         working.spin = normalizeSpin(working.speed, toNum(value));
         const spinInput = document.getElementById('pf-spin');
@@ -325,7 +332,7 @@ export function handlePresetField(field, value) {
         const scatterInput = document.getElementById('pf-scatter');
         if (scatterInput) { scatterInput.max = max; scatterInput.value = working.scatter; }
         const scatterMax = document.getElementById('pf-scatter-max');
-        if (scatterMax) scatterMax.textContent = `Max ${max}`;
+        if (scatterMax) scatterMax.textContent = t('unit.max', { n: max });
     } else if (field === 'scatter') {
         working.scatter = clamp(toNum(value), 0, maxScatterFor(working.drop));
         const scatterInput = document.getElementById('pf-scatter');
@@ -360,11 +367,11 @@ export function handlePresetType(type) {
 export function handlePresetAxisAdd(axis) {
     if (!working) return;
     const list = axis === 'placement' ? working.placements : working.depths;
-    if (list.length >= 6) { showToast("Max 6 per axis"); return; }
+    if (list.length >= 6) { showToast(t('toast.maxPerAxis')); return; }
 
     list.push(axis === 'placement'
-        ? { label: `Spot ${list.length + 1}`, drop: clamp(working.drop + (list.length - 1) * 2.5, -10, 10) }
-        : { label: `Depth ${list.length + 1}`, height: clamp(working.height, -50, 100) });
+        ? { label: t('preset.spot', { n: list.length + 1 }), drop: clamp(working.drop + (list.length - 1) * 2.5, -10, 10) }
+        : { label: t('preset.depthLabel', { n: list.length + 1 }), height: clamp(working.height, -50, 100) });
     renderPresetForm();
 }
 
@@ -398,13 +405,13 @@ export function handlePresetAxisInput(index, axis, field, value) {
 
 export function deleteEditingPreset() {
     if (!working || isNew) return;
-    if (!confirm(`Delete the preset "${working.name}"?`)) return;
+    if (!confirm(t('confirm.deletePreset', { name: working.name }))) return;
 
     const name = working.name;
     deletePreset(working.id);
     closePresetEditor();
     document.dispatchEvent(new CustomEvent('presets-updated'));
-    showToast(`"${name}" deleted`);
+    showToast(t('toast.presetDeleted', { name }));
 }
 
 // --- FILE TRANSFER ----------------------------------------------------------
@@ -421,13 +428,13 @@ function download(filename, content, type) {
 export function exportPresetsJSON() {
     download('nova_ball_presets.json', serializePresetsToJSON(), 'application/json;charset=utf-8;');
     closeMenu();
-    showToast("Presets exported");
+    showToast(t('toast.presetsExported'));
 }
 
 export function exportPresetsCSV() {
     download('nova_ball_presets.csv', serializePresetsToCSV(), 'text/csv;charset=utf-8;');
     closeMenu();
-    showToast("Presets exported");
+    showToast(t('toast.presetsExported'));
 }
 
 export function handlePresetFileUpload(event) {
@@ -438,16 +445,16 @@ export function handlePresetFileUpload(event) {
     reader.onload = (e) => {
         try {
             const incoming = parsePresetsAuto(e.target.result);
-            if (!incoming.length) { showToast("No presets found in file"); return; }
+            if (!incoming.length) { showToast(t('toast.noPresetsInFile')); return; }
 
             const { added, updated } = mergePresets(incoming);
             document.dispatchEvent(new CustomEvent('presets-updated'));
             showToast(added || updated
-                ? `Imported ${added} new, ${updated} updated`
-                : "Nothing new to import");
+                ? t('toast.presetsImported', { added, updated })
+                : t('toast.nothingNewToImport'));
         } catch (err) {
             console.error(err);
-            showToast("Import failed");
+            showToast(t('toast.importFailed'));
         }
     };
     reader.readAsText(file);
@@ -456,16 +463,26 @@ export function handlePresetFileUpload(event) {
 }
 
 export function handleResetPresets() {
-    if (!confirm("Replace the preset library with the shipped defaults? Presets already used in drills are not affected.")) return;
+    if (!confirm(t('confirm.resetPresets'))) return;
     resetPresetsToDefaults();
     document.dispatchEvent(new CustomEvent('presets-updated'));
-    showToast("Presets reset to defaults");
+    showToast(t('toast.presetsReset'));
     closeMenu();
 }
 
 function closeMenu() {
     document.getElementById('theme-menu')?.classList.remove('open');
 }
+
+// --- LANGUAGE CHANGES --------------------------------------------------------
+// Two surfaces can be open when the language is switched: the picker sheet over
+// a drill, and the editor on top of that. Both are rebuilt from the model, so
+// redrawing is the whole fix. `working` is non-null only while the editor
+// modal is open, which is the same signal closePresetEditor() clears.
+document.addEventListener('locale-changed', () => {
+    if (sheetOpen) renderPresetSheet();
+    if (working) renderPresetForm();
+});
 
 // --- WINDOW BINDINGS -------------------------------------------------------
 // The drill editor talks to this module through CustomEvents (preset-insert)

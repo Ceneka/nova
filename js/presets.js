@@ -1,4 +1,5 @@
 import { B, LIMITS, makeBall, freqToBpm, maxSpinFor, maxScatterFor } from './ball.js';
+import { t } from './i18n.js';
 import { clamp } from './utils.js';
 
 const STORAGE_KEY = 'nova_ball_presets';
@@ -303,7 +304,12 @@ export function presetFromBall(ball, name) {
 
 /** "Speed 4 · Spin 1.5 · TOP · 60 bpm" - the card subtitle. */
 export function describePreset(preset) {
-    return `Speed ${preset.speed} · Spin ${preset.spin} · ${preset.type.toUpperCase()} · ${preset.bpm} bpm`;
+    return t('preset.describe', {
+        speed: preset.speed,
+        spin: preset.spin,
+        type: preset.type.toUpperCase(),
+        bpm: preset.bpm
+    });
 }
 
 // --- IMPORT / EXPORT --------------------------------------------------------

@@ -50,6 +50,10 @@ js/
   ui.js             drill lists, tabs, drag-and-drop, session summary
   bluetooth.js      Web Bluetooth + the wire packet format
   cloud.js          share-code upload/download
+  i18n.js           translation runtime: t(), applyI18n(), language state
+  locales/
+    en.js           English dictionary, and the source of truth for the keys
+    es.js           Español
   utils.js          toast, log, clamp, MD5
 tests/              node unit tests + a browser integration page
 1.3/                archived older version, do not edit
@@ -179,6 +183,78 @@ Two traps here, both of which cost a debugging round:
 4.5:1 as text in three of the four themes. Destructive labels use the new
 `--danger-ink`, which is per-theme and does clear AA.
 
+## Translations
+
+English and Spanish. **No i18n library** — `js/i18n.js` is ~200 lines, because
+the rule at the top of this file forbids npm and a build step, and an app you
+download and host anywhere cannot carry a toolchain.
+
+Three ways to reach a string:
+
+| Where | How |
+| --- | --- |
+| `index.html` | `<span data-i18n="menu.settings">Settings</span>` |
+| attributes | `data-i18n-attr="placeholder:preset.name;aria-label:a11y.back"` |
+| code | `showToast(t('toast.drillDeleted'))` |
+
+`applyI18n()` walks the first two; it runs in `main.js` before anything else
+renders, and again on every `locale-changed`. The English text stays in
+`index.html` so the page reads correctly even if the module never loads.
+
+**`js/locales/en.js` is the source of truth for the key set.** A value is a
+string, or `{one, other}` for anything that counts — English and Spanish share
+the `n === 1` rule, so one split covers both. `t('key', { n, name })` fills
+`{name}` holes and picks the plural form.
+
+Rules that have bitten people before:
+
+- **`t()` never throws.** A missing key falls back to English, then to the key
+  itself, and warns once. A half-translated build must degrade to English
+  words, not to a blank button.
+- **`js/locales/es.js` must carry exactly the keys `en.js` has.** The
+  integration suite walks both and fails the build on a gap. This is the whole
+  point: a partial translation would otherwise ship silently.
+- **Adding a locale file means editing `PRECACHE` in `sw.js` too**, or it 404s
+  the first time the phone loses signal. The import-graph check catches it.
+- **The `window.setLang` / `window.t` bindings are guarded by
+  `typeof window !== 'undefined'`.** That guard is load-bearing:
+  `tests/presets.test.mjs` imports `presets.js` under bare Node, and
+  `presets.js` reaches `i18n.js` through `describePreset()`.
+- **`switching language only redraws what is open.** `setLang()` fires
+  `locale-changed`; `main.js` owns the drill list and connection card, and
+  `settingsUi.js`, `statsUi.js`, `editor.js` and `presetUi.js` each listen for
+  themselves. `editor.js` in particular is a `<div>`-heavy screen that stays
+  open across the change.
+
+### What is deliberately NOT translated
+
+**Stored user data.** Drill names, preset names, preset axis labels and share
+codes all round-trip through `localStorage`, the CSV export and the
+share-code server. Translating them would make a file exported in Spanish
+unreadable in English and would mean migrating data already on devices. So the
+data stays as the user typed it and only the chrome around it moves. Two places
+that needed care:
+
+- **Factory drill keys are storage** — they are the `custom_drills` object
+  keys and the `Set` column of the shared CSV. `drillDisplayName()` composes
+  the *label* from tokens (`push(b)` → `Saque(Rev.)`) and returns custom keys
+  verbatim. `ui.js`, `editor.js` and `statsUi.js` each used to have their own
+  copy of this; they now share the one in `i18n.js`, which is why switching
+  language re-labels all three at once. The suite asserts the English output
+  is byte-for-byte what it always was, for all 30 factory drills.
+- **Preset axis labels are stored inside the preset.** `standardPlacements()`
+  and `standardDepths()` still write the canonical English `BH` / `Center` /
+  `FH`, and `axisLabel()` translates them **for the read-only chips only** —
+  never for the axis `<input>`, which writes back to the model on `oninput`
+  and would otherwise rewrite a user's saved label to "Rev." on first
+  keystroke.
+
+**The language picker is in Settings**, not the hamburger menu, for the same
+reason themes are: it is a setting, not a mid-session action. The first visit
+picks the language from `navigator.languages`; any later choice is stored in
+`nova_lang` and always wins, so a trip through an English browser cannot undo
+it.
+
 ## Installing (PWA)
 
 The app installs to the home screen and runs offline. Four files, and the
@@ -215,7 +291,7 @@ A **real registration cannot be tested in the headless suite**: under
 `--virtual-time-budget` a *successful* registration never settles and the page
 hangs, while a failed one rejects immediately. (It is the virtual clock, not
 headless - over CDP against a real browser the same worker activates,
-precaches 27 files, and the app boots with the network switched off.) So
+precaches 28 files, and the app boots with the network switched off.) So
 `tests/integration.html` evaluates the real `sw.js` through `new Function` with
 a fake `self`/`caches`/`Request`/`fetch` and drives its own `install`,
 `activate` and `fetch` handlers. That covers the logic; the browser half is
@@ -246,8 +322,9 @@ the canvas or it gets cut in half on a real home screen.
   an import cycle.
 - **Storage keys**: `custom_drills`, `custom_data`, `drill_order`,
   `user_defaults`, `nova_stats`, `nova_theme_pref`, `nova_last_played`,
-  `nova_ball_presets`, `nova_sessions`, `nova_active_session`.
-  `factoryReset()` wipes all of them.
+  `nova_ball_presets`, `nova_sessions`, `nova_active_session`, `nova_lang`.
+  `factoryReset()` wipes all of them (it calls `localStorage.clear()`; the key
+  list here is documentation, not a second implementation).
 - **Styling**: CSS custom properties (`--primary`, `--surface`, `--danger`,
   …) so all four themes work for free. Never hardcode a colour in JS.
 - **Modals** all share `.modal-overlay` at `z-index: 200`; a nested modal must
@@ -304,7 +381,7 @@ the whole repo":
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 230 browser checks in `tests/integration.html`, driven through
+and the 286 browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -328,12 +405,12 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (230 checks, needs the HTTP server above):
+Browser integration (286 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(230) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(286) or FAIL(n)
 ```
 
 Open it in a normal browser to see each check. It drives the real editor, the
@@ -345,6 +422,13 @@ It also enforces the UI rules that are easy to break by eye: no horizontal
 overflow, every control at least 32-40px tall, no icon relying on the SVG
 default paint, and WCAG AA contrast for the preset and statistics UI in all
 four themes.
+
+The i18n block is the other half of it, and it is the part that stops a
+translation rotting quietly: dictionary parity, every `data-i18n` key in the
+real `index.html` resolving, every `{placeholder}` actually filled at a call
+site, the English drill labels byte-identical to the pre-i18n output, and the
+Settings screen genuinely redrawing in Spanish. Read the section on
+Translations above before changing a string.
 
 ### Bluetooth is tested with a fake robot
 

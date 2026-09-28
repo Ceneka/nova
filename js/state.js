@@ -3,6 +3,7 @@ import { B, calculateRPMs, reverseCalculate, bpmToFreq, maxSpinFor } from './bal
 import { loadPresets } from './presets.js';
 import { clearSessions } from './stats.js';
 import { showToast } from './utils.js';
+import { t } from './i18n.js';
 
 export let currentDrills = {};
 export let userCustomDrills = { "custom-a": [], "custom-b": [], "custom-c": [] };
@@ -92,38 +93,38 @@ export function saveDrillOrder() {
 }
 
 export function saveAsDefault() {
-    if(confirm("Save current settings as your new personal default?")) {
+    if(confirm(t('confirm.saveAsDefault'))) {
         localStorage.setItem('user_defaults', JSON.stringify(currentDrills));
-        showToast("Saved as Default");
+        showToast(t('toast.savedAsDefault'));
     }
 }
 export function resetToDefault() {
     const hasUserDefault = localStorage.getItem('user_defaults');
-    if(confirm(hasUserDefault ? "Restore saved defaults?" : "Restore factory settings?")) {
+    if(confirm(hasUserDefault ? t('confirm.restoreSaved') : t('confirm.restoreFactory'))) {
         currentDrills = hasUserDefault ? JSON.parse(hasUserDefault) : JSON.parse(JSON.stringify(DEFAULT_DRILLS));
         drillOrder = JSON.parse(JSON.stringify(CATEGORIES));
         localStorage.removeItem('drill_order');
         normalizeDrills();
         localStorage.setItem('custom_drills', JSON.stringify(currentDrills));
-        showToast("Restored");
+        showToast(t('toast.restored'));
         document.dispatchEvent(new CustomEvent('drills-updated'));
     }
 }
 export function factoryReset() {
-    if(confirm("WARNING: Delete ALL saved data and return to original factory state?")) {
+    if(confirm(t('confirm.factoryReset'))) {
         localStorage.clear();
         location.reload();
     }
 }
 export function resetStats() {
-    if(confirm("Reset stats? This clears the lifetime counters and all training history.")) {
+    if(confirm(t('confirm.resetStats'))) {
         appStats.balls = 0; appStats.drills = 0;
         localStorage.setItem('nova_stats', JSON.stringify(appStats));
         // The history is the same thing as "the statistics" to a user, so one
         // reset clears both. Leaving a full history behind next to zeroed
         // counters would just look like a bug.
         clearSessions();
-        showToast("Statistics Reset");
+        showToast(t('toast.statsReset'));
         document.dispatchEvent(new CustomEvent('stats-updated'));
     }
 }
@@ -246,14 +247,14 @@ export function importCustomDrills(csvText) {
 
         localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
         saveDrillsToStorage();
-        showToast("Imported Successfully");
+        showToast(t('toast.drillsImported'));
         
         // --- NEW: CLOSE MENU ON SUCCESS ---
         const menu = document.getElementById('theme-menu');
         if(menu) menu.classList.remove('open');
         
         return true;
-    } catch(e) { console.error(e); showToast("Import Failed"); return false; }
+    } catch(e) { console.error(e); showToast(t('toast.drillsImportFailed')); return false; }
 }
 
 // --- EXPORT FUNCTION (Closes Menu on Success) ---

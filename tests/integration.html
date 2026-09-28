@@ -56,7 +56,7 @@
 
 <script type="module">
 import { initData, currentDrills, userCustomDrills } from '../js/state.js';
-import { openEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
+import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
 import * as P from '../js/presets.js';
 import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
@@ -71,6 +71,9 @@ import '../js/presetUi.js';
 import { renderSettings } from '../js/settingsUi.js';
 import '../js/statsUi.js';
 import * as S from '../js/stats.js';
+import { t, setLang, getLang, initI18n, detectLang, applyI18n, drillDisplayName, axisLabel, LANGUAGES } from '../js/i18n.js';
+import { en } from '../js/locales/en.js';
+import { es } from '../js/locales/es.js';
 
 const results = [];
 const report = () => {
@@ -482,7 +485,7 @@ ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden
 ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
 eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
 eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
-eq('six sections', document.querySelectorAll('#settings-body .settings-section').length, 6);
+eq('seven sections, language among them', document.querySelectorAll('#settings-body .settings-section').length, 7);
 
 const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
 for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',
@@ -1080,7 +1083,7 @@ ok('a write is never answered from the cache',
 
 const navResponse = await respondTo(sw.navRequest('./'));
 ok('a navigation is served from the shell without touching the network',
-   navResponse && (await navResponse.text()).includes('<title>Nova Drill Control</title>'));
+   navResponse && (await navResponse.text()).includes('Nova Drill Control</title>'));
 
 const assetResponse = await respondTo(sw.getRequest('js/ball.js'));
 ok('a precached module is served from the cache',
@@ -1188,6 +1191,259 @@ ok('a missing theme-color tag is not fatal', (() => {
     const tag = themeColor; tag.remove();
     try { renderSettings(); return true; } catch (e) { return false; } finally { document.head.appendChild(tag); }
 })());
+
+/* ============================ i18n ============================ */
+// A translation layer is only trustworthy if it cannot be quietly wrong. The
+// checks below are the canaries: dictionary parity (a missing key would ship
+// English words in the middle of a Spanish screen), the resolution of every
+// data-i18n key the real index.html carries, and the fact that a language
+// switch actually redraws a real screen.
+const isPlural = (v) => v !== null && typeof v === 'object'
+    && typeof v.one === 'string' && typeof v.other === 'string';
+const flat = (o, pfx = '') => Object.entries(o).flatMap(([k, v]) =>
+    (v && typeof v === 'object' && !Array.isArray(v) && !isPlural(v))
+        ? flat(v, pfx + k + '.') : [pfx + k]);
+const enKeys = flat(en).sort();
+const esKeys = flat(es).sort();
+
+ok('every English key has a Spanish one',
+   enKeys.filter(k => !esKeys.includes(k)).join(',') === '',
+   enKeys.filter(k => !esKeys.includes(k)).join(', '));
+ok('and no Spanish key is orphaned',
+   esKeys.filter(k => !enKeys.includes(k)).join(',') === '',
+   esKeys.filter(k => !enKeys.includes(k)).join(', '));
+ok('the dictionary is substantial', enKeys.length > 200, `${enKeys.length} keys`);
+
+// A plural entry missing half its forms would render a raw object.
+const valueOf = (key) => { let n = en; for (const part of key.split('.')) n = n[part]; return n; };
+const brokenPlural = enKeys.filter((k) => {
+    if (!isPlural(valueOf(k))) return false;
+    const node = valueOf(k);
+    return typeof node.one !== 'string' || typeof node.other !== 'string';
+});
+ok('every plural entry has both forms', brokenPlural.length === 0, brokenPlural.join(', '));
+
+// A {hole} that no call site ever fills renders as literal "{bank}" text in
+// the middle of a button, and nothing about that looks like a bug on screen.
+// So: collect every hole in the dictionary, collect every argument name passed
+// at every t() call site in the app, and require that each hole is supplied
+// somewhere. It is the inverse of the usual check and catches the case that
+// actually reaches a user.
+const holesOf = (k) => {
+    const node = valueOf(k);
+    const texts = isPlural(node) ? [node.one, node.other] : [node];
+    return [...new Set(texts.flatMap((v) => (String(v).match(/\{(\w+)\}/g) || []).map((h) => h.slice(1, -1))))];
+};
+const sources = (await Promise.all(
+    [...graph].map((u) => text(u).catch(() => ''))
+)).join('\n');
+// Walking to the matching close paren rather than to the next ")" matters:
+// `t('preset.describe', { type: preset.type.toUpperCase(), ... })` has a ")"
+// inside its own argument object, and a naive scan would stop there and decide
+// the last two placeholders were never filled.
+const supplied = new Map();   // key -> set of arg names seen at a call site
+for (const call of sources.matchAll(/\bt\(\s*['"]([\w.]+)['"]/g)) {
+    let depth = 1;
+    let i = call.index + call[0].length;
+    const from = i;
+    while (i < sources.length && depth > 0) {
+        const c = sources[i];
+        if (c === '(') depth++;
+        else if (c === ')') depth--;
+        i++;
+    }
+    if (!supplied.has(call[1])) supplied.set(call[1], new Set());
+    // both `name: value` and the shorthand `{ name }` count as supplying it
+    for (const a of sources.slice(from, i).matchAll(/(\w+)\s*[:,}]/g)) {
+        supplied.get(call[1]).add(a[1]);
+    }
+}
+const unfilled = enKeys.filter((k) => holesOf(k).some((h) => !(supplied.get(k) || new Set()).has(h)));
+ok('every {placeholder} in the dictionary is filled at a call site', unfilled.length === 0, unfilled.join(', '));
+// And the other direction: a call site naming a key the dictionary lacks would
+// already have warned, but silence is easy to miss, so assert it loudly.
+const called = [...supplied.keys()].filter(k => !enKeys.includes(k));
+ok('no call site asks for a key that does not exist', called.length === 0, called.join(', '));
+ok('the placeholder check actually looked at the app', supplied.size > 100, `${supplied.size} call sites`);
+
+/* --- t() itself --- */
+eq('t() returns the English string', t('toast.drillDeleted'), 'Drill Deleted');
+eq('t() interpolates a parameter', t('toast.bankFull', { bank: 'C' }), 'Bank C is full!');
+eq('t() picks the singular for n=1', t('unit.countBalls', { n: 1 }), '1 ball');
+eq('t() picks the plural for n=3', t('unit.countBalls', { n: 3 }), '3 balls');
+eq('t() treats 0 as plural', t('unit.countDrills', { n: 0 }), '0 drills');
+eq('t() leaves an unfilled hole alone rather than printing undefined',
+   t('toast.savedTo'), 'Saved to {bank}');
+eq('a key in no dictionary comes back as itself, not as undefined',
+   t('no.such.key'), 'no.such.key');
+ok('t() survives a junk key', (() => { try { t(null); t(''); t(undefined); return true; } catch (e) { return false; } })());
+
+/* --- the real index.html, every key it references --- */
+const indexHtml = await text('index.html');
+const markupKeys = [
+    ...[...indexHtml.matchAll(/data-i18n="([^"]+)"/g)].map(m => m[1]),
+    ...[...indexHtml.matchAll(/data-i18n-attr="([^"]+)"/g)]
+        .flatMap(m => m[1].split(';').map(p => p.split(':')[1]).filter(Boolean))
+];
+ok('index.html actually uses the i18n attributes', markupKeys.length > 40, `${markupKeys.length} keys`);
+const unknown = markupKeys.filter(k => !enKeys.includes(k));
+ok('every data-i18n key in index.html resolves', unknown.length === 0, unknown.join(', '));
+ok('and every one of them has a translation', markupKeys.filter(k => !esKeys.includes(k)).join(',') === '',
+   markupKeys.filter(k => !esKeys.includes(k)).join(', '));
+
+/* --- applyI18n: text, attributes and the one markup case --- */
+setLang('es');
+const frag = document.createElement('div');
+frag.innerHTML = `<span data-i18n="menu.settings"></span>
+                  <input data-i18n-attr="placeholder:placeholder.presetName;aria-label:a11y.backToDrills">
+                  <div data-i18n-html="settings.installUnsupported"></div>`;
+applyI18n(frag);
+eq('applyI18n rewrites text', frag.querySelector('span').textContent, 'Ajustes');
+eq('applyI18n rewrites the first attribute', frag.querySelector('input').getAttribute('placeholder'), 'Nombre del preset');
+eq('applyI18n rewrites every attribute in the list', frag.querySelector('input').getAttribute('aria-label'), 'Volver a los ejercicios');
+ok('applyI18n keeps markup in a data-i18n-html node', /→/.test(frag.lastElementChild.innerHTML),
+   frag.lastElementChild.innerHTML);
+setLang('en');
+
+/* --- language state --- */
+eq('setLang() records the choice', (setLang('es'), getLang()), 'es');
+eq('and sets the document language', document.documentElement.getAttribute('lang'), 'es');
+eq('and persists it', localStorage.getItem('nova_lang'), 'es');
+ok('an unsupported language is refused', (setLang('fr'), getLang()) === 'es');
+ok('setLang() announces itself so open screens can redraw', (() => {
+    let fired = null;
+    const on = (e) => { fired = e.detail.lang; };
+    document.addEventListener('locale-changed', on);
+    setLang('en');
+    document.removeEventListener('locale-changed', on);
+    return fired === 'en';
+})());
+ok('a stored choice survives a restart', (() => {
+    localStorage.setItem('nova_lang', 'es');
+    return initI18n() === 'es' && document.documentElement.getAttribute('lang') === 'es';
+})());
+ok('detection fills in on a first visit with no stored choice', (() => {
+    localStorage.removeItem('nova_lang');
+    const real = navigator.languages;
+    Object.defineProperty(navigator, 'languages', { value: ['es-ES', 'en'], configurable: true });
+    const picked = initI18n();
+    Object.defineProperty(navigator, 'languages', { value: real, configurable: true });
+    return picked === 'es';
+})());
+ok('an unrecognised browser language falls back to English', (() => {
+    localStorage.removeItem('nova_lang');
+    const real = navigator.languages;
+    Object.defineProperty(navigator, 'languages', { value: ['ja-JP'], configurable: true });
+    const picked = initI18n();
+    Object.defineProperty(navigator, 'languages', { value: real, configurable: true });
+    return picked === 'en';
+})());
+ok('a stored choice beats the browser preference', (() => {
+    localStorage.setItem('nova_lang', 'en');
+    const real = navigator.languages;
+    Object.defineProperty(navigator, 'languages', { value: ['es-MX'], configurable: true });
+    const picked = initI18n();
+    Object.defineProperty(navigator, 'languages', { value: real, configurable: true });
+    return picked === 'en';
+})());
+localStorage.removeItem('nova_lang');
+initI18n();
+setLang('en');
+
+/* --- drill names: the keys are storage, only the labels move --- */
+const factoryKeys = ['basic', 'combined', 'complex'].flatMap(c => CATEGORIES[c]);
+const oldDrillLabel = (key) => key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+ok('English drill names are byte-for-byte what they always were',
+   factoryKeys.every(k => drillDisplayName(k) === oldDrillLabel(k)),
+   factoryKeys.filter(k => drillDisplayName(k) !== oldDrillLabel(k)).join(', '));
+setLang('es');
+const spanish = factoryKeys.map(k => drillDisplayName(k));
+ok('every factory drill is actually translated',
+   factoryKeys.every((k, i) => spanish[i] !== oldDrillLabel(k)),
+   factoryKeys.filter((k, i) => spanish[i] === oldDrillLabel(k)).join(', '));
+eq('a backhand push reads as a Spanish label', drillDisplayName('push(b)'), 'Saque(Rev.)');
+eq('a combined drill keeps its order', drillDisplayName('loop(f)-drive(b)'), 'Loop(Der.) · Golpe(Rev.)');
+eq('a numbered random drill keeps its number', drillDisplayName('23-random-drive'), '23 Aleatorio · Golpe');
+setLang('en');
+eq('a custom drill key is left exactly as stored',
+   drillDisplayName('cust_A_My_Drill_1712345'), 'cust_A_My_Drill_1712345');
+eq('an unrecognised key still falls back to the old title-cased form',
+   drillDisplayName('some-imported-key'), 'Some Imported Key');
+
+/* --- preset axis labels: translated on the way out, not on the way in --- */
+eq('a built-in axis label is translated', axisLabel('BH'), 'BH');
+setLang('es');
+eq('in the other language too', axisLabel('Center'), 'Centro');
+eq('and the depth labels', axisLabel('Long'), 'Largo');
+eq('a label the user typed passes through untouched', axisLabel('My spot'), 'My spot');
+eq('an empty label is not turned into a word', axisLabel(''), '');
+setLang('en');
+// The generator must keep writing the canonical English labels, because they
+// are stored inside the preset and round-trip through the export files.
+ok('presets still store canonical English axis labels', (() => {
+    const placements = P.standardPlacements(0).map(p => p.label);
+    const depths = P.standardDepths(50).map(d => d.label);
+    return JSON.stringify(placements) === JSON.stringify(['BH', 'Center', 'FH'])
+        && JSON.stringify(depths) === JSON.stringify(['Short', 'Mid', 'Long']);
+})(), JSON.stringify(P.standardPlacements(0).map(p => p.label)));
+ok('the shipped preset library keeps its English names', P.DEFAULT_PRESETS[0].name === 'Short under serve',
+   P.DEFAULT_PRESETS[0].name);
+
+/* --- the switch actually redraws a real screen --- */
+window.openSettings();          // the locale listener only fires when it is open
+ok('the language row exists in Settings',
+   !!document.querySelector('#settings-body [data-row="language"]'));
+ok('and offers every shipped language, in its own language',
+   [...document.querySelectorAll('#settings-body [data-lang-switch] .mode-option')]
+       .map(e => e.textContent).join('|') === LANGUAGES.map(l => l.label).join('|'));
+// A language picker nobody can hit with a thumb is not a picker. The existing
+// 40px check only sees <button>, and this is a <div> like the reps/time switch.
+const langOpts = [...document.querySelectorAll('#settings-body [data-lang-switch] .mode-option')];
+ok('every language option is a usable tap target',
+   langOpts.length > 0 && langOpts.every(e => e.getBoundingClientRect().height >= 40),
+   langOpts.map(e => `${e.textContent} ${Math.round(e.getBoundingClientRect().height)}px`).join(', '));
+ok('the language row does not squeeze its own description',
+   (() => { const d = document.querySelector('#settings-body [data-row="language"] .settings-row-desc');
+            return d && d.clientWidth > 120; })(),
+   (() => { const d = document.querySelector('#settings-body [data-row="language"] .settings-row-desc');
+            return d ? `${d.clientWidth}px` : 'no desc'; })());
+window.handleSettingsLang('es');
+const settingsText = document.getElementById('settings-body').textContent;
+ok('switching to Spanish redraws Settings',
+   /Apariencia/.test(settingsText) && /Idioma/.test(settingsText) && /Gestionar presets/.test(settingsText),
+   cut(settingsText, 160));
+ok('no English chrome is left behind in that screen',
+   !/\bAppearance\b|\bManage presets\b|\bFactory reset\b|\bOffline use\b/.test(settingsText),
+   cut(settingsText, 160));
+ok('the active language is the one that was picked',
+   /data-lang-switch[\s\S]*?mode-option active[^>]*>Español/.test(document.getElementById('settings-body').innerHTML));
+ok('the language choice reached localStorage', localStorage.getItem('nova_lang') === 'es');
+// and back again, so the checks above and below are not order-dependent
+window.handleSettingsLang('en');
+ok('and it switches back', /Appearance/.test(document.getElementById('settings-body').textContent));
+window.closeSettings();
+
+/* --- the editor redraws itself when the language changes --- */
+setLang('es');
+ok('an open editor is already in Spanish', (() => {
+    openEditor('push(b)');
+    const before = document.getElementById('editor-body').textContent;
+    setLang('en');
+    const after = document.getElementById('editor-body').textContent;
+    closeEditor();
+    return /Velocidad/.test(before) && /Speed/.test(after) && !/Velocidad/.test(after);
+})());
+ok('the editor labels are translated as well', (() => {
+    setLang('es');
+    openEditor('push(b)');
+    const txt = document.getElementById('editor-body').textContent;
+    closeEditor();
+    return /Velocidad/.test(txt) && /Efecto/.test(txt) && !/\bSpeed\b/.test(txt);
+})());
+
+// Leave the app in English, which is what the rest of this page assumes.
+localStorage.removeItem('nova_lang');
+setLang('en');
 
 /* ---- report ---- */
 } catch (err) {

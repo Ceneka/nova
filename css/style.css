@@ -300,6 +300,32 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
 }
 
+/* The language picker reuses .mode-switch inside a settings row, which is a
+   flex ROW with the description beside it. The standalone switch is width:100%
+   with a bottom margin for the control card, and both of those squeeze the
+   description into a 70px column on a phone. Here it is a compact control that
+   keeps its own width and gives the row its space back. */
+.settings-row .mode-switch {
+    width: auto;
+    margin-bottom: 0;
+    flex: 0 0 auto;
+}
+.settings-row .mode-option {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    white-space: nowrap;
+    /* 30px, inherited from the standalone switch, is under the 40px tap target
+       the rest of Settings is held to. A language picker is a setting people
+       tap once and set, but it is still a button, so it gets the same floor.
+       The app is not globally border-box, so without this the 8px padding
+       lands outside the min-height and the option comes out 56px tall. */
+    box-sizing: border-box;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .level-select { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
 
 .lvl-dot { 

@@ -2,6 +2,7 @@ import { currentDrills, selectedLevel, runMode, appStats, setLastPlayed } from '
 import { noteSessionDrill, noteSessionBalls } from './stats.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { log, showToast, clamp, toggleBodyScroll } from './utils.js';
+import { t } from './i18n.js';
 import { updateStatsUI, updateLastPlayedHighlight } from './ui.js';
 
 let isRunning = false;
@@ -42,7 +43,7 @@ export function startDrillSequence(drillName) {
     });
 
     if (executableSteps.length === 0) {
-        showToast("no active balls to play");
+        showToast(t('toast.noActiveBallsToPlay'));
         document.querySelectorAll('.btn-drill').forEach(b => b.classList.remove('running'));
         return;
     }
@@ -60,7 +61,7 @@ export function startDrillSequence(drillName) {
     
     let count = 4;
     ui.display.textContent = count;
-    ui.label.textContent = "GET READY";
+    ui.label.textContent = t('run.getReady');
     ui.btnPause.style.display = 'none';
     
     ui.progress.style.transition = 'none';
@@ -78,7 +79,7 @@ export function startDrillSequence(drillName) {
             ui.display.textContent = count;
         } else {
             clearInterval(countdownTimer);
-            ui.display.textContent = "GO!";
+            ui.display.textContent = t('run.go');
             // --- UPDATED: Store timeout to allow cancelling ---
             startTimeout = setTimeout(beginDrillExecution, 800);
         }
@@ -97,9 +98,9 @@ export function beginDrillExecution() {
     // ---------------------------------------------------------------
 
     ui.btnPause.style.display = 'block';
-    ui.btnPause.textContent = "PAUSE";
+    ui.btnPause.textContent = t('run.pause');
     ui.btnPause.classList.remove('pulse-anim');
-    ui.label.textContent = "REMAINING";
+    ui.label.textContent = t('run.remaining');
 
     ui.progress.style.transition = 'none';
     ui.progress.style.strokeDashoffset = '0';
@@ -213,7 +214,7 @@ export function handleDone() {
 export function togglePause() {
     if (isPaused) {
         isPaused = false;
-        ui.btnPause.textContent = "PAUSE";
+        ui.btnPause.textContent = t('run.pause');
         ui.btnPause.classList.remove('pulse-anim');
         
         if(runMode === 'time') {
@@ -223,7 +224,7 @@ export function togglePause() {
         runIteration(); 
     } else {
         isPaused = true;
-        ui.btnPause.textContent = "RESUME";
+        ui.btnPause.textContent = t('run.resume');
         ui.btnPause.classList.add('pulse-anim');
         clearTimeout(pauseTimer);
         
@@ -264,7 +265,7 @@ export function skipCountdown() {
     clearTimeout(startTimeout);
     
     // Visual feedback
-    ui.display.textContent = "GO!";
+    ui.display.textContent = t('run.go');
     
     // Start immediately
     beginDrillExecution();

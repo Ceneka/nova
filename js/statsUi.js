@@ -3,6 +3,7 @@ import {
     deleteSession, clearSessions, isSessionOpen, MAX_SESSIONS
 } from './stats.js';
 import { showToast, formatDuration } from './utils.js';
+import { t, drillDisplayName } from './i18n.js';
 
 /**
  * The statistics screen: a full screen above Settings, mirroring how Settings
@@ -64,15 +65,9 @@ function formatWhen(ts) {
     const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    if (ts >= startOfToday) return `Today ${time}`;
-    if (ts >= startOfToday - DAY_MS) return `Yesterday ${time}`;
+    if (ts >= startOfToday) return t('stats.today', { time });
+    if (ts >= startOfToday - DAY_MS) return t('stats.yesterday', { time });
     return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${time}`;
-}
-
-/** "push(b)" -> "Push B"; custom drill keys are shown verbatim, as elsewhere. */
-function drillLabel(key) {
-    if (key.startsWith('cust_')) return key;
-    return key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 function renderChart(series) {
@@ -82,7 +77,8 @@ function renderChart(series) {
         // reads as a gap rather than as a rendering failure.
         const h = d.drills > 0 ? Math.max(6, Math.round((d.drills / max) * 100)) : 2;
         const day = new Date(d.dayStart);
-        const label = `${day.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}: ${d.drills} drill${d.drills === 1 ? '' : 's'}`;
+        const date = day.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        const label = t('stats.chartLabel', { date, n: d.drills });
         return `<div class="chart-col" title="${esc(label)}" aria-label="${esc(label)}">
                     <div class="chart-bar${d.drills ? '' : ' empty'}" style="height:${h}%"></div>
                 </div>`;
@@ -103,12 +99,12 @@ function renderRanking(ranking) {
     const rows = ranking.map((r, i) => `
         <div class="rank-row">
             <span class="rank-pos">${i + 1}</span>
-            <span class="rank-name" title="${esc(r.key)}">${esc(drillLabel(r.key))}</span>
+            <span class="rank-name" title="${esc(r.key)}">${esc(drillDisplayName(r.key))}</span>
             <span class="rank-bar"><span style="width:${Math.max(6, Math.round((r.count / max) * 100))}%"></span></span>
             <span class="rank-count">${r.count}</span>
         </div>`).join('');
     return `<section class="stats-section">
-                <div class="settings-section-title">Most played</div>
+                <div class="settings-section-title">${t('stats.mostPlayed')}</div>
                 <div class="rank-list">${rows}</div>
             </section>`;
 }
@@ -116,8 +112,7 @@ function renderRanking(ranking) {
 function renderSessions(sessions) {
     if (!sessions.length) {
         return `<div class="stats-empty">
-                    No sessions yet. Play a drill with the robot connected and it
-                    will show up here.
+                    ${t('stats.emptySessions')}
                 </div>`;
     }
     // Newest first, capped: the log can hold 500 entries and a list of 500
@@ -129,16 +124,16 @@ function renderSessions(sessions) {
                     <div class="session-main">
                         <div class="session-when">${esc(formatWhen(s.startedAt))}</div>
                         <div class="session-meta">
-                            <span>${s.drills} drill${s.drills === 1 ? '' : 's'}</span>
+                            <span>${t('unit.countDrills', { n: s.drills })}</span>
                             <span class="dot">&middot;</span>
-                            <span>${s.balls} ball${s.balls === 1 ? '' : 's'}</span>
+                            <span>${t('unit.countBalls', { n: s.balls })}</span>
                             <span class="dot">&middot;</span>
                             <span>${esc(formatDuration(dur))}</span>
                         </div>
                     </div>
                     <button class="session-del" data-del="${s.id}"
-                            aria-label="Delete session from ${esc(formatWhen(s.startedAt))}"
-                            title="Delete this session">${ICON_TRASH}</button>
+                            aria-label="${esc(t('a11y.deleteSessionFrom', { when: formatWhen(s.startedAt) }))}"
+                            title="${t('a11y.deleteSessionTitle')}">${ICON_TRASH}</button>
                 </div>`;
     }).join('');
     return rows;
@@ -154,9 +149,7 @@ export function renderStats() {
     if (!totals.sessions) {
         body.innerHTML = `
             <div class="stats-empty">
-                No training recorded yet.<br><br>
-                Sessions are logged automatically while the robot is connected,
-                one per sitting. Nothing to set up.
+                ${t('stats.empty')}
             </div>`;
         return;
     }
@@ -164,32 +157,35 @@ export function renderStats() {
     const series = getDailySeries(CHART_DAYS);
     const active = isSessionOpen();
     const tiles = [
-        { label: 'Sessions', value: totals.sessions },
-        { label: 'Drills', value: totals.drills },
-        { label: 'Balls', value: totals.balls },
-        { label: 'Time', value: formatDuration(totals.durationMs) }
-    ].map(t => `<div class="stat-tile">
-                    <div class="stat-value">${t.value}</div>
-                    <div class="stat-label">${t.label}</div>
+        { label: t('unit.sessions'), value: totals.sessions },
+        { label: t('unit.drills'), value: totals.drills },
+        { label: t('unit.balls'), value: totals.balls },
+        { label: t('unit.time'), value: formatDuration(totals.durationMs) }
+    // The callback parameter must not be called `t`: that is the translation
+    // function imported above, and shadowing it here would break the moment
+    // anyone added a t() call inside this map.
+    ].map(tile => `<div class="stat-tile">
+                    <div class="stat-value">${tile.value}</div>
+                    <div class="stat-label">${tile.label}</div>
                 </div>`).join('');
 
     body.innerHTML = `
-        ${active ? `<div class="stats-live">Recording a session while the robot is connected.</div>` : ''}
+        ${active ? `<div class="stats-live">${t('stats.live')}</div>` : ''}
 
         <div class="stat-tiles">${tiles}</div>
 
         <section class="stats-section">
-            <div class="settings-section-title">Last ${CHART_DAYS} days</div>
+            <div class="settings-section-title">${t('stats.lastDays', { n: CHART_DAYS })}</div>
             ${renderChart(series)}
         </section>
 
         ${renderRanking(getDrillRanking())}
 
         <section class="stats-section">
-            <div class="settings-section-title">Sessions</div>
+            <div class="settings-section-title">${t('unit.sessions')}</div>
             <div class="session-list">${renderSessions(sessions)}</div>
-            <button class="stats-clear" onclick="window.deleteAllSessions()">Delete all history</button>
-            <div class="stats-foot-note">Keeping the last ${MAX_SESSIONS} sessions.</div>
+            <button class="stats-clear" onclick="window.deleteAllSessions()">${t('stats.deleteAll')}</button>
+            <div class="stats-foot-note">${t('stats.keepingLast', { n: MAX_SESSIONS })}</div>
         </section>`;
 }
 
@@ -198,17 +194,17 @@ export function renderStats() {
 export function deleteStatsSession(id) {
     const sid = Number(id);
     if (deleteSession(sid)) {
-        showToast("Session deleted");
+        showToast(t('toast.sessionDeleted'));
     } else {
-        showToast("Session not found");
+        showToast(t('toast.sessionNotFound'));
     }
     renderStats();
 }
 
 export function deleteAllSessions() {
-    if (!confirm("Delete all training history? This cannot be undone.")) return;
+    if (!confirm(t('confirm.deleteAllSessions'))) return;
     clearSessions();
-    showToast("History deleted");
+    showToast(t('toast.historyDeleted'));
     renderStats();
 }
 

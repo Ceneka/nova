@@ -6,6 +6,7 @@ import {
 import { MAX_STEPS_PER_DRILL, getPresetById, buildVariantStep, buildSequenceSteps, buildSingleBall } from './presets.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { showToast, clamp, toggleBodyScroll } from './utils.js';
+import { t, drillDisplayName } from './i18n.js';
 import { uploadDrill } from './cloud.js';
 
 // --- Local State ---
@@ -62,7 +63,7 @@ export function saveDrillChanges() {
     saveDrillsToStorage();
 
     closeEditor();
-    showToast("Configuration saved");
+    showToast(t('toast.configSaved'));
     document.dispatchEvent(new CustomEvent('drills-updated'));
 }
 
@@ -94,10 +95,10 @@ document.addEventListener('preset-insert', (e) => {
  * Returns the number of steps added, or -1 if nothing was added.
  */
 export function insertPresetIntoDrill(presetId, mode = 'single') {
-    if (!tempDrillData) { showToast("Open a drill first"); return -1; }
+    if (!tempDrillData) { showToast(t('toast.openDrillFirst')); return -1; }
 
     const preset = getPresetById(presetId);
-    if (!preset) { showToast("Preset not found"); return -1; }
+    if (!preset) { showToast(t('toast.presetNotFound')); return -1; }
 
     let steps;
     if (mode === 'variants') steps = [buildVariantStep(preset)];
@@ -107,15 +108,15 @@ export function insertPresetIntoDrill(presetId, mode = 'single') {
     const room = MAX_STEPS_PER_DRILL - tempDrillData.length;
     if (steps.length > room) {
         showToast(room <= 0
-            ? `Drill is full (${MAX_STEPS_PER_DRILL} balls)`
-            : `Only ${room} slot${room === 1 ? '' : 's'} left in this drill`);
+            ? t('toast.drillFull', { max: MAX_STEPS_PER_DRILL })
+            : t('toast.onlyLeft', { n: room }));
         return -1;
     }
 
     steps.forEach(step => tempDrillData.push(step));
 
     renderEditor();
-    showToast(`+${steps.length} ball${steps.length === 1 ? '' : 's'} from "${preset.name}"`);
+    showToast(t('toast.ballsAdded', { n: steps.length, name: preset.name }));
     return steps.length;
 }
 
@@ -145,7 +146,7 @@ function renderEditor() {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path>
         </svg>
-        <span>Add from preset</span>`;
+        <span>${t('editor.addFromPreset')}</span>`;
     modalBody.appendChild(entry);
 
     tempDrillData.forEach((stepOptions, stepIndex) => {
@@ -171,7 +172,7 @@ function renderEditor() {
         const scatterHtml = isSingle ? `
             <div style="display:flex; align-items:center; gap:5px; margin-left:auto; margin-right:10px;">
                 <div class="editor-field" style="flex-direction:row; align-items:center; gap:6px; padding:2px 6px; background:var(--bg); border:1px solid var(--border);">
-                    <label style="font-size:0.6rem; color:var(--text-light); font-weight:800; text-transform:uppercase;">Scatter</label>
+                    <label style="font-size:0.6rem; color:var(--text-light); font-weight:800; text-transform:uppercase;">${t('field.scatter')}</label>
                     <input type="number" inputmode="decimal" 
                            value="${currentScatter}" 
                            step="0.5" min="0" max="${maxScatter}"
@@ -182,7 +183,7 @@ function renderEditor() {
 
         // Duplicate/Next Step Button (Header)
         const plusBtn = `
-            <button class="btn-add-opt" title="Duplicate Ball" onclick="window.handleAddSequenceStep(${stepIndex})">
+            <button class="btn-add-opt" title="${t('editor.duplicateBall')}" onclick="window.handleAddSequenceStep(${stepIndex})">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -192,7 +193,7 @@ function renderEditor() {
         groupDiv.innerHTML = `
             <div class="group-title">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                    <span>Ball ${stepIndex + 1}</span>
+                    <span>${t('editor.ball', { n: stepIndex + 1 })}</span>
                     <div class="ball-toggle ${isActive ? 'active' : ''}" onclick="window.handleToggleBallActive(${stepIndex})">
                         <div class="toggle-switch"></div>
                     </div>
@@ -226,14 +227,14 @@ function renderEditor() {
             // --- UPDATED: Swap Colors for Top/Back Toggle (Top=Blue, Back=Red) ---
             const toggleHtml = `
                 <div class="spin-row">
-                    <span class="spin-label">Rotation:</span>
+                    <span class="spin-label">${t('editor.rotation')}</span>
                     <div class="spin-capsule">
                         <div class="sc-opt ${type === 'top' ? 'active' : ''}" 
                              style="${type === 'top' ? 'background:#0984e3' : ''}"
-                             onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'top')">TOP</div>
+                             onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'top')">${t('unit.top')}</div>
                         <div class="sc-opt ${type === 'back' ? 'active' : ''}" 
                              style="${type === 'back' ? 'background:var(--danger)' : ''}"
-                             onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'back')">BACK</div>
+                             onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'back')">${t('unit.back')}</div>
                     </div>
                 </div>`;
             // ---------------------------------------------------------------------
@@ -242,33 +243,33 @@ function renderEditor() {
             const inputsHtml = `
                 <div class="editor-grid">
                     <div class="editor-field">
-                        <div class="field-header"><label>Speed</label><span class="range-hint">0-10</span></div>
+                        <div class="field-header"><label>${t('field.speed')}</label><span class="range-hint">0-10</span></div>
                         <input type="number" inputmode="decimal" id="inp-speed-${stepIndex}-${optIndex}" value="${speed}" step="0.5" min="0" max="10"
                             onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPEED}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>Spin</label><span class="range-hint" id="lbl-spin-${stepIndex}-${optIndex}">Max ${currentMaxSpin}</span></div>
+                        <div class="field-header"><label>${t('field.spin')}</label><span class="range-hint" id="lbl-spin-${stepIndex}-${optIndex}">${t('unit.max', { n: currentMaxSpin })}</span></div>
                         <input type="number" inputmode="decimal" id="inp-spin-${stepIndex}-${optIndex}" value="${spin}" step="0.5" min="0" max="${currentMaxSpin}"
                             style="${spinStyle}"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPIN}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>Height</label><span class="range-hint">-50/100</span></div>
+                        <div class="field-header"><label>${t('field.height')}</label><span class="range-hint">-50/100</span></div>
                         <input type="number" inputmode="decimal" value="${ballParams[B.HEIGHT]}" step="1" min="-50" max="100"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.HEIGHT}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>Drop</label><span class="range-hint">L/R</span></div>
+                        <div class="field-header"><label>${t('field.drop')}</label><span class="range-hint">${t('field.dropHint')}</span></div>
                         <input type="number" inputmode="decimal" value="${ballParams[B.DROP]}" step="0.5" min="-10" max="10"
                             onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.DROP}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>BPM</label><span class="range-hint">30-90</span></div>
+                        <div class="field-header"><label>${t('field.bpm')}</label><span class="range-hint">30-90</span></div>
                         <input type="number" inputmode="decimal" value="${bpmValue}" step="1" min="30" max="90"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.FREQ}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>Reps</label><span class="range-hint">#</span></div>
+                        <div class="field-header"><label>${t('field.reps')}</label><span class="range-hint">#</span></div>
                         <input type="number" inputmode="decimal" value="${ballParams[B.REPS]}" step="1" min="1" max="200"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.REPS}, this.value)">
                     </div>
@@ -280,20 +281,20 @@ function renderEditor() {
                 <div class="card-actions">
                      <button class="btn-action btn-act-test"
                              onclick="window.handleTestBall(${stepIndex}, ${optIndex})"
-                             ${isConnected && isActive ? '' : 'disabled'}>Test</button>
+                             ${isConnected && isActive ? '' : 'disabled'}>${t('action.test')}</button>
                      <button class="btn-action btn-act-clone"
-                             onclick="window.handleAddVariant(${stepIndex}, ${optIndex})">+ Variant</button>
+                             onclick="window.handleAddVariant(${stepIndex}, ${optIndex})">${t('editor.addVariant')}</button>
                      <button class="btn-action btn-act-del"
                              onclick="window.handleDeleteBall(${stepIndex}, ${optIndex})"
-                             ${isLastBall ? 'disabled' : ''}>Delete</button>
-                     <button class="btn-action btn-act-preset" title="Save this ball as a preset"
+                             ${isLastBall ? 'disabled' : ''}>${t('action.delete')}</button>
+                     <button class="btn-action btn-act-preset" title="${t('editor.saveBallAsPreset')}"
                              onclick="window.handleSaveBallAsPreset(${stepIndex}, ${optIndex})">
                          <svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path></svg>
                      </button>
                 </div>
             `;
             
-            const label = stepOptions.length > 1 ? `<span class="option-label">Variant ${optIndex + 1}</span>` : '';
+            const label = stepOptions.length > 1 ? `<span class="option-label">${t('editor.variant', { n: optIndex + 1 })}</span>` : '';
             optDiv.innerHTML = label + toggleHtml + inputsHtml + actionsHtml;
             groupDiv.appendChild(optDiv);
         });
@@ -308,7 +309,7 @@ function renderEditor() {
         <button class="btn-swap"
                 style="color:var(--primary); border-color:var(--primary); width:32px; height:32px;"
                 onclick="window.handleAddSequenceStep(${tempDrillData.length - 1})"
-                title="Duplicate the last ball">
+                title="${t('editor.duplicateLastBall')}">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -327,11 +328,19 @@ function renderEditor() {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path>
         </svg>
-        <span>Add from preset</span>`;
+        <span>${t('editor.addFromPreset')}</span>`;
     modalBody.appendChild(bottomEntry);
 }
 
 // --- HANDLERS ---
+
+// The editor is the one surface that stays open across a language change, so
+// it redraws itself. `tempDrillData` is the same "is it open" signal
+// closeEditor() already relies on; a closed editor has nothing to redraw and
+// rebuilding it would throw away the user's scroll position for nothing.
+document.addEventListener('locale-changed', () => {
+    if (tempDrillData) renderEditor();
+});
 
 window.handleScatterChange = (stepIdx, value) => {
     if (!tempDrillData) return;
@@ -343,7 +352,7 @@ window.handleScatterChange = (stepIdx, value) => {
     const maxAllowed = maxScatterFor(ball[3]);
     if (val > maxAllowed) {
         val = maxAllowed;
-        showToast(`Limit is ${val} for this Drop position`);
+        showToast(t('toast.scatterLimit', { n: val }));
     }
 
     ball[10] = clamp(val, 0, maxAllowed);
@@ -379,7 +388,7 @@ window.handleEditorInput = (stepIdx, optIdx, paramIdx, value) => {
         const spinInput = document.getElementById(`inp-spin-${stepIdx}-${optIdx}`);
         const spinLabel = document.getElementById(`lbl-spin-${stepIdx}-${optIdx}`);
         if (spinInput) { spinInput.max = maxAllowed; spinInput.value = ball[B.SPIN]; }
-        if (spinLabel) spinLabel.textContent = `Max ${maxAllowed}`;
+        if (spinLabel) spinLabel.textContent = t('unit.max', { n: maxAllowed });
     }
 
     if (paramIdx === B.SPEED || paramIdx === B.SPIN) {
@@ -446,7 +455,7 @@ window.handleAddVariant = (stepIndex, sourceOptIndex) => {
 
 window.handleDeleteBall = (stepIdx, optIdx) => {
     if (tempDrillData.length <= 1 && tempDrillData[0].length <= 1) {
-        showToast("Cannot delete last ball"); return;
+        showToast(t('toast.cannotDeleteLastBall')); return;
     }
     tempDrillData[stepIdx].splice(optIdx, 1);
     if (tempDrillData[stepIdx].length === 0) tempDrillData.splice(stepIdx, 1);
@@ -481,13 +490,13 @@ window.selectSaveCategory = (val, btn) => {
 
 window.performSaveAs = () => {
     const newName = document.getElementById('save-name').value.trim();
-    if(!newName) { showToast("Enter a name"); return; }
-    if (newName.length > 40) { showToast("Name too long"); return; }
-    if (!/^[a-zA-Z0-9.\-#\[\]><\+\)\( ]+$/.test(newName)) { showToast("Invalid characters"); return; }
+    if(!newName) { showToast(t('toast.enterAName')); return; }
+    if (newName.length > 40) { showToast(t('toast.nameTooLong')); return; }
+    if (!/^[a-zA-Z0-9.\-#\[\]><\+\)\( ]+$/.test(newName)) { showToast(t('toast.invalidCharacters')); return; }
 
     const targetCat = selectedSaveCat;
     if (userCustomDrills[targetCat].length >= 100) { 
-            showToast("That bank is full (Max 100)!"); return; 
+            showToast(t('toast.bankFullMax100')); return; 
     }
 
     const catChar = targetCat.split('-')[1].toUpperCase(); 
@@ -512,12 +521,12 @@ window.performSaveAs = () => {
     
     const tabBtn = document.querySelector(`.tab-btn[onclick*="${targetCat}"]`);
     if (tabBtn) switchTab(targetCat, tabBtn);
-    showToast(`Saved to ${catChar}`);
+    showToast(t('toast.savedTo', { bank: catChar }));
 };
 
 window.handleDeleteDrill = () => {
     if (!editingDrillKey || !editingDrillKey.startsWith('cust_')) return;
-    if (!confirm("Delete this drill?")) return;
+    if (!confirm(t('confirm.deleteDrill'))) return;
 
     const parts = editingDrillKey.split('_');
     const catKey = `custom-${parts[1].toLowerCase()}`;
@@ -530,7 +539,7 @@ window.handleDeleteDrill = () => {
     localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
 
     closeEditor();
-    showToast("Drill Deleted");
+    showToast(t('toast.drillDeleted'));
     document.dispatchEvent(new CustomEvent('drills-updated'));
 };
 
@@ -538,11 +547,11 @@ window.handleRenameDrill = () => {
     if (!editingDrillKey || !editingDrillKey.startsWith('cust_')) return;
     
     const nameEl = document.getElementById('editor-drill-name');
-    const currentName = nameEl ? nameEl.textContent : "New Drill";
+    const currentName = nameEl ? nameEl.textContent : t('drill.newDrill');
     
-    const newName = prompt("Rename Drill:", currentName);
+    const newName = prompt(t('prompt.renameDrill'), currentName);
     if (!newName || newName === currentName) return;
-    if (newName.length > 40) { showToast("Name too long"); return; }
+    if (newName.length > 40) { showToast(t('toast.nameTooLong')); return; }
 
     const parts = editingDrillKey.split('_'); 
     const catChar = parts[1]; 
@@ -562,7 +571,7 @@ window.handleRenameDrill = () => {
         localStorage.setItem('custom_data', JSON.stringify(userCustomDrills)); 
         saveDrillsToStorage(); 
         updateTitleDisplay(newKey);
-        showToast("Renamed");
+        showToast(t('toast.renamed'));
         document.dispatchEvent(new CustomEvent('drills-updated'));
     }
 };
@@ -580,7 +589,7 @@ function updateTitleDisplay(key) {
            displayName = entry ? entry.name : key.replace(/^cust_[A-C]_/, '');
         }
     } else {
-        displayName = key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        displayName = drillDisplayName(key);
     }
     
     const nameEl = document.getElementById('editor-drill-name');
@@ -605,7 +614,7 @@ function updateTitleDisplay(key) {
 }
 
 window.handleTestBall = async (stepIdx, optIdx) => {
-    if (!bleState.isConnected) { showToast("Device not connected"); return; }
+    if (!bleState.isConnected) { showToast(t('toast.notConnected')); return; }
     const d = tempDrillData[stepIdx][optIdx];
     const ballData = packBall(d[0], d[1], d[2], d[3], d[4], 1); 
     const buffer = new ArrayBuffer(31); 
@@ -615,12 +624,12 @@ window.handleTestBall = async (stepIdx, optIdx) => {
     view.setUint16(4, 1, true); 
     view.setUint8(6, 0);
     new Uint8Array(buffer).set(ballData, 7);
-    try { await sendPacket(new Uint8Array(buffer)); showToast("Test Ball Fired"); } 
-    catch (e) { console.error(e); showToast("Test Failed"); }
+    try { await sendPacket(new Uint8Array(buffer)); showToast(t('toast.testBallFired')); } 
+    catch (e) { console.error(e); showToast(t('toast.testFailed')); }
 };
 
 window.handleTestCombo = async () => {
-    if (!bleState.isConnected) { showToast("Device not connected"); return; }
+    if (!bleState.isConnected) { showToast(t('toast.notConnected')); return; }
     if (!tempDrillData || tempDrillData.length === 0) return;
     const balls = [];
     tempDrillData.forEach(stepOptions => {
@@ -644,7 +653,7 @@ window.handleTestCombo = async () => {
         
         balls.push(packBall(d[0], d[1], d[2], d[3], d[4], 1));
     });
-    if (balls.length === 0) { showToast("No active balls"); return; }
+    if (balls.length === 0) { showToast(t('toast.noActiveBalls')); return; }
     const totalLen = 7 + (balls.length * 24);
     const buffer = new ArrayBuffer(totalLen);
     const view = new DataView(buffer);
@@ -655,13 +664,13 @@ window.handleTestCombo = async () => {
     view.setUint8(6, 0);
     let offset = 7;
     balls.forEach(b => { uint8.set(b, offset); offset += 24; });
-    try { await sendPacket(uint8); showToast("Testing Drill..."); } 
-    catch (e) { console.error(e); showToast("Test Failed"); }
+    try { await sendPacket(uint8); showToast(t('toast.testingDrill')); } 
+    catch (e) { console.error(e); showToast(t('toast.testFailed')); }
 };
 
 window.handleShareDrill = async () => {
     if (!editingDrillKey || !tempDrillData) return;
-    let drillName = "Shared Drill";
+    let drillName = t('drill.sharedDrill');
     const nameEl = document.getElementById('editor-drill-name');
     if(nameEl) drillName = nameEl.textContent;
 
@@ -681,13 +690,13 @@ window.handleShareDrill = async () => {
         const code = await uploadDrill(payload);
         if (navigator.clipboard && navigator.clipboard.writeText) {
              await navigator.clipboard.writeText(code);
-             alert(`Drill Shared Successfully!\n\nCode: ${code}\n\n(Copied to clipboard)`);
+             alert(t('alert.shareSuccess', { code }));
         } else {
-             prompt("Drill Shared! Copy this code:", code);
+             prompt(t('prompt.shareCopy'), code);
         }
     } catch (e) {
         console.error("Share Error:", e);
-        showToast("Share failed. Check network.");
+        showToast(t('toast.shareFailed'));
     } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
