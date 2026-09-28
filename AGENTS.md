@@ -178,7 +178,7 @@ the whole repo":
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 120 browser checks in `tests/integration.html`, driven through
+and the 138 browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -202,12 +202,12 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (120 checks, needs the HTTP server above):
+Browser integration (138 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(120) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(138) or FAIL(n)
 ```
 
 Open it in a normal browser to see each check. It drives the real editor, the
