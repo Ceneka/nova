@@ -1097,37 +1097,22 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
    their placement/depth variations expanded. See js/presets.js.
    ========================================================================== */
 
-/* Header button in the drill editor */
-.btn-header-presets {
-    background: transparent;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    padding: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s;
-    flex-shrink: 0;
-}
-.btn-header-presets:hover { transform: scale(1.1); color: var(--text); }
-.btn-header-presets { color: var(--primary-ink); }
-.btn-header-presets svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-/* Main "add from preset" entry point, at the top of the drill editor body. */
+/* "Add from preset", used at the top of the drill editor body and again under
+   the "+" at the end. One class for both: they are the same action, so they
+   look the same. */
 .preset-entry {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 13px;
+    gap: 7px;
+    padding: 11px;
     margin: 0 0 14px 0;
     border: 2px dashed var(--primary);
     border-radius: 12px;
     background: var(--primary-dim);
     color: var(--primary-ink);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -1136,31 +1121,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 .preset-entry:hover { filter: brightness(0.97); }
 .preset-entry:active { transform: scale(0.99); }
-.preset-entry svg { flex-shrink: 0; fill: none; stroke: currentColor; }
-
-/* Compact variant sitting directly under the "+" at the end of the list. */
-.preset-entry-inline {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 11px;
-    margin: 0 0 20px 0;
-    border: 2px dashed var(--primary);
-    border-radius: 12px;
-    background: transparent;
-    color: var(--primary-ink);
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-}
-.preset-entry-inline:hover { background: var(--primary-dim); }
-.preset-entry-inline:active { transform: scale(0.99); }
-.preset-entry-inline svg { flex-shrink: 0; fill: none; stroke: currentColor; }
+.preset-entry svg { flex-shrink: 0; width: 16px; height: 16px; fill: none; stroke: currentColor; }
 
 /* --- PRESET CARDS (picker) --- */
 .preset-card {

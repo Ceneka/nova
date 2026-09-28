@@ -134,15 +134,15 @@ function renderEditor() {
     const isConnected = bleState.isConnected;
     syncDrillContext();
 
-    // Prominent entry point. The header star is easy to miss, and the "+"
-    // at the bottom of the list only duplicates the previous ball - which is
-    // exactly what someone reaches for when they want to add a ball, so the
-    // preset route needs to be unmissable from the top of the list too.
+    // The first thing in the editor, so the preset route is unmissable. The
+    // "+" at the bottom of the list only duplicates the previous ball - which
+    // is exactly what someone reaches for when they want to add a ball. The
+    // same button is repeated at the end of the list, not instead of this one.
     const entry = document.createElement('button');
     entry.className = 'preset-entry';
     entry.onclick = () => window.openPresetSheet();
     entry.innerHTML = `
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path>
         </svg>
         <span>Add from preset</span>`;
@@ -318,9 +318,10 @@ function renderEditor() {
 
     // Sitting right under the "+", so "I want another ball" leads here too.
     // The "+" only duplicates the previous ball, which is not what people
-    // reaching for it usually want.
+    // reaching for it usually want. Same .preset-entry class as the top one:
+    // identical action, identical styling.
     const bottomEntry = document.createElement('button');
-    bottomEntry.className = 'preset-entry-inline';
+    bottomEntry.className = 'preset-entry';
     bottomEntry.onclick = () => window.openPresetSheet();
     bottomEntry.innerHTML = `
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

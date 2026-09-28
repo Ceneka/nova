@@ -364,8 +364,10 @@ window.closePresetSheet();
 /* ---- 16. the preset entry point also sits next to the "+" ---- */
 // loop(b) still has room; push(b) was filled to the 20-step cap by section 5.
 openEditor('loop(b)');
-const inline = document.querySelector('#editor-body .preset-entry-inline');
-ok('there is an inline preset button under the "+"', !!inline);
+const allEntries = [...document.querySelectorAll('#editor-body .preset-entry')];
+eq('both preset entry points are present', allEntries.length, 2);
+const inline = allEntries[allEntries.length - 1];
+ok('there is a preset button under the "+"', !!inline);
 if (inline) {
     const plus = document.querySelector('#editor-body .swap-zone:last-of-type .btn-swap');
     ok('it sits directly below the "+" button',
@@ -373,6 +375,20 @@ if (inline) {
     ok('it is labelled', inline.textContent.trim() === 'Add from preset', inline.textContent.trim());
     ok('it is at least 40px tall', inline.getBoundingClientRect().height >= 40,
        Math.round(inline.getBoundingClientRect().height) + 'px');
+    // The two are the same action, so they must be indistinguishable.
+    const topBox = allEntries[0];
+    const styleOf = el => {
+        const s = getComputedStyle(el);
+        return { padding: s.padding, fontSize: s.fontSize, borderWidth: s.borderTopWidth,
+                 borderStyle: s.borderTopStyle, borderColor: s.borderTopColor,
+                 background: s.backgroundColor, borderRadius: s.borderRadius,
+                 height: el.getBoundingClientRect().height };
+    };
+    const a = styleOf(topBox), b = styleOf(inline);
+    const diff = Object.keys(a).filter(k => a[k] !== b[k]);
+    ok('both preset buttons are styled identically', diff.length === 0, diff.join(', '));
+    ok('the header no longer carries a duplicate preset star',
+       !document.querySelector('#editor-modal .btn-header-presets'));
     inline.click();
     ok('it opens the preset sheet', document.getElementById('preset-sheet').classList.contains('open'));
     window.closePresetSheet();
