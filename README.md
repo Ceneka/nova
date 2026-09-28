@@ -3,6 +3,10 @@
 A pretty web client for the Nova S Pro table tennis robot. 
 This tool can be used as a replacement for the original app, removing the requirements for server connectivity and user login.
 
+An independent, actively developed continuation of the original
+[**olanga/nova**](https://github.com/olanga/nova). See
+[Credits](#credits) and [What this fork adds](#what-this-fork-adds).
+
 | Main | Editor | Countdown |
 | :---: | :---: | :---: |
 | <img src="./images/main.png" width="300"> | <img src="./images/editor.png" width="300"> | <img src="./images/countdown.png" width="300"> |
@@ -29,8 +33,8 @@ This tool can be used as a replacement for the original app, removing the requir
   * **Fully customizable drills** Add and remove drills and balls. Share, export and import settings.
   * **Data Persistence:** Settings and drills saved to browser local storage.
   * **Themes:** 4 options, including dark mode.
-  * **Settings screen:** themes, the preset library, drill defaults and data resets live in one place, behind the menu.
-  * **Stratistics:**  accumulated counters (total balls/drills).<br>
+  * **Settings screen:** themes, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
+  * **Statistics:** a stored history of every session you have trained, with totals, a 14-day chart, your most-played drills, and per-session delete.
 
 
 **Drill Management**
@@ -61,8 +65,8 @@ A preset is a named ball recipe plus up to two variation axes:
 Both axes are optional and fully editable: rename the labels, change the
 values, add or remove rows, or leave one axis empty to pin that value.
 
-The editor header has a star button that opens the preset picker. Each preset
-offers three ways in:
+The top of the drill editor has an "Add from preset" button, repeated at the
+bottom of the list where you add balls. Each preset offers three ways in:
 
 | Action | Result |
 | --- | --- |
@@ -76,7 +80,7 @@ a single number.
 
 A starter library of 8 serve and rally presets ships with the app; edit, rename
 or delete any of them. Presets can be exported and imported as their own JSON
-or CSV file (menu → Presets) so a library can move between devices. This is
+or CSV file (Settings → Presets) so a library can move between devices. This is
 separate from the drill CSV below, which is unchanged and still shared with
 other apps.
 
@@ -111,15 +115,34 @@ B;1;Drill B1;7.5;5;back;50;5;60;1
 | **Reps** | Repetitions | 1 - 200 | 1 |
 
 
-## Credits & Support
+## What this fork adds
 
-Additional informations: [Wiki](https://github.com/olanga/nova/wiki/General-information)
+Work done here on top of the original, most of it driven by things the
+upstream app could not do or did not get right:
 
-Spinsight measurements: [Wiki](https://github.com/olanga/nova/wiki/Spinsight-measurements-with-Nova-S-Pro)
+  * **Ball presets** — a library of named ball recipes dropped into any drill with placement and depth variations expanded, in their own JSON/CSV format so they cannot break the shared drill CSV.
+  * **Settings as a full screen** — themes, presets, statistics and data resets moved out of the hamburger menu, which now carries only drill actions.
+  * **Training history** — sessions logged per robot connection, with totals, a 14-day chart, a most-played ranking, and the ability to delete a single session or all of them.
+  * **Fixes** — connecting silently doing nothing, the 20-drill category cap, the Settings back button, preset field overflow, and three identical-looking preset entry points in the editor.
+  * **Continuous deployment** — pushing to `main` runs the test suites and publishes to GitHub Pages. There is still no build step.
 
-Based on findings by [smee](https://github.com/smee/nova-s-custom-drills) and plunder.
+The drill CSV format, the ball array and the Bluetooth packet format are
+unchanged, so drills remain interchangeable with the original app.
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E1E21PUFEQ)
+## Credits
+
+This project is an independent continuation of the original
+[**olanga/nova**](https://github.com/olanga/nova) and is not affiliated with or
+endorsed by its author. The drill CSV format documented above is theirs, and
+is deliberately kept compatible.
+
+Upstream documentation that still applies:
+
+  * [Wiki — general information](https://github.com/olanga/nova/wiki/General-information)
+  * [Wiki — Spinsight measurements with Nova S Pro](https://github.com/olanga/nova/wiki/Spinsight-measurements-with-Nova-S-Pro)
+
+Spinsight measurements are based on findings by
+[smee](https://github.com/smee/nova-s-custom-drills) and plunder.
 
 ## Development
 
