@@ -146,6 +146,202 @@ export function voiceErrorText(code) {
 
 // --- speech in --------------------------------------------------------------
 
+// --- the screen lock -------------------------------------------------------
+//
+// Two features depend on this and it is worth being blunt about why.
+//
+// **A web page cannot hold a microphone once the browser suspends it**, and
+// Chrome suspends `SpeechRecognition` when the page is hidden OR when the
+// screen locks. That is what makes a wake word viable at all in a page: keep
+// the screen awake, the page stays foreground, and the microphone survives.
+// Without the lock an "always listening" wake word dies the moment the phone
+// dims - which is about fifteen seconds at a table.
+//
+// **The browser releases the lock itself** whenever the page is hidden, so
+// holding it is not a one-shot: it has to be re-acquired on every
+// `visibilitychange` back to visible, or it works exactly once.
+//
+// The lock is released for good when the panel closes, so the app never leaves
+// a phone awake by itself.
+
+let screenLock = null;
+let screenLockWanted = false;
+
+/** Whether this browser offers the API at all. */
+export function isScreenLockSupported() {
+    return typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+}
+
+export function isScreenLockHeld() {
+    return !!screenLock;
+}
+
+/**
+ * Ask for the lock. Safe to call when one is already held.
+ * @returns {Promise<boolean>} whether the lock is now held
+ */
+export async function acquireScreenLock({ request = null } = {}) {
+    if (screenLock) return true;
+    const ask = request
+        || (typeof navigator !== 'undefined' && navigator.wakeLock
+            ? navigator.wakeLock.request.bind(navigator.wakeLock)
+            : null);
+    if (!ask) return false;
+
+    try {
+        screenLock = await ask('screen');
+    } catch {
+        // Denied, or the document is not visible. Not worth showing anything:
+        // the screen will simply sleep, which is what would have happened
+        // anyway.
+        screenLock = null;
+        return false;
+    }
+
+    // The browser takes it away on its own schedule, and `release` is the only
+    // notification we get - it is how we learn to re-acquire.
+    try {
+        screenLock?.addEventListener?.('release', () => { screenLock = null; });
+    } catch { /* a handle without addEventListener is still usable */ }
+    return true;
+}
+
+/** Let the screen sleep again, and stop trying to take the lock back. */
+export function releaseScreenLock() {
+    screenLockWanted = false;
+    const held = screenLock;
+    screenLock = null;
+    if (held) { try { held.release?.(); } catch { /* already gone */ } }
+}
+
+/**
+ * Keep the screen awake for as long as `wants` is true, re-acquiring whenever
+ * the browser takes it back. This is the one the panel calls, kept separate
+ * from acquire/release so the lifecycle lives here rather than at six call
+ * sites.
+ */
+export function holdScreenLock(wants) {
+    screenLockWanted = !!wants;
+    if (!screenLockWanted) { releaseScreenLock(); return false; }
+    if (!isScreenLockSupported()) return false;
+    acquireScreenLock();
+    return true;
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+        if (!screenLockWanted) return;
+        if (document.visibilityState !== 'visible') {
+            // The browser is about to take it; let it, and remember we still
+            // want it, so the handler below re-acquires on the way back.
+            const held = screenLock;
+            screenLock = null;
+            if (held) { try { held.release?.(); } catch { /* already gone */ } }
+            return;
+        }
+        if (!screenLock) acquireScreenLock();
+    });
+}
+
+// --- the wake phrase --------------------------------------------------------
+//
+// "Hey Nova" and friends. A pure function, because it is the one piece of this
+// feature that can be tested exhaustively without a microphone.
+//
+// Three things a recogniser hands back that a naive `startsWith` gets wrong:
+// **case**, **accents** ("revez" for "revés"), and **punctuation and fillers**
+// ("Okay, hey nova - push b" hides the phrase behind two things). So the
+// comparison runs on folded, de-punctuated text, and only at the START - a
+// wake word that fires mid-sentence is worse than no wake word at all.
+
+/** The phrases out of the box. "Nova" is the app's name, so none of these need translating. */
+export const DEFAULT_WAKE_PHRASES = ['hey nova', 'ok nova', 'nova'];
+
+/** Strip accents and lower-case, for comparing what was heard to what we meant. */
+export function foldSpeech(s) {
+    return String(s ?? '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')
+        .trim();
+}
+
+/**
+ * Words people say before the thing they mean. Stripped before comparing, so
+ * "Okay, hey nova - push b" still wakes. Deliberately CAPPED at
+ * MAX_FILLERS: an unbounded strip would eat real words, and "muy bueno" must
+ * not turn into a prefix match for every sentence that happens to start with
+ * a greeting.
+ */
+const WAKE_FILLERS = new Set([
+    'ok', 'okay', 'okey', 'hey', 'hola', 'bueno', 'buenas', 'bien', 'muy',
+    'ehm', 'eh', 'ah', 'dale', 'venga', 'perfecto', 'listo', 'yeah', 'yep', 'yes'
+]);
+const MAX_FILLERS = 2;
+
+/** Punctuation, including the inverted marks NFKD does not decompose. */
+const PUNCTUATION = /[.,!?;:"'`´“”()\[\]{}¡¿…—–-]/g;
+
+/**
+ * Does `text` begin with a wake phrase?
+ *
+ * @param {string} text
+ * @param {string[]} [phrases]
+ * @returns {{phrase: string, rest: string, alone: boolean}|null}
+ *          `rest` is what is left to act on; `alone` means the whole utterance
+ *          WAS the wake word - which is "I am here", not "do something".
+ */
+export function matchWakePhrase(text, phrases = DEFAULT_WAKE_PHRASES) {
+    const said = String(text ?? '').trim();
+    if (!said) return null;
+
+    // Fold accents and case, turn punctuation into spaces, and drop leading
+    // fillers, so "¡Hey, Nova!" and "okay hey nova push b" both compare right.
+    // Two parallel token lists: the FOLDED one is what we compare against the
+    // phrases, the ORIGINAL one is what the user gets back. Folding is
+    // lossy - it drops accents - and the transcript is the user's own words, so
+    // handing back "saque al reves" for something they said as "saque al
+    // revés" is a small lie about what was heard. Splitting the original on
+    // the same punctuation keeps the two aligned, since folding never changes
+    // how many tokens there are.
+    const origTokens = said.replace(PUNCTUATION, ' ').split(/\s+/).filter(Boolean);
+    const words = origTokens.map(tok => foldSpeech(tok)).filter(Boolean);
+
+    const list = (Array.isArray(phrases) && phrases.length ? phrases : DEFAULT_WAKE_PHRASES)
+        .map(p => foldSpeech(p).replace(PUNCTUATION, ' ').split(/\s+/).filter(Boolean).join(' '))
+        .filter(Boolean)
+        // Longest first, so "hey nova" is preferred over "nova" when both
+        // match. Otherwise the short one always wins and the specific phrase
+        // never gets a chance.
+        .sort((a, b) => b.length - a.length);
+
+    // Try the phrase at offset 0 FIRST, and only fall back to skipping
+    // fillers. Stripping first looks equivalent and is not: "hey" is both a
+    // filler AND the first word of the shipped phrase "hey nova", so a
+    // strip-then-match matcher silently degraded every "hey nova" to "nova"
+    // and the specific phrase could never fire. Matching first also means a
+    // custom phrase is never eaten by the filler list.
+    for (let start = 0; start <= MAX_FILLERS; start++) {
+        if (start > 0 && !WAKE_FILLERS.has(words[start - 1])) break;
+
+        for (const phrase of list) {
+            const wanted = phrase.split(' ');
+            if (words.slice(start, start + wanted.length).join(' ') !== phrase) continue;
+
+            const used = start + wanted.length;
+            // The ORIGINAL tokens from `used` onwards, not the folded ones.
+            // If the two lists ever disagreed - a pathological fold - the
+            // folded text is better than a mis-aligned splice, so fall back.
+            const tail = origTokens.length === words.length
+                ? origTokens.slice(used)
+                : words.slice(used);
+            const rest = tail.join(' ').replace(/[.,!?;:]+$/, '').trim();
+            return { phrase, rest, alone: used >= words.length };
+        }
+    }
+    return null;
+}
+
 let recognition = null;
 let listening = false;
 
@@ -159,6 +355,7 @@ export function isListening() {
  */
 export function startListening({
     lang = null,
+    continuous = false,
     onInterim = null,
     onFinal = null,
     onError = null,
@@ -184,7 +381,10 @@ export function startListening({
 
     rec.lang = lang || getSpeechLang();
     rec.interimResults = true;
-    rec.continuous = false;
+    // Armed mode listens across turns. The engine still ends the session on
+    // its own schedule - Chrome stops after a pause - which is what the
+    // auto-restart below exists for.
+    rec.continuous = !!continuous;
     rec.maxAlternatives = 1;
     // The single biggest accuracy win for exactly this vocabulary.
     if ('phrases' in rec) {
@@ -374,6 +574,95 @@ export function speak(text, { lang = null, rate = 1.02 } = {}) {
     }
 }
 
+// --- armed (wake word) mode -------------------------------------------------
+//
+// "Always listening" in a page, with the honest caveats baked in rather than
+// buried: the browser decides when to stop the microphone, so this restarts it,
+// and the whole thing only works while the page is in the foreground with the
+// screen awake. `holdScreenLock()` is what buys that.
+//
+// Everything said while armed is DISCARDED unless it starts with a wake
+// phrase. Showing every stray sentence in the transcript would make the panel
+// unusable, and acting on them would be worse.
+
+let armed = false;
+let armedOpts = null;
+let restartTimer = null;
+
+/** How long to wait before asking for the microphone again after the engine stops. */
+const RESTART_DELAY_MS = 250;
+
+export function isArmed() {
+    return armed;
+}
+
+/**
+ * Stay listening until `disarm()`.
+ *
+ * @param {object} [options]
+ * @param {string[]} [options.phrases]  wake phrases; defaults to DEFAULT_WAKE_PHRASES
+ * @param {Function} [options.onWake]   ({rest, alone, phrase}) => void
+ * @param {Function} [options.onState]  (listening: boolean) => void
+ * @param {Function} [options.onError]  (message: string) => void
+ */
+export function arm({ phrases = null, onWake = null, onState = null, onError = null } = {}) {
+    if (armed) return true;
+    armed = true;
+    armedOpts = {
+        phrases: Array.isArray(phrases) && phrases.length ? phrases : DEFAULT_WAKE_PHRASES,
+        onWake, onState, onError
+    };
+
+    // The whole point of the feature: keep the screen on so the browser does
+    // not suspend the microphone we are about to ask for.
+    holdScreenLock(true);
+    listenOnce();
+    return true;
+}
+
+function listenOnce() {
+    if (!armed) return;
+    startListening({
+        continuous: true,
+        onInterim: (text) => armedOpts?.onState?.(true, text),
+        onFinal: (text) => {
+            if (!armed) return;
+            const hit = matchWakePhrase(text, armedOpts?.phrases);
+            // No wake phrase: the user was talking to somebody else, or to
+            // themselves. Drop it on the floor and keep listening.
+            if (!hit) return;
+            armedOpts?.onWake?.(hit);
+        },
+        onError: (message) => {
+            if (!armed) return;
+            armedOpts?.onError?.(message);
+            // A permission refusal is not going to fix itself, and retrying it
+            // in a loop would be a mic light blinking forever.
+            if (/microphone|mic|permiso|access/i.test(message)) disarm();
+        },
+        onEnd: () => {
+            armedOpts?.onState?.(false);
+            if (!armed) return;
+            // The engine ended the session. Chrome does this on its own after
+            // a pause, so the restart is the normal path, not an error path.
+            clearTimeout(restartTimer);
+            restartTimer = setTimeout(listenOnce, RESTART_DELAY_MS);
+        }
+    });
+}
+
+/** Stop listening and give the screen back. */
+export function disarm() {
+    if (!armed) return false;
+    armed = false;
+    armedOpts = null;
+    clearTimeout(restartTimer);
+    restartTimer = null;
+    stopListening();
+    holdScreenLock(false);
+    return true;
+}
+
 /** Stop mid-sentence. Used by barge-in and by closing the panel. */
 export function stopSpeaking() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -387,6 +676,8 @@ export function stopSpeaking() {
 
 /** The panel calls this when it closes: no microphone, no voice, no leak. */
 export function releaseVoice() {
+    disarm();
     stopListening();
     stopSpeaking();
+    holdScreenLock(false);
 }

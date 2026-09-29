@@ -545,6 +545,106 @@ test('the API speech-in path has TWO wire formats, and picks by provider', async
     assert.ok(!boom.message.includes('SUPERSECRET'), boom.message);
 });
 
+test('the wake phrase matches only at the start, folded and de-punctuated', async () => {
+    const V = await import('../js/aiVoice.js');
+
+    // The three things a recogniser hands back that a naive startsWith misses.
+    assert.deepEqual(V.matchWakePhrase('Hey Nova push b fuerte'),
+        { phrase: 'hey nova', rest: 'push b fuerte', alone: false });
+    assert.deepEqual(V.matchWakePhrase('¡Hey, Nova! - saque corto a la derecha'),
+        { phrase: 'hey nova', rest: 'saque corto a la derecha', alone: false });
+    assert.deepEqual(V.matchWakePhrase('okay hey nova push b'),
+        { phrase: 'hey nova', rest: 'push b', alone: false });
+
+    // The wake word ALONE means "I am here", not "do something".
+    assert.deepEqual(V.matchWakePhrase('hey nova'),
+        { phrase: 'hey nova', rest: '', alone: true });
+
+    // A specific phrase beats the bare one when both match.
+    assert.equal(V.matchWakePhrase('nova drive f').phrase, 'nova');
+
+    // Accented Spanish survives being handed back to the parser.
+    assert.equal(V.matchWakePhrase('hey nova, saque al revés').rest, 'saque al revés');
+});
+
+test('a wake word mid-sentence does not fire', async () => {
+    const V = await import('../js/aiVoice.js');
+    // A wake word that fires anywhere is worse than no wake word at all: it
+    // would answer to "dame un nova al medio".
+    for (const said of ['empujame un drive', 'dame un nova al medio', 'necesito un push', '']) {
+        assert.equal(V.matchWakePhrase(said), null, JSON.stringify(said));
+    }
+});
+
+test('the wake phrase list is the user\'s, and junk in it is dropped', async () => {
+    const V = await import('../js/aiVoice.js');
+    assert.equal(V.matchWakePhrase('hola nova', ['hola nova'])?.phrase, 'hola nova');
+    assert.equal(V.matchWakePhrase('hey nova', ['hola nova']), null, 'their list replaces ours');
+    // An empty list must not mean "never wake up".
+    assert.ok(V.matchWakePhrase('hey nova', []), 'falls back to the shipped phrases');
+});
+
+test('the screen lock is requested, released, and re-acquired after the browser takes it', async () => {
+    const V = await import('../js/aiVoice.js');
+    V.releaseScreenLock();
+
+    let asked = 0;
+    const listeners = {};
+    const handle = {
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        release: () => { listeners.release?.(); }
+    };
+    const request = async () => { asked++; return handle; };
+
+    // 1. unsupported: asking is a no-op, not a crash.
+    assert.equal(await V.acquireScreenLock({ request: null }), false);
+    assert.equal(V.isScreenLockHeld(), false);
+
+    // 2. granted.
+    assert.equal(await V.acquireScreenLock({ request }), true);
+    assert.equal(V.isScreenLockHeld(), true);
+    // Asking twice does not double-request - a second request throws.
+    assert.equal(await V.acquireScreenLock({ request }), true);
+    assert.equal(asked, 1, 'already held, so not asked again');
+
+    // 3. the browser takes it away on its own schedule; `release` is the only
+    //    notification we get, and it is how we learn to re-acquire.
+    listeners.release();
+    assert.equal(V.isScreenLockHeld(), false);
+    assert.equal(await V.acquireScreenLock({ request }), true);
+    assert.equal(asked, 2, 're-acquired after the browser let go');
+
+    // 4. denied: no lock, and still no crash.
+    V.releaseScreenLock();
+    const denied = await V.acquireScreenLock({ request: async () => { throw new Error('denied'); } });
+    assert.equal(denied, false);
+    assert.equal(V.isScreenLockHeld(), false);
+
+    V.releaseScreenLock();
+});
+
+test('wake phrases and the screen lock survive a junk configuration', async () => {
+    const store2 = new Map();
+    globalThis.localStorage = {
+        getItem: (k) => (store2.has(k) ? store2.get(k) : null),
+        setItem: (k, v) => store2.set(k, String(v)),
+        removeItem: (k) => store2.delete(k),
+        clear: () => store2.clear()
+    };
+    const { getAiConfig, setAiConfig, normalizeConfig } = await import('../js/aiConfig.js');
+
+    assert.equal(normalizeConfig(null).wake.enabled, false, 'arming is never on by default');
+    assert.equal(normalizeConfig(null).screenLock, true);
+    assert.deepEqual(normalizeConfig({ wake: { phrases: 'hey nova, , BAD!!, ok nova' } }).wake.phrases,
+        ['hey nova', 'ok nova'], 'blank and punctuated entries are dropped');
+    assert.deepEqual(normalizeConfig({ wake: { phrases: [] } }).wake.phrases,
+        ['hey nova', 'ok nova', 'nova'], 'an empty list falls back rather than never waking');
+
+    setAiConfig({ wake: { enabled: true, phrases: ['hola nova'] }, screenLock: false });
+    assert.deepEqual(getAiConfig().wake.phrases, ['hola nova']);
+    assert.equal(getAiConfig().screenLock, false);
+});
+
 test('a destructive tool with no confirmation hook declines', async () => {
     // The safe default: no way to ask means do nothing, not "assume yes".
     store.clear();

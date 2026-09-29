@@ -2552,3 +2552,48 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     line-height: 1.5;
     text-align: center;
 }
+
+/* --- armed microphone ----------------------------------------------------
+   Arming the mic is a visible, deliberate state, not a blinking icon. The
+   filled style is the "the microphone is OPEN right now" case, which is a
+   different thing from "we are listening to this one utterance". */
+.ai-icon-btn.armed {
+    border-color: var(--danger);
+    background: var(--accent-fill);
+    color: var(--danger-ink);
+}
+.ai-icon-btn.armed::after {
+    /* A slow pulse, so it reads as live from across a table. Decorative, so
+       it is aria-hidden by virtue of being a pseudo-element. */
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 12px;
+    border: 1px solid var(--danger);
+    opacity: 0.5;
+    animation: ai-pulse 1.8s ease-in-out infinite;
+    pointer-events: none;
+}
+.ai-icon-btn { position: relative; }
+
+@keyframes ai-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 0;   transform: scale(1.12); }
+}
+/* Respect the OS setting rather than animating at somebody who asked us not to. */
+@media (prefers-reduced-motion: reduce) {
+    .ai-icon-btn.armed::after { animation: none; opacity: 0.4; }
+}
+
+.ai-armed-note {
+    margin-top: 8px;
+    padding: 8px 11px;
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    background: var(--card-bg);
+    /* A destructive LABEL, so --danger-ink and not white on --danger. */
+    color: var(--danger-ink);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-align: center;
+}

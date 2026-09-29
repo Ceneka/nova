@@ -172,6 +172,28 @@ your own endpoint for a better model, or for Firefox.
 
 Talking over the assistant cancels its reply, so you can interrupt it.
 
+### "Hey Nova"
+
+Turn on **Settings → AI assistant → Wake word** and the microphone stays open
+while the assistant is on screen. Say *"hey nova"* and the rest of the sentence
+is treated as the drill:
+
+  * "hey nova, saque corto a la derecha" → one short serve to the forehand
+  * "hey nova" on its own just wakes it up, and it waits for the drill
+
+The wake phrases are yours to change — *"hey nova"*, *"ok nova"* and *"nova"*
+ship as defaults, comma separated in Settings. Anything you say that does not
+start with one of them is ignored, so it does not answer to half the room.
+
+**Keep the screen on** is a separate switch, and it is on by default, because a
+browser stops listening once the screen sleeps. A wake word without it is dead
+about fifteen seconds after you stop touching the phone. It is given back the
+moment you close the assistant, so it never leaves your phone awake by itself.
+
+Being straight about the limits: this works while Nova is on screen. A browser
+stops the microphone when the app is closed or the screen is off, so it is not a
+hands-free wake word the way a smart speaker is — for that, keep the tab open.
+
 ## Custom Drills (CSV)
 
 Drills can be imported via CSV. Each category (A, B, C) holds 100 drills; each drill holds 20 balls. Variant balls (pseudo-randomness) share the same ball number.

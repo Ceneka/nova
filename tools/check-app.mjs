@@ -76,6 +76,12 @@ await new Promise((resolve, reject) => {
 await send('Runtime.enable');
 await send('Log.enable');
 await send('Page.enable');
+// The HTTP cache. A browser profile reused across runs will happily serve a
+// STALE js/*.js, and this tool exists to catch things the test suite cannot -
+// so it reading last run's modules makes it worse than useless, silently. It
+// cost a confusing "undefined" while wiring the wake word up.
+await send('Network.enable');
+await send('Network.setCacheDisabled', { cacheDisabled: true });
 await send('Page.navigate', { url: URL_UNDER_TEST });
 
 // Let the modules load, the service worker register and the first paint settle.

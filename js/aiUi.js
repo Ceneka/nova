@@ -63,7 +63,9 @@ import { runAgent } from './aiClient.js';
 import { TOOLS, makeToolHandlers } from './aiAgent.js';
 import { isTextConfigured, getAiConfig } from './aiConfig.js';
 import {
-    startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths
+    startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths,
+    arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
+    holdScreenLock, isScreenLockHeld, isScreenLockSupported
 } from './aiVoice.js';
 import { startSequence, isDrillRunning } from './runner.js';
 import { t, getLang } from './i18n.js';
@@ -103,6 +105,9 @@ export function isAiOpen() {
 export function openAiView() {
     open = true;
     document.getElementById('theme-menu')?.classList.remove('open');
+    // Before the first paint, so a phone handed to somebody does not dim while
+    // they read what the assistant just built.
+    holdScreenLock(!!getAiConfig().screenLock);
     renderAi();
     const view = document.getElementById('ai-view');
     view?.removeAttribute('hidden');
@@ -121,8 +126,10 @@ export function closeAiView() {
         inFlight.abort();
         inFlight = null;
     }
-    // No microphone left open and no voice left talking behind a closed panel.
+    // No microphone left open, no voice still talking, and the screen handed
+    // back. A panel that leaves the phone awake is a flat battery.
     releaseVoice();
+    holdScreenLock(false);
     streaming = '';
     const view = document.getElementById('ai-view');
     view?.classList.remove('active');
@@ -289,6 +296,32 @@ function aiTrace(lines) {
     renderAi();
 }
 
+// --- the screen lock --------------------------------------------------------
+
+/**
+ * Hold the screen awake while the panel is open - unless the user turned it
+ * off. This is not only battery politeness: the browser suspends the
+ * microphone when the screen locks, and that is the whole thing the wake word
+ * depends on, so turning this off turns the wake word off with it.
+ */
+function syncScreenLock() {
+    if (!getAiConfig().screenLock) {
+        holdScreenLock(false);
+        return;
+    }
+    if (isArmed() || isListening() || getDraft()) {
+        holdScreenLock(true);
+    }
+}
+
+export function aiScreenLockState() {
+    return {
+        supported: isScreenLockSupported(),
+        held: isScreenLockHeld(),
+        armed: isArmed()
+    };
+}
+
 // --- rendering --------------------------------------------------------------
 
 /**
@@ -347,6 +380,7 @@ function renderAi() {
 
     body.appendChild(renderActions(draft));
     body.appendChild(renderComposer());
+    syncScreenLock();
 }
 
 function renderDraft(draft) {
@@ -441,10 +475,17 @@ function renderComposer() {
         mic.disabled = true;
         mic.title = t('ai.voiceUnsupported');
     } else {
-        const live = isListening();
+        // Armed and merely listening are different states and the button has to
+        // show which: armed means "the microphone is open right now".
+        const armedNow = isArmed();
+        const live = armedNow || isListening();
         mic.classList.toggle('listening', live);
-        mic.title = live ? t('ai.listening') : t('a11y.talk');
-        mic.setAttribute('aria-label', live ? t('ai.listening') : t('a11y.talk'));
+        mic.classList.toggle('armed', armedNow);
+        const label = armedNow
+            ? t('ai.wakeArmed', { phrase: wakePhrasesForUi()[0] || '' })
+            : live ? t('ai.listening') : t('a11y.talk');
+        mic.title = label;
+        mic.setAttribute('aria-label', label);
         mic.onclick = () => window.aiToggleMic();
     }
     row.appendChild(mic);
@@ -456,7 +497,12 @@ function renderComposer() {
     send.onclick = () => window.aiSubmit();
     row.appendChild(send);
 
-    return row;
+    // A fragment, not a bare row: the "microphone is open" note belongs UNDER
+    // the composer, and at this point `row` has no parent to append it to.
+    const out = document.createDocumentFragment();
+    out.appendChild(row);
+    if (isArmed()) out.appendChild(el('div', 'ai-armed-note', t('ai.arming')));
+    return out;
 }
 
 const ICON_MIC = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -613,8 +659,11 @@ export function openAiInEditor() {
  * different.
  */
 export function toggleMic() {
-    if (isListening()) {
-        stopListening();
+    // Armed first: one tap means "the mic is open from now on", and tapping
+    // again closes it. Anything else makes the wake word a thing you have to
+    // keep re-triggering by hand, which is not a wake word.
+    if (isArmed()) {
+        disarm();
         renderAi();
         return false;
     }
@@ -623,6 +672,17 @@ export function toggleMic() {
     if (paths.stt === 'none') {
         aiModelSay(t('ai.voiceUnsupported'), { error: true });
         return false;
+    }
+
+    if (isWakeEnabled()) {
+        arm({
+            phrases: wakePhrasesForUi(),
+            onState: () => renderAi(),
+            onError: (message) => { aiModelSay(message, { error: true }); },
+            onWake: (hit) => onWakeWord(hit)
+        });
+        renderAi();
+        return true;
     }
 
     const started = startListening({
@@ -634,6 +694,35 @@ export function toggleMic() {
 
     if (started) renderAi();
     return !!started;
+}
+
+function isWakeEnabled() {
+    return !!getAiConfig().wake?.enabled;
+}
+
+/** The phrases to listen for: what the user set, or the shipped ones. */
+export function wakePhrasesForUi() {
+    const set = getAiConfig().wake?.phrases;
+    return Array.isArray(set) && set.length ? set : DEFAULT_WAKE_PHRASES;
+}
+
+/**
+ * The wake word fired.
+ *
+ * Two cases, and they mean different things. With words after it, that is the
+ * drill - straight into the same pipeline a typed sentence uses. With nothing
+ * after it, the user is just waking the assistant up, so say so and wait
+ * rather than treating a bare "hey nova" as an empty drill.
+ */
+function onWakeWord({ phrase, rest, alone }) {
+    aiFinal(phrase);
+    if (alone) {
+        aiModelSay(t('ai.wakeNothing', { phrase }));
+        return;
+    }
+    // The rest is ordinary text, so it goes through the same path as typing it.
+    pushMessage('user', rest);
+    handleUtterance(rest, { tier: 'local' });
 }
 
 /** Say the assistant's answer, if the user asked for replies to be spoken. */
@@ -773,6 +862,10 @@ function askUserInPanel({ question, options = [] }) {
 // do. The panel is a <div>-heavy screen that stays open across a change.
 document.addEventListener('locale-changed', () => { if (open) renderAi(); });
 
+// The wake word and the screen lock can be changed from Settings while this
+// panel is open underneath, so the panel has to follow.
+document.addEventListener('ai-voice-settings', () => { if (open) renderAi(); });
+
 // The draft is worth keeping usable if the panel is closed and reopened, so
 // nothing is cleared here on purpose.
 document.addEventListener('ai-drills-updated', () => { if (open) renderAi(); });
@@ -789,4 +882,9 @@ if (typeof window !== 'undefined') {
     window.aiToggleMic = toggleMic;
     window.aiOpenInEditor = openAiInEditor;
     window.playAiDrill = playAiDrill;
+    // Exposed for tools/check-app.mjs, which drives the REAL page over CDP
+    // rather than the stubbed harness. Harmless: both are pure functions and
+    // neither touches the microphone.
+    window.__matchWake = matchWakePhrase;
+    window.__wakePhrases = wakePhrasesForUi;
 }

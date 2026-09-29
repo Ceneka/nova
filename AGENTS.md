@@ -60,7 +60,7 @@ js/
   aiConfig.js       BYOK storage, endpoint building, key redaction
   aiClient.js       OpenAI-compatible transport + the bounded agent loop
   aiAgent.js        the tools the model may call
-  aiVoice.js        speech in and speech out
+  aiVoice.js        speech in/out, the wake word, the screen lock
   aiUi.js           the assistant panel
   locales/
     en.js           English dictionary, and the source of truth for the keys
@@ -358,6 +358,46 @@ barge-in: starting to talk cancels the answer mid-sentence.
 object is built through one seam, `setRecognitionFactory()`. A microphone you
 can miss is a microphone that gets abandoned. Live voice gets tested by a person,
 on a phone, with real keys.
+
+### The wake word, and why the screen lock is not a separate feature
+
+`holdScreenLock()` and the wake word are the same feature. **Chrome suspends
+`SpeechRecognition` when the page is hidden or the screen locks**, so a wake
+word in a page with no screen lock is dead about fifteen seconds after you stop
+touching it - which is exactly how long a phone takes to dim at a table. So:
+
+- **The lock is taken while the panel is open and given back the moment it
+  closes.** An app that leaves a phone awake by itself is a flat battery.
+- **The lock is released BY the browser** whenever the page is hidden, so
+  holding it is not a one-shot: `aiVoice.js` re-acquires on
+  `visibilitychange`. Without that it works exactly once.
+- **Turning the lock off turns the wake word off with it**, and the settings
+  copy says so rather than letting somebody wonder.
+
+Rules that have bitten people before:
+
+- **Arming is a tap, and the state is visible in words.** One tap means "the
+  microphone is open from now on"; tapping again closes it. Anything that makes
+  you re-trigger the wake word by hand is not a wake word. An armed mic that is
+  only signalled by a blinking icon is a mic somebody does not know is live, so
+  there is a line of text under the composer saying so.
+- **A wake phrase matches only at the START.** A wake word that fires mid
+  sentence answers to *"dame un nova al medio"*. `matchWakePhrase()` is a pure
+  function precisely so this is testable exhaustively without a microphone.
+- **Match the phrase BEFORE stripping fillers, not after.** `hey` is both a
+  filler *and* the first word of the shipped phrase "hey nova", so a
+  strip-then-match matcher silently degraded every "hey nova" to "nova" and the
+  specific phrase could never fire. Filler stripping is the fallback, capped at
+  two words.
+- **The remainder is handed back as the ORIGINAL tokens, not the folded ones.**
+  Folding is lossy, and the transcript is the user's own words: returning
+  "saque al reves" for something said as "saque al revés" is a small lie about
+  what was heard.
+- **The engine ending a session is the NORMAL path, not an error path.** Chrome
+  stops continuous recognition on its own after a pause, so `arm()` restarts it
+  on every `onend`. A permission refusal is the one case that disarms instead.
+- **A wake word on its own means "I am here", not "do something"** - it is
+  acknowledged and the assistant waits, rather than compiling an empty drill.
 
 ### AI drills count toward the training history
 
@@ -692,12 +732,12 @@ that third-party server. If you want your own, self-host PocketBase and change
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 85 unit tests, no dependencies
+node --test tests/*.test.mjs            # 90 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (438 checks, needs the HTTP server above):
+Browser integration (471 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

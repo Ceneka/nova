@@ -1440,7 +1440,159 @@ window.SpeechSynthesisUtterance = realUtterance;
 if (realSynthesis) Object.defineProperty(window, 'speechSynthesis', realSynthesis);
 else delete window.speechSynthesis;
 
+/* ---- 19g. the wake word and the screen lock ---- */
+// Two features that only work together: the browser suspends the microphone
+// when the screen locks, so the screen lock is what makes a wake word viable
+// in a page at all. Both are checked here through the same seams the unit
+// suite uses, plus the two Settings buttons that were previously never pressed
+// by anything.
+eq('the wake word is off until you ask for it', CFG.getAiConfig().wake.enabled, false);
+eq('and the screen lock is on by default', CFG.getAiConfig().screenLock, true);
+eq('with the shipped phrases', CFG.getAiConfig().wake.phrases.join('|'), 'hey nova|ok nova|nova');
+
+window.openSettings();
+ok('Settings has a screen-lock row', !!document.querySelector('#settings-body [data-row="ai-screen-lock"]'));
+ok('and a wake-word row', !!document.querySelector('#settings-body [data-row="ai-wake"]'));
+ok('the phrase field only appears once the wake word is on',
+   !document.querySelector('#settings-body [data-row="ai-wake-phrases"]') &&
+   !document.getElementById('ai-wake-phrases'));
+window.handleAiToggle('wake');
+ok('turning it on reveals the phrases', !!document.getElementById('ai-wake-phrases'));
+ok('and the description says it is a real microphone',
+   /microphone|microfono/i.test(document.querySelector('[data-row="ai-wake"] .settings-row-desc').textContent));
+window.handleAiWakePhrases('hola nova, buenas nova');
+eq('the user\'s phrases are stored verbatim',
+   CFG.getAiConfig().wake.phrases.join('|'), 'hola nova|buenas nova');
+ok('and the panel was told, so it can re-render armed',
+   AI.wakePhrasesForUi().join('|') === 'hola nova|buenas nova', AI.wakePhrasesForUi().join('|'));
+
+// The two buttons nothing had ever pressed. A missing import in settingsUi.js
+// made both throw a ReferenceError the first time a real user touched them.
+//
+// These are AWAITED rather than passed to ok() as a promise: ok() records
+// `!!cond`, and a pending promise is always truthy, so a check written that way
+// passes whether or not the code works. It also let the faked fetch outlive
+// the block and break the PWA section further down, which reads real files.
+// 19d ended by clearing the key on purpose, so put one back: without it both
+// of these bail out early, which is correct behaviour and tells us nothing
+// about whether the buttons work.
+CFG.setAiConfig({ text: { apiKey: SECRET } });
+{
+    const savedFetch = window.fetch;
+    let reached = false;
+    window.fetch = async () => {
+        reached = true;
+        return { ok: true, status: 200, json: async () => ({ data: [{ id: 'a/b' }, { id: 'c/d' }] }) };
+    };
+    const ids = await window.aiFetchModels();
+    window.fetch = savedFetch;
+
+    ok('"Fetch model list" survives being pressed', Array.isArray(ids) && ids.length === 2, JSON.stringify(ids));
+    ok('and it actually reached the network', reached);
+    ok('filling the picker with what came back',
+       [...document.querySelectorAll('#ai-model-list option')].map(o => o.value).join('|') === 'a/b|c/d',
+       document.getElementById('ai-model-list')?.innerHTML || 'no datalist');
+}
+{
+    const savedFetch = window.fetch;
+    let sent = null;
+    window.fetch = async (u, i) => {
+        sent = u;
+        return { ok: false, status: 401, text: async () => 'unauthorized', json: async () => ({}) };
+    };
+    const reached = await window.aiTestConnection();
+    window.fetch = savedFetch;
+
+    ok('"Test connection" survives being pressed', reached === false, 'a 401 is a failure, not a crash');
+    ok('and it got as far as sending', typeof sent === 'string' && sent.includes('/chat/completions'), String(sent));
+    // The failure is reported in the UI, and the key is not in it.
+    const line = document.querySelector('#settings-body [data-ai-test]')?.textContent || '';
+    ok('with the result shown on the row', /Could not reach|401/.test(line), line);
+    ok('and no key in the message the user is shown', !line.includes('SUPERSECRET'), line);
+}
+
+// A wake word that is only at the start. This is the difference between a wake
+// word and something that answers to every other sentence.
+V.setRecognitionFactory(() => null);
+window.openAiView();
+const wakeRoundTrip = (said) => {
+    const hit = V.matchWakePhrase(said, AI.wakePhrasesForUi());
+    return hit ? hit.rest : null;
+};
+eq('a phrase plus a drill passes the drill on', wakeRoundTrip('hola nova push b fuerte'), 'push b fuerte');
+eq('a phrase on its own means "I am here"', wakeRoundTrip('hola nova'), '');
+eq('and a phrase mid-sentence does not fire', wakeRoundTrip('dame un nova al medio'), null);
+V.resetRecognitionFactory();
+
+// Arming is a visible state, and closing gives everything back.
+window.openAiView();
+ok('the mic starts unarmed', !V.isArmed());
+const micBtn = () => document.getElementById('ai-mic');
+ok('and says so on the button', !/Listening|Escuchando/.test(micBtn()?.title || ''),
+   micBtn()?.title || 'no button');
+ok('with no screen lock taken while nothing is happening',
+   AI.aiScreenLockState().held === false, JSON.stringify(AI.aiScreenLockState()));
+window.closeAiView();
+
+// Wake Lock is a getter-only property on Navigator, so it is installed and
+// removed with defineProperty, exactly as speechSynthesis was above.
+let fakeLock = null;
+const defineWakeLock = (value) => {
+    if (value === undefined) delete navigator.wakeLock;   // back to the prototype's
+    else Object.defineProperty(navigator, 'wakeLock', { configurable: true, value });
+};
+// `wakeLock` lives on Navigator.prototype, so there is no own descriptor to
+// save: defining an OWN property shadows it, and deleting the own property
+// puts the real one back. That is the whole save/restore.
+defineWakeLock({ request: async () => (fakeLock = { addEventListener() {}, release() {} }) });
+CFG.setAiConfig({ screenLock: true, wake: { enabled: true, phrases: ['hola nova'] } });
+window.openAiView();
+// navigator.wakeLock.request() is a promise, so the lock is not held on the
+// same tick the panel opens. Yield, then read the real state - the panel
+// renders from the armed flag, never from this, so nothing user-visible races.
+await new Promise(r => setTimeout(r, 0));
+const lockState = AI.aiScreenLockState();
+ok('opening the panel asks for the screen lock', lockState.supported && lockState.held,
+   JSON.stringify(lockState));
+ok('and it is not armed until the user asks', lockState.armed === false);
+
+// Now arm, through the same path the mic button uses.
+let armError = null;
+{
+    const savedFetch = window.fetch;
+    window.fetch = async () => ({ ok: true, status: 200, body: null, json: async () => ({}) });
+    try { window.aiToggleMic(); } catch (e) { armError = e; }
+    window.fetch = savedFetch;
+}
+ok('tapping the mic arms it rather than listening once', V.isArmed() && !armError,
+   armError ? String(armError) : 'not armed');
+ok('and arming asks for the lock too', V.isArmed() ? V.isScreenLockHeld() : true);
+ok('the button now says it is listening for the phrase',
+   /hola nova/.test(micBtn()?.title || ''), micBtn()?.title || 'no button');
+ok('and the panel says the microphone is open, in words not just an icon',
+   !!document.querySelector('#ai-body .ai-armed-note'),
+   'an icon alone is not enough to tell somebody their mic is live');
+
+window.aiToggleMic();
+ok('tapping again disarms', !V.isArmed());
+ok('and gives the screen back', !V.isScreenLockHeld());
+window.closeAiView();
+ok('closing gives everything back', !V.isArmed() && !V.isScreenLockHeld(),
+   JSON.stringify(AI.aiScreenLockState()));
+
+// Turning the lock off in Settings must actually turn it off.
+CFG.setAiConfig({ screenLock: false });
+window.openAiView();
+ok('with the lock turned off, opening the panel does not take it',
+   !V.isScreenLockHeld());
+window.closeAiView();
+CFG.setAiConfig({ screenLock: true, wake: { enabled: false, phrases: ['hey nova', 'ok nova', 'nova'] } });
+defineWakeLock(undefined);
+V.releaseScreenLock();
+
 /* ---- 20. connecting to the robot ---- */
+
+
 // The regression this guards: the app used to add the notify listener AFTER
 // awaiting startNotifications(). The robot pushes its serial the moment
 // notifications switch on, so that packet was dropped and the handshake could

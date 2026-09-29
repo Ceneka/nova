@@ -9,6 +9,13 @@ import {
     getAiConfig, setAiConfig, clearAiKey, maskKey, isTextConfigured,
     normalizeBaseUrl, redact as redactAi, PROVIDER_IDS, PROVIDERS, modelsUrl, buildHeaders
 } from './aiConfig.js';
+// These two were missing until the screen-lock row forced a second look at
+// this import block, and nothing had ever pressed either button, so
+// aiTestConnection() and aiFetchModels() would have thrown a ReferenceError the
+// first time a real user touched them. The checks in tests/integration.html
+// now press both.
+import { chat } from './aiClient.js';
+import { isScreenLockSupported } from './aiVoice.js';
 import { getInstallState, promptInstall, isOfflineReady } from './pwa.js';
 import { t, getLang, setLang, LANGUAGES } from './i18n.js';
 
@@ -261,6 +268,35 @@ function aiSettingsHtml() {
                 </select>
             </div>
 
+            <div class="ai-toggle-row" data-row="ai-screen-lock">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('ai.screenLock')}</div>
+                    <div class="settings-row-desc">${isScreenLockSupported()
+                        ? t('ai.screenLockDesc')
+                        : t('ai.screenLockUnsupported')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiToggle('screenLock')"
+                        ${isScreenLockSupported() ? '' : 'disabled'}>${c.screenLock ? t('action.on') : t('action.off')}</button>
+            </div>
+
+            <div class="ai-toggle-row" data-row="ai-wake">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('ai.wake')}</div>
+                    <div class="settings-row-desc">${t('ai.wakeDesc')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiToggle('wake')">${c.wake.enabled ? t('action.on') : t('action.off')}</button>
+            </div>
+
+            ${c.wake.enabled ? `
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-wake-phrases">${t('ai.wakePhrases')}</label>
+                <input class="ai-input mono" id="ai-wake-phrases" type="text"
+                       value="${esc(c.wake.phrases.join(', '))}"
+                       placeholder="hey nova, ok nova, nova"
+                       onchange="window.handleAiWakePhrases(this.value)">
+                <div class="ai-note">${t('ai.wakePhrasesDesc')}</div>
+            </div>` : ''}
+
             <div class="ai-toggle-row" data-row="ai-speak">
                 <div class="settings-row-main">
                     <div class="settings-row-title">${t('settingsAi.speakReplies')}</div>
@@ -484,9 +520,21 @@ export function handleAiLanguage(code) {
 
 export function handleAiToggle(field) {
     const c = getAiConfig();
-    if (field === 'speak' || field === 'remember' || field === 'sessionOnly') {
+    if (field === 'speak' || field === 'remember' || field === 'sessionOnly' || field === 'screenLock') {
         setAiConfig({ [field]: !c[field] });
+    } else if (field === 'wake') {
+        setAiConfig({ wake: { enabled: !c.wake.enabled } });
     }
+    // Arming or disarming belongs to whoever is listening, and the panel
+    // redraws itself, so tell it.
+    if (field === 'wake' || field === 'screenLock') document.dispatchEvent(new CustomEvent('ai-voice-settings'));
+    renderSettings();
+}
+
+/** "hey nova, ok nova" -> the phrase list. Junk entries are dropped by normalizeConfig. */
+export function handleAiWakePhrases(value) {
+    setAiConfig({ wake: { phrases: String(value ?? '').split(',') } });
+    showToast(t('settingsAi.savedMsg'));
     renderSettings();
 }
 
@@ -631,6 +679,7 @@ window.handleAiField = handleAiField;
 window.handleAiVoiceMode = handleAiVoiceMode;
 window.handleAiToggle = handleAiToggle;
 window.handleAiLanguage = handleAiLanguage;
+window.handleAiWakePhrases = handleAiWakePhrases;
 window.handleAiClearKey = handleAiClearKey;
 window.aiFetchModels = aiFetchModels;
 window.aiTestConnection = aiTestConnection;

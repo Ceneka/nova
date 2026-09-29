@@ -84,6 +84,13 @@ export function defaultConfig() {
         // History is per-session unless this is turned on. Off by default
         // because "remember this conversation" is opt-in everywhere else too.
         remember: false,
+        // The screen lock is on by default because it is what keeps the
+        // browser from suspending the microphone the wake word depends on -
+        // see aiVoice.js. It is still released the moment the panel closes.
+        screenLock: true,
+        // "Hey Nova" and friends. Off by default: arming the microphone has to
+        // be a thing the user does, not a thing that happens to them.
+        wake: { enabled: false, phrases: ['hey nova', 'ok nova', 'nova'] },
         // The key is kept in memory only, never written to localStorage.
         sessionOnly: false
     };
@@ -122,16 +129,35 @@ function normalizeSlot(raw, fallback) {
     return out;
 }
 
+/** A wake phrase is a couple of short words. Anything else is a typo. */
+const normalizePhrases = (list) => (Array.isArray(list) ? list : String(list || '').split(','))
+    .map(p => String(p ?? '').trim().slice(0, 40))
+    .filter(p => /^[\p{L}\p{N} ]+$/u.test(p))
+    .slice(0, 5);
+
 export function normalizeConfig(raw) {
     const base = defaultConfig();
     if (!raw || typeof raw !== 'object') return base;
+    const phrases = normalizePhrases(raw.wake?.phrases ?? base.wake.phrases);
     return {
         text: normalizeSlot(raw.text, base.text),
         voice: normalizeSlot(raw.voice, base.voice),
         speak: raw.speak === undefined ? base.speak : !!raw.speak,
         remember: !!raw.remember,
-        sessionOnly: !!raw.sessionOnly
+        sessionOnly: !!raw.sessionOnly,
+        screenLock: raw.screenLock === undefined ? base.screenLock : !!raw.screenLock,
+        // An empty list would mean "never wakes up", which is not a thing
+        // anybody asked for, so it falls back to the shipped phrases.
+        wake: {
+            enabled: !!raw.wake?.enabled,
+            phrases: phrases.length ? phrases : base.wake.phrases
+        }
     };
+}
+
+/** The wake phrases that will actually be used, in the form the panel needs. */
+export function getWakePhrases() {
+    return getAiConfig().wake.phrases;
 }
 
 /**
