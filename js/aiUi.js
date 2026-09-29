@@ -228,8 +228,20 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
     const parsed = parseUtterance(text, { presets: getPresets() });
     if (!parsed) {
         // Not understood at all. Say so with the sentence in hand, and offer
-        // the model tier - Tier 0 is a floor, never a trap.
-        pushMessage('model', t('ai.notUnderstood', { text: String(text).slice(0, 120) }), { error: true });
+        // the model tier - Tier 0 is a floor, never a trap. Unless there is no
+        // model tier to offer, in which case offering it is a lie: the
+        // "ask the model" half of the sentence names a button that cannot work,
+        // and the setup row is the only route forward.
+        //
+        // Two static calls and not one ternary over the key, because the i18n
+        // check finds a call site by matching a literal key in the source
+        // text - a computed key hides both of them at once. (It matches the
+        // source, prose included, so do not quote the pattern in a comment
+        // either: that reads as a call site and fails the build.)
+        const said = String(text).slice(0, 120);
+        pushMessage('model', isTextConfigured()
+            ? t('ai.notUnderstood', { text: said })
+            : t('ai.notUnderstoodNoModel', { text: said }), { error: true });
         return null;
     }
 
@@ -497,12 +509,50 @@ function renderComposer() {
     send.onclick = () => window.aiSubmit();
     row.appendChild(send);
 
-    // A fragment, not a bare row: the "microphone is open" note belongs UNDER
-    // the composer, and at this point `row` has no parent to append it to.
+    // A fragment, not a bare row: the notes below belong UNDER the composer,
+    // and at this point `row` has no parent to append them to.
     const out = document.createDocumentFragment();
     out.appendChild(row);
+    const setup = renderModelSetup();
+    if (setup) out.appendChild(setup);
     if (isArmed()) out.appendChild(el('div', 'ai-armed-note', t('ai.arming')));
     return out;
+}
+
+/**
+ * The one row that tells the truth about the model tier.
+ *
+ * Tier 0 working with no key is the design, not a gap, so nagging somebody
+ * who only ever wants "push b" would be wrong - and nagging is what an
+ * un-dismissible banner becomes. But silence is worse than either: the panel
+ * looks identical whether or not a model is configured, so a missing key reads
+ * as a feature that works. That is exactly what was reported.
+ *
+ * So: one row, only while unconfigured, saying BOTH halves - what still works
+ * without a key, and what does not. It disappears on its own once a key is
+ * set, and it is the answer when a sentence cannot be read, so the failure
+ * message does not need a second prompt of its own.
+ */
+function renderModelSetup() {
+    if (isTextConfigured()) return null;
+    const row = el('div', 'ai-setup-note');
+    row.id = 'ai-model-setup';
+    row.appendChild(el('div', 'ai-setup-text', t('ai.modelUnset')));
+    const cta = el('button', 'ai-setup-cta', t('ai.modelSetUp'));
+    cta.id = 'ai-model-setup-cta';
+    cta.onclick = () => window.aiOpenModelSetup();
+    row.appendChild(cta);
+    return row;
+}
+
+/**
+ * Send the user to the AI group in Settings.
+ *
+ * A document event rather than an import, because settingsUi.js imports this
+ * module to own the Escape ordering; importing back would be a cycle.
+ */
+export function aiOpenModelSetup() {
+    document.dispatchEvent(new CustomEvent('settings-open', { detail: { group: 'ai' } }));
 }
 
 const ICON_MIC = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -855,6 +905,19 @@ function askUserInPanel({ question, options = [] }) {
     });
 }
 
+/**
+ * Redraw the panel after something outside it changed the model setup.
+ *
+ * The panel sits UNDER Settings, so opening Settings from the setup row,
+ * saving a key and pressing back reveals the panel without ever going through
+ * `openAiView()`. Its "not set up" row would then sit next to a key that now
+ * exists. Settings owns that transition, so it calls this rather than the
+ * panel guessing when its own state went stale.
+ */
+export function refreshAiPanel() {
+    if (open) renderAi();
+}
+
 // --- wiring -----------------------------------------------------------------
 
 
@@ -881,6 +944,7 @@ if (typeof window !== 'undefined') {
     window.aiAskModel = askAiModel;
     window.aiToggleMic = toggleMic;
     window.aiOpenInEditor = openAiInEditor;
+    window.aiOpenModelSetup = aiOpenModelSetup;
     window.playAiDrill = playAiDrill;
     // Exposed for tools/check-app.mjs, which drives the REAL page over CDP
     // rather than the stubbed harness. Harmless: both are pure functions and

@@ -421,6 +421,12 @@ export const es = {
         step: 'Paso {n}',
         generated: 'generado',
         notUnderstood: 'No pude leer «{text}». Probá «push b, y luego drive f fuerte», o preguntale al modelo.',
+        // Sin modelo al que apuntar, la frase anterior ofrece algo que no
+        // funciona. Esta dice la verdad y deja el camino de siempre.
+        notUnderstoodNoModel: 'No pude leer «{text}». Probá «push b, y luego drive f fuerte», o configurá el modelo para preguntarle con tus propias palabras.',
+        // La fila bajo el compositor, presente solo mientras no haya clave.
+        modelUnset: 'El modelo no está configurado. Los ejercicios que este dispositivo puede leer siguen funcionando.',
+        modelSetUp: 'Configurar el modelo',
         chipFrom: 'usando «{name}»',
         traceTool: 'called {name}',
         presetsFound: {

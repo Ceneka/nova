@@ -423,6 +423,15 @@ export const en = {
         step: 'Step {n}',
         generated: 'generated',
         notUnderstood: 'I could not read “{text}”. Try “push b, then drive f fuerte”, or ask the model.',
+        // The same sentence with no model tier to point at. "or ask the model"
+        // names a button that cannot work, so it is not said at all.
+        notUnderstoodNoModel: 'I could not read “{text}”. Try “push b, then drive f fuerte”, or set up the model to ask in your own words.',
+        // The row under the composer, present only while no key is set. It says
+        // both halves on purpose: what still works without a key, and what does
+        // not. A row that only announced the absence would read as a warning
+        // about the feature rather than an answer to "why is this limited?".
+        modelUnset: 'The model is not set up. Drills this device can read still work.',
+        modelSetUp: 'Set up the model',
         chipFrom: 'using “{name}”',
         traceTool: 'called {name}',
         presetsFound: {

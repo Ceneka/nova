@@ -4,7 +4,7 @@ import { getTotals } from './stats.js';
 import { setTheme } from './ui.js';
 import { toggleBodyScroll, showToast } from './utils.js';
 import { isStatsOpen, closeStatsView } from './statsUi.js';
-import { isAiOpen, closeAiView } from './aiUi.js';
+import { isAiOpen, closeAiView, refreshAiPanel } from './aiUi.js';
 import {
     getAiConfig, setAiConfig, clearAiKey, maskKey, isTextConfigured,
     normalizeBaseUrl, redact as redactAi, PROVIDER_IDS, PROVIDERS, modelsUrl, buildHeaders
@@ -69,6 +69,10 @@ export function closeSettings() {
     view?.setAttribute('hidden', '');
     document.querySelector('.container')?.classList.remove('screen-hidden');
     toggleBodyScroll(false);
+    // The assistant panel can be sitting underneath, and this close is what
+    // reveals it - it never re-opens, so nothing would redraw it. Without this
+    // its "model not set up" row survives a key that has just been saved.
+    if (isAiOpen()) refreshAiPanel();
 }
 
 function currentTheme() {
@@ -346,6 +350,17 @@ function aiSettingsHtml() {
  */
 const openGroups = new Set(['appearance', 'language']);
 
+/**
+ * A group to expand on the next render, asked for by another screen.
+ *
+ * It is held rather than written into `openGroups` directly because
+ * `captureOpenGroups()` reads the live DOM at the START of `renderSettings`
+ * and clears the set from there. Seeding it before the call therefore works
+ * only when the body happens to be empty - on a re-open the previous render's
+ * state wipes it and the group the user was sent to stays shut.
+ */
+let pendingGroup = null;
+
 const CHEVRON = `<svg class="settings-group-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
 
 /**
@@ -522,6 +537,26 @@ export function renderSettings() {
                         </div>
         `, )}
         <div class="settings-foot">${t('settings.foot')}</div>`;
+
+    revealPendingGroup();
+}
+
+/**
+ * Expand the group another screen asked for, now that the DOM exists.
+ *
+ * The group id is matched against the rendered rows rather than interpolated
+ * into a selector: it arrives from an event, and there is no reason to hand a
+ * caller a way to build a query out of one.
+ */
+function revealPendingGroup() {
+    if (!pendingGroup) return;
+    const wanted = pendingGroup;
+    pendingGroup = null;
+    const details = [...document.querySelectorAll('#settings-body details.settings-group')]
+        .find((d) => d.dataset.group === wanted);
+    if (!details) return;
+    details.open = true;
+    details.scrollIntoView({ block: 'start' });
 }
 
 /**
@@ -717,6 +752,23 @@ document.addEventListener('keydown', (e) => {
 // open, so redraw whenever the data behind them changes.
 document.addEventListener('presets-updated', () => { if (open) renderSettings(); });
 document.addEventListener('stats-updated', () => { if (open) renderSettings(); });
+
+/**
+ * Open Settings with one group already expanded.
+ *
+ * The assistant panel needs this and cannot call it directly: this module
+ * already imports aiUi.js, so importing the other way would be a cycle. A
+ * document event is the pattern the rest of the app uses for exactly that
+ * (AGENTS.md, "Cross-module talk goes through CustomEvents").
+ */
+export function openSettingsAt(group) {
+    if (typeof group === 'string' && group) pendingGroup = group;
+    openSettings();
+}
+
+document.addEventListener('settings-open', (event) => {
+    openSettingsAt(event?.detail?.group);
+});
 
 // The install row changes under the user: the browser fires
 // beforeinstallprompt some time after load, and the prompt is spent the moment

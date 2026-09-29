@@ -1005,6 +1005,92 @@ ok('and which round-trips through storage',
 // The editor is open on the AI drill now; close it without saving.
 closeEditor();
 
+/* ---- 19c-bis. the panel says the model is not set up ---- */
+// Tier 0 working with no key is the DESIGN, so nothing here may nag. But the
+// panel looking identical whether or not a model is configured is what was
+// reported as "it seems like it will work" - so the row has to be there, it has
+// to say both halves, and it has to lead somewhere.
+//
+// Every render rebuilds the body, so a node captured before one is stale. The
+// helpers below re-query instead of holding a reference, for that reason.
+const setupRow = () => document.querySelector('#ai-body #ai-model-setup');
+const setupCtaNow = () => document.querySelector('#ai-body #ai-model-setup-cta');
+// Its own key: SECRET is declared further down this file, and referencing it
+// from here is a temporal-dead-zone error, not a missing setup.
+const SETUP_KEY = 'sk-or-v1-FAKEFORTHEPANELTEST';
+const unreadable = () => {
+    AI.clearAiTranscript();
+    AI.handleUtterance('zzzz qqqq', { tier: 'local' });
+    return [...aiBody.querySelectorAll('.ai-msg.model.error')].map(n => n.textContent).join(' | ');
+};
+const setModel = (on) => {
+    if (on) CFG.setAiConfig({ text: { provider: 'custom', baseUrl: 'https://fake.invalid/v1', apiKey: SETUP_KEY, model: 'fake-model' } });
+    else CFG.clearAiKey();
+    AI.refreshAiPanel();
+};
+
+ok('with no key there is a row about it', !!setupRow());
+ok('which says the on-device tier still works',
+   /still work/i.test(setupRow()?.textContent || ''),
+   cut(setupRow()?.textContent || '', 120));
+ok('and it does not imply the feature is broken',
+   !/error|broken|failed|wrong/i.test(setupRow()?.textContent || ''),
+   setupRow()?.textContent || '');
+ok('with a real button to act on', setupCtaNow()?.tagName === 'BUTTON', setupCtaNow()?.tagName);
+ok('that is big enough to tap',
+   setupCtaNow().getBoundingClientRect().height >= 44,
+   `${setupCtaNow().getBoundingClientRect().height.toFixed(0)}px`);
+
+// The honest failure message. With no model there is nothing to "ask", so the
+// sentence naming that route must not be the one shown.
+const noModelMsg = unreadable();
+ok('an unreadable sentence does not offer to ask a model that is not there',
+   !/ask the model/i.test(noModelMsg), cut(noModelMsg, 140));
+ok('it points at setting one up instead',
+   /set up the model/i.test(noModelMsg), cut(noModelMsg, 140));
+
+// The row leads to Settings, at the AI group.
+setupCtaNow().click();
+await new Promise(r => setTimeout(r, 40));
+ok('the button opens Settings', !document.getElementById('settings-view').hasAttribute('hidden'));
+ok('with the AI group already open',
+   document.querySelector('#settings-body details[data-group="ai"]')?.open === true);
+ok('so the key field is on screen without hunting for it',
+   !!document.querySelector('#settings-body details[data-group="ai"] [data-row="ai-text"]'));
+
+// The re-open case, and the reason it needs its own check: the open state is
+// read from the live DOM at the START of the next render, so a group seeded
+// before the call is wiped by the previous render's state. Testing only a
+// first-ever open would pass with that mechanism removed - the empty body
+// returns early and nothing has cleared the seed.
+window.closeSettings();
+await new Promise(r => setTimeout(r, 20));
+ok('closing Settings hides it again, with the panel still open underneath',
+   document.getElementById('settings-view').hasAttribute('hidden') && !aiView.hasAttribute('hidden'));
+setupCtaNow().click();
+await new Promise(r => setTimeout(r, 40));
+ok('and the group is STILL open on a second trip',
+   document.querySelector('#settings-body details[data-group="ai"]')?.open === true,
+   `open:${document.querySelector('#settings-body details[data-group="ai"]')?.open}`);
+
+// The real journey: set the model up where the button took you, then come
+// back. Settings closes OVER the panel, so nothing re-opens it and the row
+// would survive next to a key that now exists - unless closing refreshes it.
+CFG.setAiConfig({ text: { provider: 'custom', baseUrl: 'https://fake.invalid/v1', apiKey: SETUP_KEY, model: 'fake-model' } });
+window.closeSettings();
+await new Promise(r => setTimeout(r, 40));
+ok('setting the model up where the button led removes the row on the way back',
+   !setupRow(), cut(aiBody.textContent, 120));
+CFG.clearAiKey();
+AI.refreshAiPanel();
+
+// A message that used to say "or ask the model" when one exists.
+setModel(true);
+const withModelMsg = unreadable();
+ok('with a model configured it does offer it',
+   /ask the model/i.test(withModelMsg), cut(withModelMsg, 140));
+setModel(false);
+
 // Escape must be handled in exactly one place - settingsUi.js - and the
 // assistant is the TOPMOST screen, so it is checked first.
 window.openSettings();

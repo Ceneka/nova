@@ -2647,6 +2647,52 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     text-align: center;
 }
 
+/* The "model not set up" row.
+   Neutral, not a danger border: nothing is wrong, and the on-device tier
+   really does still work. The armed note above is a privacy warning about
+   something live RIGHT NOW, which is why it earns a red one - reusing that
+   treatment here would make a missing key look like an error state. */
+.ai-setup-note {
+    margin-top: 8px;
+    padding: 10px 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-light);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.ai-setup-text {
+    /* Both halves of the message matter, and the second one is what the row is
+       for, so the button gets its own block and is not left as a trailing word
+       on the last line. */
+    margin-bottom: 9px;
+}
+
+.ai-setup-cta {
+    display: block;
+    width: 100%;
+    /* 44px, the floor the suite enforces on every control in this panel. It is
+       not the 32px of the preset UI: this is the only way out of an
+       unconfigured assistant, and it is on screen while the mic may be armed. */
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+    background: transparent;
+    /* --primary is a FILL colour, never text - see Design in AGENTS.md. */
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ai-setup-cta:active {
+    background: var(--card-bg);
+}
+
 /* ==========================================================================
    Settings, as a list of groups you open
    ==========================================================================
