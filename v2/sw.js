@@ -11,21 +11,54 @@
  *
  * Two things this deliberately does NOT do:
  *
- *   - Cache the share-code API. `js/cloud.js` talks to a PocketBase instance
- *     on another origin. That is somebody else's server, the responses are not
- *     ours to store, and a cached "code not found" would be worse than no
- *     answer. Every cross-origin request is left completely alone.
+ *   - Cache the Nova API. `js/cloud.js` and `js/account.js` talk to
+ *     `tenisdemesa.ar` on another origin. Those responses are not ours to
+ *     store, a cached "code not found" is worse than no answer, and a cached
+ *     sign-in response is worse still. Every cross-origin request is left
+ *     completely alone.
  *   - Runtime-cache on a miss and call it a day. A cached 404 that then serves
  *     itself forever is a bug factory, so only `res.ok` basic responses are
  *     stored, and the precache below is atomic - one bad entry means no
  *     install at all, rather than an app that half-works offline.
  */
 
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = `nova-shell-${VERSION}`;
 
 /** The precached address of the app itself. Serve as the navigation fallback. */
 const SHELL = './';
+
+/**
+ * Documents that are pages in their own right, not routes into the app.
+ *
+ * Every OTHER navigation is answered with the app shell, because the app is a
+ * single document: `/`, `/index.html` and `/settings` are the same page and
+ * must behave identically. These two are different documents that merely live
+ * in the same directory, and handing them the shell means the user ends up in
+ * the drill list.
+ *
+ * `callback.html` was broken exactly this way. Signing in completed, the
+ * browser arrived here carrying a one-time code, and the worker answered with
+ * `index.html` - so the code was never redeemed and signing in silently did
+ * nothing. It read like a server fault because the server had done everything
+ * right, and the failure was that the user landed on a perfectly working app.
+ *
+ * `callback` is here because Cloudflare Pages strips the `.html` extension and
+ * 308s to it, so the worker sees that URL too.
+ *
+ * Matched on the LAST SEGMENT rather than the whole path, because the app is
+ * also developed and tested under a `/v2/` prefix and is meant to be
+ * downloadable and hostable anywhere. Matching `/callback.html` exactly meant
+ * any prefix at all - a subdirectory, a test harness - served the shell again.
+ * This is the same instinct as the manifest, where every path is relative.
+ */
+const STANDALONE = new Set(['converter.html', 'callback.html', 'callback']);
+
+/** The final path segment, or '' for the root. */
+function lastSegment(pathname) {
+    const parts = String(pathname || '').split('/').filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : '';
+}
 
 /**
  * Every file the browser needs to boot the app with no network.
@@ -41,6 +74,7 @@ const PRECACHE = [
     'index.html',
     'manifest.webmanifest',
     'converter.html',
+    'callback.html',
     'css/style.css',
 
     // Self-hosted so the app still looks right with no signal. A webfont
@@ -60,10 +94,11 @@ const PRECACHE = [
     'js/aiTerms.js',
     'js/aiVoice.js',
     'js/aiUi.js',
-    // The account and backup modules. `callback.html` itself is deliberately
-    // NOT here: it is only ever reached by a redirect that needs the network
-    // by definition, so precaching it would put a page that cannot succeed
-    // offline into the offline path.
+    // The account and backup modules. `callback.html` is precached too, even
+    // though a sign-in needs the network: it is a static handoff page like
+    // converter.html, and the worker navigation handler sends it to the network
+    // first. Being in the list only matters with no signal, where rendering the
+    // handoff page and failing is better than a browser error page.
     'js/account.js',
     'js/ball.js',
     'js/bluetooth.js',
@@ -148,6 +183,24 @@ self.addEventListener('fetch', (event) => {
  */
 async function handleNavigate(request) {
     const cache = await caches.open(CACHE);
+
+    // A real document rather than a route into the app. Network first, because
+    // a sign-in is a one-shot handoff and a cached copy of it is a stale one -
+    // falling back to the cache is only here so the page renders offline
+    // instead of showing the browser's error page.
+    if (STANDALONE.has(lastSegment(new URL(request.url).pathname))) {
+        try {
+            return await fetch(request);
+        } catch {
+            const standalone = await cache.match(request, { ignoreSearch: true });
+            if (standalone) return standalone;
+            return new Response('Offline', {
+                status: 503,
+                headers: { 'Content-Type': 'text/plain' }
+            });
+        }
+    }
+
     const cached = await cache.match(SHELL) || await cache.match('index.html');
 
     if (cached) {

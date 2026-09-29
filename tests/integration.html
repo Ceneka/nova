@@ -2304,6 +2304,40 @@ const navResponse = await respondTo(sw.navRequest('./'));
 ok('a navigation is served from the shell without touching the network',
    navResponse && (await navResponse.text()).includes('Nova Drill | Tenisdemesa.ar</title>'));
 
+// converter.html and callback.html are documents of their own, not routes into
+// the app. Serving them the shell looks like success - the user lands on a
+// perfectly working app - and it silently broke signing in: the one-time code
+// was never redeemed because the browser arrived at the drill list instead of
+// the handoff page.
+//
+// The body is read exactly once per request: a Response body can only be
+// consumed a single time, and `clone()` is no way round it either - it throws
+// if the body has already been read.
+const navigatesTo = async (request) => {
+    const response = await respondTo(request);
+    if (!response) return { answered: false, isShell: false, preview: 'nothing answered' };
+    const body = await response.text();
+    return {
+        answered: true,
+        isShell: body.includes('Nova Drill | Tenisdemesa.ar</title>'),
+        preview: body.slice(0, 80)
+    };
+};
+
+const converterNav = await navigatesTo(sw.navRequest('converter.html'));
+ok('the converter is its own document, not the app shell',
+   converterNav.answered && !converterNav.isShell, converterNav.preview);
+
+const callbackNav = await navigatesTo(sw.navRequest('callback.html?code=ABC&state=xyz'));
+ok('the sign-in callback is its own document, not the app shell',
+   callbackNav.answered && !callbackNav.isShell, callbackNav.preview);
+
+// Cloudflare Pages strips the extension and 308s to /callback, so the worker
+// has to recognise that URL too - otherwise the redirect lands on the shell.
+const cleanCallbackNav = await navigatesTo(sw.navRequest('callback?code=ABC&state=xyz'));
+ok('and the extensionless URL Pages redirects to, which the worker must also recognise',
+   cleanCallbackNav.answered && !cleanCallbackNav.isShell, cleanCallbackNav.preview);
+
 const assetResponse = await respondTo(sw.getRequest('js/ball.js'));
 ok('a precached module is served from the cache',
    assetResponse && assetResponse.ok && (await assetResponse.text()).includes('export'));

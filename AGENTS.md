@@ -92,6 +92,11 @@ tools/
   check-app.mjs      boots the real v2/index.html over CDP
   screenshots.mjs    regenerates images/*.png for the README
   live-check.mjs     one live call against a real endpoint, BYOK
+  sw-probe.mjs       drives a real browser and the real service worker over
+  #   CDP, reporting what each URL actually rendered. The suite runs the
+  #   worker against a fake CacheStorage, which cannot tell you that a page
+  #   came back as the wrong document - see "The worker must not swallow
+  #   the callback"
   #   check-app.mjs also audits all 11 screens, at two widths, for boxes
   #   that reach past the edge of the screen
 tests/              node unit tests + a browser integration page
@@ -474,10 +479,40 @@ one cannot be reused. `callback.html` is standalone — it imports
 `js/account.js` and nothing else, and carries its own copy of two strings
 rather than pulling in the dictionary, because it is a one-shot handoff.
 
-**`callback.html` is deliberately NOT in `PRECACHE`.** A sign-in needs the
-network by definition; precaching it would put a page that can only fail
-offline into the offline path. `converter.html` IS precached, which is the
-difference between the two standalone pages.
+### The worker must not swallow the callback
+
+`callback.html` and `converter.html` are **documents in their own right**, not
+routes into the app. Every other navigation is answered with the app shell,
+because the app is a single document — `/`, `/index.html` and `/settings` are
+the same page. Handing one of these two the shell sends the user into the drill
+list instead.
+
+This shipped broken and it cost the whole sign-in: the authorization code came
+back, the browser arrived at `/callback.html?code=…`, the worker answered with
+`index.html`, and the code was never redeemed. It reads like a server fault
+because the server did everything right — the user just landed on a perfectly
+working app. `converter.html` was broken the same way for as long as it has
+existed and nobody noticed, which is the better argument for fixing it.
+
+Three things about it are easy to get wrong again:
+
+- **Match the last path segment, not the whole path.** `/callback.html` exactly
+  meant that any prefix at all — the `/v2/` the tests run under, or a
+  subdirectory someone self-hosted into — served the shell again. The suite
+  caught that one, because the harness sees `/v2/callback.html`.
+- **Cloudflare Pages strips `.html` and 308s to `/callback`**, so the worker has
+  to recognise the extensionless URL too. It preserves the query string, so the
+  code survives the hop.
+- **The callback IS precached**, network-first with a cache fallback. Being in
+  the list only matters with no signal, where rendering “signing you in…” and
+  failing is better than a browser error page. It used to be deliberately
+  excluded on the grounds that a sign-in needs the network — true, and not a
+  reason to withhold the offline rendering.
+
+`tools/sw-probe.mjs` is what proves this. It drives a real browser and the real
+worker over CDP and reports what each URL actually rendered; the integration
+suite runs the same worker against a fake CacheStorage, which is faster but
+cannot tell you that a page came back as the wrong document.
 
 ### The API never gets the AI key
 
@@ -958,12 +993,12 @@ belong on somebody else's *server* either.
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 109 unit tests, no dependencies
+node --test tests/*.test.mjs            # 110 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (515 checks, needs the HTTP server above):
+Browser integration (518 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

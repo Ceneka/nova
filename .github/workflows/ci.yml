@@ -127,7 +127,12 @@ jobs:
           body = re.search(r'const PRECACHE = \[(.*?)\];', source, re.S)
           if not body:
               sys.exit('::error::could not find the PRECACHE list in v2/sw.js')
-          entries = re.findall(r"'([^']+)'", body.group(1))
+          # Comments are stripped before the string literals are read. An
+          # apostrophe in a comment - "signing you in", say - is not a path,
+          # and reading it as one turns this job into a deploy blocker for
+          # nothing. The list is prose-adjacent by design; it explains itself.
+          listing = re.sub(r'//[^\n]*', '', body.group(1))
+          entries = re.findall(r"'([^']+)'", listing)
           missing = [e for e in entries if e != 'SHELL' and not (site / e).exists()]
           if missing:
               sys.exit('::error::v2/sw.js precaches files that are not there: ' + ', '.join(missing))
