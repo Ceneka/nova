@@ -706,6 +706,15 @@ the canvas or it gets cut in half on a real home screen.
   preset sheet still opens over it. Add new settings there, not to the menu.
 - `setTheme(name, { closeMenu = true })` — pass `closeMenu: false` when the
   caller is Settings, which must stay open so themes can be compared.
+- **The site is linked from every place that names it**, and every one of those
+  is `target="_blank" rel="noopener noreferrer"`: the About box (`.about-site`),
+  the header brand (`index.html`, `.brand-link`, styled to look like plain
+  heading text because it sits in the app's own header), the Settings footer
+  (`footHtml()` in `settingsUi.js`, which wraps the domain inside the one
+  `settings.foot` dictionary value rather than rebuilding the line — that string
+  is the fourth copy of the app name and the suite checks it), and the bottom of
+  `converter.html`, which is a standalone page with no way back otherwise. The
+  domain is never translated; it is a domain.
 - Re-rendering is done by rebuilding `innerHTML` from the model, so **every
   input must write to the model on `input`/`change`** or its value is lost on
   the next render. This bit the preset name field once already.

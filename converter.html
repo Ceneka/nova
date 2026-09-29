@@ -183,6 +183,28 @@
         .copy-btn:hover { opacity: 0.9; }
         .btn-sec { background: var(--input-bg); color: var(--text); border-color: var(--border); }
 
+        /* The one way out of this page. It is also a manifest shortcut, so it
+           gets launched standalone with no address bar, and it shares no code
+           with the app it is published inside - which is why the only thing
+           pointing at tenisdemesa.ar is a link at the bottom of it. */
+        .foot {
+            margin-top: 22px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        .foot a {
+            display: inline-block;
+            padding: 7px 4px;
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .foot a:hover { text-decoration: underline; }
+
     </style>
     <!-- Self-hosted for the same reason as the app: this tool is opened at a
          table, and a CDN webfont falls back exactly when the wifi does. -->
@@ -276,6 +298,10 @@
     <div class="btn-row">
         <button class="copy-btn btn-sec" onclick="copyText('out-csv')">Copy CSV</button>
         <button class="copy-btn" onclick="copyText('out-hex')">Copy Hex</button>
+    </div>
+
+    <div class="foot">
+        <a href="https://tenisdemesa.ar/" target="_blank" rel="noopener noreferrer">tenisdemesa.ar</a>
     </div>
 </div>
 

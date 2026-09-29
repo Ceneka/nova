@@ -44,8 +44,15 @@
              scroll a header for. The short form is the same brand, and it is
              what a narrow header has always wanted. -->
         <h1 class="brand">
-            <span class="brand-full" data-i18n="app.title">Nova Drill | Tenisdemesa.ar</span>
-            <span class="brand-short" data-i18n="app.shortTitle">Nova</span>
+            <!-- The name is the site's name, so the name goes to the site. It
+                 carries no link styling: this is the app's own header, and the
+                 anchor is here to make the line tappable and focusable rather
+                 than to shout. `target` is what keeps a stray tap from
+                 navigating a training session off the page. -->
+            <a class="brand-link" href="https://tenisdemesa.ar/" target="_blank" rel="noopener noreferrer">
+                <span class="brand-full" data-i18n="app.title">Nova Drill | Tenisdemesa.ar</span>
+                <span class="brand-short" data-i18n="app.shortTitle">Nova</span>
+            </a>
         </h1>
         <div class="ai-open-wrap">
             <button class="ai-open-btn" onclick="window.openAiView()" data-i18n-attr="aria-label:a11y.openAi;title:menu.ai">

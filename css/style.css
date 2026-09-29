@@ -242,6 +242,17 @@ header h1 {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* The brand is a link to the site the app is published inside, and it looks
+   like nothing of the sort: no underline, no link colour. An anchor in the
+   middle of the app's own header that painted itself like a link would fight
+   the two controls floating beside it. Left `display: inline` on purpose - an
+   inline-block would give the h1's `text-overflow: ellipsis` something it
+   cannot clip. */
+header h1 .brand-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
 /* The narrow form of the name. Below the breakpoint the short one is shown and
    the long one leaves the box entirely - `display: none`, not a smaller font,
    because at 320px the full name and two 40px buttons cannot both fit at any
@@ -1784,6 +1795,22 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     font-size: 0.68rem;
     color: var(--text-light);
 }
+/* The domain in that line is the one place outside the About box that names the
+   site, so it goes there. `inline-block` plus padding is what makes an 11px-tall
+   strip of micro-label text into a real tap target; the negative margin hangs
+   the padding outside so it does not lengthen the line or shift the text
+   either side of it. */
+.settings-foot .foot-link {
+    display: inline-block;
+    padding: 7px 3px;
+    margin: 0 -3px;
+    border-radius: 7px;
+    color: var(--primary);
+    font-family: var(--font-mono);
+    text-decoration: none;
+}
+.settings-foot .foot-link:hover,
+.settings-foot .foot-link:focus-visible { text-decoration: underline; }
 
 /* --- About --- */
 .about-body {

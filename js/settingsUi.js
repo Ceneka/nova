@@ -40,6 +40,26 @@ const esc = (s) => String(s ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+/** Where the app lives. The About box carries the same URL in markup. */
+const SITE_URL = 'https://tenisdemesa.ar/';
+
+/**
+ * The Settings footer, with the domain in it as the link it names.
+ *
+ * The line is still ONE dictionary value per language - the suite checks that it
+ * leads with the app name, and this is the fourth copy of that name - so the
+ * domain is wrapped where it already sits rather than re-assembled out of
+ * `app.title` and `footer.version`, which is exactly how those copies drift
+ * apart. The string being spliced is our own dictionary, never anything a model
+ * or the user typed, which is what makes it safe to hand back as HTML.
+ */
+function footHtml() {
+    return t('settings.foot').replace(
+        /tenisdemesa\.ar/i,
+        (domain) => `<a class="foot-link" href="${SITE_URL}" target="_blank" rel="noopener noreferrer">${domain}</a>`
+    );
+}
+
 let open = false;
 
 export function isSettingsOpen() {
@@ -536,7 +556,7 @@ export function renderSettings() {
                             <button class="settings-btn danger" onclick="window.factoryReset()">${t('action.erase')}</button>
                         </div>
         `, )}
-        <div class="settings-foot">${t('settings.foot')}</div>`;
+        <div class="settings-foot">${footHtml()}</div>`;
 
     revealPendingGroup();
 }
