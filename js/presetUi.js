@@ -221,9 +221,9 @@ function renderPresetForm() {
         <div class="spin-row">
             <span class="spin-label">${t('editor.rotation')}</span>
             <div class="spin-capsule">
-                <div class="sc-opt ${p.type === 'top' ? 'active' : ''}" style="${p.type === 'top' ? 'background:#0984e3' : ''}"
+                <div class="sc-opt ${p.type === 'top' ? 'active' : ''}"
                      onclick="window.handlePresetType('top')">${t('unit.top')}</div>
-                <div class="sc-opt ${p.type === 'back' ? 'active' : ''}" style="${p.type === 'back' ? 'background:var(--danger)' : ''}"
+                <div class="sc-opt ${p.type === 'back' ? 'active' : ''}"
                      onclick="window.handlePresetType('back')">${t('unit.back')}</div>
             </div>
         </div>

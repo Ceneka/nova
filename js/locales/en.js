@@ -16,7 +16,7 @@
 
 export const en = {
     app: {
-        title: 'Nova Drill Control'
+        title: 'Nova Drill | Tenisdemesa.ar'
     },
 
     // --- index.html: the hamburger menu and the header ---
@@ -119,7 +119,10 @@ export const en = {
 
     // --- index.html: the About modal ---
     about: {
-        viewOnGithub: 'View on GitHub'
+        viewOnGithub: 'View on GitHub',
+        siteBlurb: 'Find table tennis tournaments all over Argentina.',
+        thanks: 'An independent continuation of the original Nova app. Thanks to its author for the work this is built on.',
+        originalProject: 'Visit the original project'
     },
 
     // --- ui.js: the footer counter. JS owns this line after boot; the markup
@@ -289,15 +292,17 @@ export const en = {
         resetStatsDesc: '{balls} balls · {drills} drills · clears the history too.',
         factoryReset: 'Factory reset',
         factoryResetDesc: 'Erases everything, including presets.',
-        foot: 'Nova Drill Control · Version 2.4a'
+        foot: 'Nova Drill | Tenisdemesa.ar · Version 2.4a'
     },
 
     // --- settingsUi.js: the theme cards. Themes are named, not styled. ---
+    // All four are dark now - they are four accent hues over one shared set of
+    // surfaces - so the names are the accents, not the light/dark split.
     theme: {
-        standard: 'Standard',
+        standard: 'Mesa',
         ocean: 'Ocean',
         forest: 'Forest',
-        night: 'Dark'
+        night: 'Violet'
     },
 
     // --- statsUi.js: the statistics screen ---

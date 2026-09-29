@@ -18,10 +18,10 @@ import { t, getLang, setLang, LANGUAGES } from './i18n.js';
 
 /** `id` is the stored value; `name` is translated at render time. */
 const THEMES = [
-    { id: 'standard', swatch: '#ff6b4a' },
-    { id: 'ocean',    swatch: '#0984e3' },
-    { id: 'forest',   swatch: '#00b894' },
-    { id: 'night',    swatch: '#2d3436' }
+    { id: 'standard', swatch: '#40e2a7' },
+    { id: 'ocean',    swatch: '#45b8f0' },
+    { id: 'forest',   swatch: '#8fd14f' },
+    { id: 'night',    swatch: '#b98cf5' }
 ];
 
 const esc = (s) => String(s ?? '')

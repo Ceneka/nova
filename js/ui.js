@@ -149,8 +149,11 @@ export function renderDrillButtons() {
         addWrapper.style.cssText = "width:100%; display:flex; justify-content:center; margin:15px 0 10px 0;";
 
         const addBtn = document.createElement('button');
-        addBtn.className = 'btn-swap'; 
-        addBtn.style.cssText = "width:40px; height:40px; color:var(--primary); border-color:var(--primary); font-size:1.2rem; box-shadow:0 2px 5px rgba(0,0,0,0.1);";
+        // Sizing lives in .btn-drill-add rather than an inline cssText, so the
+        // button's colours keep following the active theme. An inline
+        // border-color here used to pin it to whatever the palette was on the
+        // day this was written.
+        addBtn.className = 'btn-swap btn-drill-add';
         addBtn.title = t('a11y.createNewDrill');
         
         addBtn.innerHTML = `
@@ -350,7 +353,7 @@ export function updateDrillButtonStates() {
             btnConnect.textContent = t('action.disconnect');
             btnConnect.classList.add('connected');
             statusText.textContent = t('status.connected');
-            statusText.style.color = "#00b894";
+            statusText.style.color = "var(--primary)";
         } else if (bleState.isConnecting) {
             // Previously the button did not change at all during the whole
             // attempt, so a connection that hung looked like no-op.

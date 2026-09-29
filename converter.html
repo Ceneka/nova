@@ -5,23 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Drill Converter v4.1</title>
     <style>
+        /* This page shares no code with the app - it is a standalone tool - but
+           it should not look like it came from somewhere else. The tokens below
+           are css/style.css's "standard" theme, so the converter is the same
+           dark shell with the same neon accent as the app that links to it.
+           There is no theme switcher here, so there is no data-theme to vary
+           against. */
         :root {
-            --primary: #0984e3;
-            --bg: #f5f6fa;
-            --surface: #ffffff;
-            --text: #2d3436;
-            --border: #dfe6e9;
-            --danger: #d63031;
+            --primary: #40e2a7;      /* tenisdemesa.ar's neon, hsl(158 74% 57%) */
+            --on-accent: #0b1013;    /* text on a --primary / --danger fill */
+            --bg: #0b1013;
+            --surface: #181f23;
+            --input-bg: #101619;
+            --text: #f1f3f3;
+            --text-light: #7e918d;
+            --border: #263036;
+            --accent-line: #1c4535;
+            --danger: #e5484d;
+            --danger-ink: #ff8a8f;
+            --log-bg: #0d1214;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             display: flex;
             justify-content: center;
             padding: 20px;
             margin: 0;
+            -webkit-font-smoothing: antialiased;
         }
 
         .container {
@@ -29,127 +42,164 @@
             width: 100%;
             max-width: 600px;
             padding: 25px;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+            border-radius: 14px;
         }
 
-        h1 { margin-top: 0; font-size: 1.5rem; color: var(--primary); margin-bottom: 10px; }
-        
-        /* NEW: Formula Text Style */
+        h1 { margin-top: 0; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.01em; color: var(--text); margin-bottom: 14px; }
+
+        /* The formula is reference material, not prose: mono, on a recessed
+           well, the way every other number in the app is set. */
         .formula-text {
             text-align: center;
-            color: #636e72;
-            font-size: 0.85rem;
-            margin-bottom: 25px;
-            font-family: monospace;
-            background: #f1f2f6;
-            padding: 10px;
-            border-radius: 8px;
-            line-height: 1.5;
+            color: var(--text-light);
+            font-size: 0.82rem;
+            margin-bottom: 20px;
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 10px;
+            line-height: 1.7;
         }
 
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .control-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 6px;
         }
-        
+
         .checkbox-group {
             display: flex;
             align-items: center;
             gap: 10px;
             margin-bottom: 20px;
-            background: #dfe6e9;
-            padding: 10px;
-            border-radius: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            border-radius: 10px;
         }
 
         label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #636e72;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-light);
             text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         /* Inputs */
-        input[type="range"] { width: 100%; cursor: pointer; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--primary); }
         input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
-        select { padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
-        
+        select {
+            padding: 9px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--input-bg);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
         .val-display {
-            font-weight: bold;
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-weight: 700;
             color: var(--primary);
             float: right;
         }
-        .val-display.limited { color: var(--danger); }
+        .val-display.limited { color: var(--danger-ink); }
 
         /* Results Section */
         .results {
-            background: #2d3436;
-            color: #dfe6e9;
+            background: var(--log-bg);
+            color: var(--text-light);
+            border: 1px solid var(--border);
             padding: 15px;
-            border-radius: 12px;
+            border-radius: 10px;
             margin-top: 20px;
-            font-family: monospace;
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 0.82rem;
         }
 
         .result-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 8px;
-            border-bottom: 1px solid #4a4a4a;
+            border-bottom: 1px solid var(--border);
             padding-bottom: 4px;
         }
         .result-row:nth-child(6) { border: none; margin-bottom: 0; }
+        .result-row span:last-child { color: var(--text); font-weight: 700; }
 
         .output-box {
             background: #000;
-            color: #00cec9;
-            padding: 10px;
-            border-radius: 6px;
+            color: var(--primary);
+            padding: 12px;
+            border-radius: 8px;
             word-break: break-all;
             margin-top: 5px;
-            font-size: 0.9rem;
-            border: 1px solid #00b894;
+            font-size: 0.85rem;
+            border: 1px solid var(--accent-line);
             margin-bottom: 15px;
         }
-        
+
         .label-small {
-            color: #b2bec3;
-            font-size: 0.75rem;
+            color: var(--text-light);
+            font-size: 0.65rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.1em;
             margin-top: 15px;
             display: block;
         }
 
-        .btn-row { 
-            display: flex; 
-            gap: 10px; 
-            margin-top: 20px; 
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
         }
-        
+
         .copy-btn {
             flex: 1;
             background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
+            color: var(--on-accent);
+            border: 1px solid transparent;
+            font-family: inherit;
+            padding: 13px;
+            border-radius: 9px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.03em;
             transition: opacity 0.2s;
         }
         .copy-btn:hover { opacity: 0.9; }
-        .btn-sec { background: #636e72; }
+        .btn-sec { background: var(--input-bg); color: var(--text); border-color: var(--border); }
 
+    </style>
+    <!-- Self-hosted for the same reason as the app: this tool is opened at a
+         table, and a CDN webfont falls back exactly when the wifi does. -->
+    <link rel="preload" href="fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/jbm-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <style>
+        /* The two faces, declared locally rather than through css/style.css:
+           that file styles the app and carries a :root block this page must not
+           inherit. Only the weights this page actually sets are declared. */
+        @font-face {
+            font-family: 'DM Sans'; font-style: normal; font-weight: 100 1000;
+            font-display: swap; src: url('fonts/dm-sans-latin.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800;
+            font-display: swap; src: url('fonts/jbm-latin.woff2') format('woff2');
+        }
     </style>
 </head>
 <body>

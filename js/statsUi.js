@@ -33,18 +33,52 @@ const esc = (s) => String(s ?? '')
 
 let open = false;
 
+/**
+ * Where the screen was opened from: 'settings' (the Settings row) or 'drills'
+ * (the running totals in the footer). It changes nothing about what closing
+ * does - closing uncovers whatever is underneath either way - but the back
+ * button has to *name* what is underneath, and those are not the same screen.
+ */
+let origin = 'settings';
+
 export function isStatsOpen() {
     return open;
 }
 
-export function openStatsView() {
+/**
+ * Point the back button at whatever is actually underneath this screen.
+ *
+ * Both the text and the data-i18n attributes are set, not just the text:
+ * applyI18n() re-walks `data-i18n` / `data-i18n-attr` on every language
+ * change, so an attribute left pointing at the other key would put "Settings"
+ * back the moment somebody switched to Spanish.
+ */
+function applyBackLabel() {
+    const back = document.querySelector('#stats-view .settings-back');
+    if (!back) return;
+    const toDrills = origin === 'drills';
+    const labelKey = toDrills ? 'menu.drill' : 'menu.settings';
+    const ariaKey = toDrills ? 'a11y.backToDrills' : 'a11y.backToSettings';
+    const label = back.querySelector('span');
+    if (label) {
+        label.setAttribute('data-i18n', labelKey);
+        label.textContent = t(labelKey);
+    }
+    back.setAttribute('data-i18n-attr', `aria-label:${ariaKey}`);
+    back.setAttribute('aria-label', t(ariaKey));
+}
+
+export function openStatsView(from = 'settings') {
     open = true;
+    origin = from;
     renderStats();
     const view = document.getElementById('stats-view');
     view?.removeAttribute('hidden');
-    // Settings stays underneath, as the preset sheet stays over Settings.
+    // Whatever opened it stays underneath, as the preset sheet stays over
+    // Settings. From the footer that is the drill list.
     view?.classList.add('active');
     view?.scrollTo(0, 0);
+    applyBackLabel();
 }
 
 export function closeStatsView() {
@@ -211,7 +245,12 @@ export function deleteAllSessions() {
 export function openStatsFromSettings() {
     // Settings is deliberately left open underneath, exactly as the preset
     // sheet is opened over it.
-    openStatsView();
+    openStatsView('settings');
+}
+
+/** From the running totals in the footer. Settings was never opened. */
+export function openStatsFromDrills() {
+    openStatsView('drills');
 }
 
 // Escape is handled in one place, in settingsUi.js: it owns the stack of
@@ -225,6 +264,16 @@ export function openStatsFromSettings() {
 // every change. settingsUi.js listens for the same event and is a no-op here.
 document.addEventListener('stats-updated', () => { if (open) renderStats(); });
 
+// Switching language redraws this screen and re-points the back button, whose
+// label depends on where it was opened from. Every other full screen listens
+// for this; this one did not, so a stats screen left open across a switch kept
+// showing the previous language.
+document.addEventListener('locale-changed', () => {
+    if (!open) return;
+    renderStats();
+    applyBackLabel();
+});
+
 // One delegated handler for every delete button, so re-rendering the list does
 // not mean re-binding one listener per row.
 document.addEventListener('click', (e) => {
@@ -236,6 +285,7 @@ document.addEventListener('click', (e) => {
 window.openStatsView = openStatsView;
 window.closeStatsView = closeStatsView;
 window.openStatsFromSettings = openStatsFromSettings;
+window.openStatsFromDrills = openStatsFromDrills;
 window.deleteStatsSession = deleteStatsSession;
 window.deleteAllSessions = deleteAllSessions;
 window.renderStats = renderStats;

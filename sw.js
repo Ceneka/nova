@@ -1,5 +1,5 @@
 /**
- * Service worker for Nova Drill Control.
+ * Service worker for Nova Drill | Tenisdemesa.ar.
  *
  * The whole point of this app is that it runs at a table, where the wifi is
  * whatever the hall happens to have. So the entire app shell is precached on
@@ -21,7 +21,7 @@
  *     install at all, rather than an app that half-works offline.
  */
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `nova-shell-${VERSION}`;
 
 /** The precached address of the app itself. Serve as the navigation fallback. */
@@ -42,6 +42,14 @@ const PRECACHE = [
     'manifest.webmanifest',
     'converter.html',
     'css/style.css',
+
+    // Self-hosted so the app still looks right with no signal. A webfont
+    // fetched from a CDN is a webfont that falls back to the system stack at
+    // exactly the moment this app matters most.
+    'fonts/dm-sans-latin.woff2',
+    'fonts/dm-sans-latin-ext.woff2',
+    'fonts/jbm-latin.woff2',
+    'fonts/jbm-latin-ext.woff2',
 
     'js/ball.js',
     'js/bluetooth.js',

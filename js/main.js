@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Last, and deliberately so: the precache competes for the same connection
     // as the app's own modules, and the app has to boot first either way.
     registerServiceWorker();
-    console.log("Nova Drill Control: Modules Loaded");
+    console.log("Nova Drill | Tenisdemesa.ar: Modules Loaded");
 });
 
 // --- Event Listeners Setup ---

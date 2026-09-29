@@ -30,7 +30,7 @@
 
 export const es = {
     app: {
-        title: 'Nova Drill Control'
+        title: 'Nova Drill | Tenisdemesa.ar'
     },
 
     // --- index.html: the hamburger menu and the header ---
@@ -132,7 +132,10 @@ export const es = {
 
     // --- index.html: the About modal ---
     about: {
-        viewOnGithub: 'Ver en GitHub'
+        viewOnGithub: 'Ver en GitHub',
+        siteBlurb: 'Encontrá torneos de tenis de mesa en toda la Argentina.',
+        thanks: 'Continuación independiente de la app Nova original. Gracias a su autor por el trabajo en el que se apoya.',
+        originalProject: 'Ver el proyecto original'
     },
 
     // --- ui.js: the footer counter ---
@@ -296,15 +299,15 @@ export const es = {
         resetStatsDesc: '{balls} bolas · {drills} ejercicios · también borra el historial.',
         factoryReset: 'Restablecer de fábrica',
         factoryResetDesc: 'Borra todo, incluidos los presets.',
-        foot: 'Nova Drill Control · Versión 2.4a'
+        foot: 'Nova Drill | Tenisdemesa.ar · Versión 2.4a'
     },
 
     // --- settingsUi.js: the theme cards ---
     theme: {
-        standard: 'Estándar',
+        standard: 'Mesa',
         ocean: 'Océano',
         forest: 'Bosque',
-        night: 'Oscuro'
+        night: 'Violeta'
     },
 
     // --- statsUi.js: the statistics screen ---

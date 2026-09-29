@@ -77,14 +77,17 @@ jobs:
 
           # Everything the browser actually loads, plus the standalone
           # converter tool and the README.
-          cp -a index.html converter.html css js images icons _site/
+          cp -a index.html converter.html css js images icons fonts _site/
           cp -a manifest.webmanifest sw.js nova_drills_v2_example.csv README.md _site/
 
           # sw.js and manifest.webmanifest are not optional extras: without
           # them the site still works in a tab, but it can never be installed
-          # and never opens offline. icons/ is precached by the worker.
+          # and never opens offline. icons/ is precached by the worker, and so
+          # is fonts/ - a self-hosted webfont that is not precached falls back
+          # to the system stack the first time the phone is out of signal.
           test -f _site/sw.js
           test -f _site/manifest.webmanifest
+          test -f _site/fonts/dm-sans-latin.woff2
 
           # Deliberately NOT deployed:
           #   tests/   - development only, and it stubs the page chrome

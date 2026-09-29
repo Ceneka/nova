@@ -1,303 +1,461 @@
-/* --- THEME DEFINITIONS --- */
-:root { 
-    --trans-speed: 0.3s; 
+/* ==========================================================================
+   NOVA DRILL CONTROL
+
+   The visual system is a dark, low-chroma shell with one bright "neon"
+   accent, taken from tenisdemesa.ar so the app and the site it ships inside
+   read as one thing. The four themes are four accent hues over the same dark
+   surfaces, which is why a stored theme preference (nova_theme_pref) still
+   means something after this change.
+
+   Nothing here is a build artefact. One stylesheet, CSS custom properties per
+   theme, no preprocessor. See AGENTS.md.
+   ========================================================================== */
+
+/* ==========================================================================
+   TYPEFACES
+   DM Sans for the interface, JetBrains Mono for anything numeric. Both are
+   self-hosted under fonts/ rather than pulled from a CDN: this app's whole
+   reason for existing is running with no signal at a table, and a webfont
+   that only arrives over the network is a webfont that silently falls back
+   exactly when it matters. Both are SIL Open Font License 1.1.
+   ========================================================================== */
+
+/* Latin-ext first: the unicode-range on each face is what tells the browser
+   which file a character lives in, so order here is cosmetic. */
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 100 1000;
+    font-display: swap;
+    src: url('../fonts/dm-sans-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+                   U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+                   U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+                   U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 100 1000;
+    font-display: swap;
+    src: url('../fonts/dm-sans-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+                   U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+                   U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+                   U+FFFD;
 }
 
-[data-theme="standard"] { 
-    --primary: #ff6b4a;
-    --primary-ink: #ba4e36;
-    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
-    --primary-dim: rgba(255, 107, 74, 0.1); 
-    --bg: #f5f6fa; 
-    --surface: #ffffff; 
-    --card-bg: #e4e7eb; 
-    --text: #2d3436; 
-    --text-light: #636e72; 
-    --border: #dfe6e9; 
-    --shadow: rgba(0,0,0,0.05); 
-    --danger: #d63031;
-    --danger-ink: #c62828;   /* --danger is a FILL colour (white text on top of it). As text it falls under 4.5:1 in three of the four themes, so destructive labels use this instead. */
-    --btn-text: #4a4a4a;
-    --menu-bg: rgba(255, 255, 255, 0.98);
-    --ring-track: #dfe6e9;
-    --ring-color: #ff6b4a; 
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('../fonts/jbm-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+                   U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+                   U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+                   U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('../fonts/jbm-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+                   U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+                   U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+                   U+FFFD;
 }
 
-[data-theme="ocean"] { 
-    --primary: #0984e3;
-    --primary-ink: #0873c5;
-    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
-    --primary-dim: rgba(9, 132, 227, 0.1); 
-    --bg: #f0f9ff; 
-    --surface: #ffffff; 
-    --card-bg: #dfe6e9; 
-    --text: #2c3e50; 
-    --text-light: #576574; 
-    --border: #c7ecee; 
-    --shadow: rgba(9, 132, 227, 0.1); 
-    --danger: #ff7675;
-    --danger-ink: #c62828;
-    --btn-text: #2c3e50;
-    --menu-bg: rgba(255, 255, 255, 0.98); 
-    --ring-track: #c7ecee; 
-    --ring-color: #0984e3; 
+/* ==========================================================================
+   THEME DEFINITIONS
+
+   The neutrals are shared by all four themes on purpose: only the accent
+   changes. That is what makes the Settings theme grid readable as a row of
+   colour choices rather than four different-looking apps.
+
+   Every text/background pair below clears WCAG AA in every theme, and
+   tests/integration.html re-checks the preset and statistics screens on every
+   push rather than taking this comment's word for it.
+
+   --danger and --primary are FILL colours: text on them is --on-accent, which
+   is a near-black and clears AA on all four accents. White does not (it is
+   3.9:1 on the danger red), which is why the deletes are dark-on-red.
+   ========================================================================== */
+
+:root {
+    --trans-speed: 0.2s;
+
+    --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo,
+                 Consolas, monospace;
+
+    /* Shared neutrals. These are tenisdemesa.ar's own values, rounded to
+       8-bit hex: hsl(204 25% 6%) and friends. */
+    --bg: #0b1013;            /* the page, and the status bar */
+    --surface: #181f23;       /* a card sitting on the page */
+    --card-bg: #12181c;       /* a recessed container INSIDE a surface */
+    --input-bg: #101619;      /* wells, tracks, anything you type into */
+    --text: #f1f3f3;          /* hsl(160 8% 95%) */
+    --text-light: #7e918d;    /* hsl(168 8% 53%) - 5.0:1 on --surface */
+    --border: #263036;        /* hairline; hsl(204 18% 18%) */
+    --header-bg: rgba(11, 16, 19, 0.82);
+    --menu-bg: rgba(24, 31, 35, 0.97);
+    --shadow: rgba(0, 0, 0, 0.5);
+
+    /* Text that sits ON a --primary / --danger / --spin-* fill. */
+    --on-accent: #0b1013;
+
+    /* Semantic fills that are the same in every theme. */
+    --danger: #e5484d;
+    --danger-ink: #ff8a8f;    /* --danger as TEXT, which needs to be lighter */
+    --danger-dim: rgba(229, 72, 77, 0.14);
+    --spin-top: #f2a33c;      /* topspin, and only topspin, is amber */
+    --spin-back: #3fa9f5;     /* backspin is blue, in every theme */
+    --switch-off: #2b383e;    /* a toggle that is off */
+    --hover: rgba(255, 255, 255, 0.05);
+    --log-bg: #0d1214;
+
+    /* A focus ring and a selected state are boundaries, not decoration, so
+       they wear the accent: it is the one colour here with the contrast to
+       carry a 3:1 non-text boundary on a near-black surface. */
+    --focus: var(--primary);
 }
 
-[data-theme="forest"] { 
-    --primary: #00b894;
-    --primary-ink: #007b63;
-    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
-    --primary-dim: rgba(0, 184, 148, 0.1); 
-    --bg: #f1f2f6; 
-    --surface: #ffffff; 
-    --card-bg: #ced6e0; 
-    --text: #2f3542; 
-    --text-light: #646d7a;   /* was #747d8c: 4.15:1 on this theme's white --surface and 3.71:1 on --bg, so every small muted label here failed WCAG AA */ 
-    --border: #a4b0be; 
-    --shadow: rgba(0, 184, 148, 0.1); 
-    --danger: #ff6b6b; 
-    --danger-ink: #c62828;
-    --btn-text: #2f3542; 
-    --menu-bg: rgba(255, 255, 255, 0.98); 
-    --ring-track: #a4b0be; 
-    --ring-color: #00b894; 
+/* Mesa - the tenisdemesa.ar accent, hsl(158 74% 57%). */
+[data-theme="standard"] {
+    --primary: #40e2a7;
+    --primary-ink: #40e2a7;
+    --primary-solid-ink: #0b1013;
+    --primary-dim: rgba(64, 226, 167, 0.12);
+    --accent-fill: #102d23;   /* hsl(158 48% 12%) */
+    --accent-line: #1c4535;   /* the site's own accent button border */
+    --ring-track: #263036;
+    --ring-color: #40e2a7;
 }
 
-[data-theme="night"] { 
-    --primary: #ff7675;
-    --primary-ink: #ff7e7d;
-    --primary-solid-ink: #0a0a0c;   /* text on a solid --primary fill (white fails on all 4 themes) */   /* >=4.5:1 on this theme's surface - use for text */ 
-    --primary-dim: rgba(255, 118, 117, 0.15); 
-    --bg: #1e272e; 
-    --surface: #2f3640; 
-    --card-bg: #353b48; 
-    --text: #f5f6fa; 
-    --text-light: #dcdde1; 
-    --border: #4b6584; 
-    --shadow: rgba(0,0,0,0.3); 
-    --danger: #e17055; 
-    --danger-ink: #e8907f;   /* this theme's surfaces are dark, so a dark red would vanish - the ink runs light here */
-    --btn-text: #f5f6fa;
-    --menu-bg: rgba(47, 54, 64, 0.98); 
-    --ring-track: #4b6584; 
-    --ring-color: #ff7675; 
+/* Ocean - the same dark shell on a sky-blue accent. */
+[data-theme="ocean"] {
+    --primary: #45b8f0;
+    --primary-ink: #45b8f0;
+    --primary-solid-ink: #07131c;
+    --primary-dim: rgba(69, 184, 240, 0.12);
+    --accent-fill: #0d2635;
+    --accent-line: #16455f;
+    --ring-track: #263036;
+    --ring-color: #45b8f0;
 }
 
-/* --- GLOBAL STYLES --- */
-body { 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-    background: var(--bg); 
-    color: var(--text); 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    min-height: 100vh; 
-    margin: 0; 
-    padding: 20px 15px; 
-    box-sizing: border-box; 
-    transition: background-color var(--trans-speed), color var(--trans-speed); 
+/* Forest - a leaf green, far enough from Mesa's mint to tell apart in the
+   theme grid at 26px. */
+[data-theme="forest"] {
+    --primary: #8fd14f;
+    --primary-ink: #8fd14f;
+    --primary-solid-ink: #0f1407;
+    --primary-dim: rgba(143, 209, 79, 0.12);
+    --accent-fill: #1e2a12;
+    --accent-line: #3c5220;
+    --ring-track: #263036;
+    --ring-color: #8fd14f;
 }
 
-.container { 
-    width: 100%; 
-    max-width: 500px; 
-    position: relative; 
-    padding-bottom: 80px; 
+/* Night - violet. */
+[data-theme="night"] {
+    --primary: #b98cf5;
+    --primary-ink: #b98cf5;
+    --primary-solid-ink: #120a1f;
+    --primary-dim: rgba(185, 140, 245, 0.13);
+    --accent-fill: #241a37;
+    --accent-line: #43305e;
+    --ring-track: #263036;
+    --ring-color: #b98cf5;
 }
 
-/* --- HEADER & MENU --- */
-header { 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    position: relative; 
-    margin-bottom: 20px; 
-    padding: 0 10px; 
+/* ==========================================================================
+   GLOBAL
+   ========================================================================== */
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0 15px;
+    box-sizing: border-box;
+    transition: background-color var(--trans-speed), color var(--trans-speed);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
 }
 
-h1 { 
-    margin: 0; 
-    font-size: 1.1rem; 
-    font-weight: 600; 
-    color: var(--text); 
+.container {
+    width: 100%;
+    max-width: 500px;
+    position: relative;
+    padding-bottom: 80px;
 }
 
-.menu-btn { 
-    position: absolute; 
-    right: 0; 
-    color: var(--text-light); 
-    cursor: pointer; 
-    padding: 5px; 
-    z-index: 101; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
+/* Every focusable control gets the accent ring. The app is a touch app, so
+   this mostly matters for the keyboard cases (Settings, the editor), but a
+   visible focus style has to be visible somewhere. */
+:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
 
-.menu-btn svg { width: 24px; height: 24px; }
-
-.theme-menu { 
-    position: absolute; 
-    top: 50px; 
-    right: 10px; 
-    width: 180px; 
-    background: var(--menu-bg); 
-    backdrop-filter: blur(10px); 
-    -webkit-backdrop-filter: blur(10px); 
-    border-radius: 16px; 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
-    padding: 10px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 5px; 
-    z-index: 100; 
-    border: 1px solid var(--border); 
-    opacity: 0; 
-    transform: scale(0.8); 
-    pointer-events: none; 
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-    transform-origin: top right; 
+/* --- HEADER --- */
+/* Sticky with a blurred backdrop, the way the rest of the site holds its nav
+   in place. It is inside .container, so it sticks to the top of the document
+   scroll rather than floating free. */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    margin: 0 -15px 16px;
+    padding: 14px 25px;
+    background: var(--header-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
 }
 
-.theme-menu.open { 
-    opacity: 1; 
-    transform: scale(1); 
-    pointer-events: auto; 
+h1 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text);
 }
 
-.menu-title { 
-    font-size: 0.7rem; 
-    color: var(--text-light); 
-    font-weight: 700; 
-    padding: 5px 10px; 
-    border-bottom: 1px solid var(--border); 
-    margin-bottom: 5px; 
-    text-transform: uppercase; 
+.menu-btn {
+    position: absolute;
+    right: 0;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 8px;
+    margin: -8px;
+    z-index: 101;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: color var(--trans-speed);
+}
+.menu-btn:hover { color: var(--primary); }
+
+.menu-btn svg { width: 20px; height: 20px; }
+
+.theme-menu {
+    position: absolute;
+    top: 58px;
+    right: 15px;
+    width: 210px;
+    background: var(--menu-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px var(--shadow);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 100;
+    border: 1px solid var(--border);
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity 0.16s, transform 0.16s;
 }
 
-.theme-item { 
-    padding: 10px; 
-    border-radius: 10px; 
-    cursor: pointer; 
-    font-size: 0.9rem; 
-    font-weight: 500; 
-    color: var(--text); 
-    display: flex; 
-    align-items: center; 
-    gap: 10px; 
-    transition: background 0.2s; 
+.theme-menu.open {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
 }
 
-.theme-item:hover { 
-    background: var(--primary-dim); 
-    color: var(--primary); 
+.menu-title {
+    font-size: 0.65rem;
+    color: var(--text-light);
+    font-weight: 700;
+    padding: 8px 10px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
-.color-preview { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-.reset-item { color: var(--danger); }
-.reset-item:hover { background: rgba(214, 48, 49, 0.1); color: var(--danger); }
+.theme-item {
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background var(--trans-speed), color var(--trans-speed);
+}
 
-/* --- SETTINGS CARD --- */
-.settings-card { 
-    background: var(--card-bg); 
-    border-radius: 20px; 
-    padding: 15px; 
-    margin-bottom: 20px; 
-    transition: background-color var(--trans-speed); 
+.theme-item:hover {
+    background: var(--hover);
+    color: var(--primary);
+}
+
+.color-preview {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.reset-item { color: var(--danger-ink); }
+.reset-item:hover { background: var(--danger-dim); color: var(--danger-ink); }
+
+/* --- CONNECTION CARD --- */
+.settings-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 20px;
+    transition: background-color var(--trans-speed);
+}
+
+.btn-connect {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    background: var(--primary);
+    color: var(--primary-solid-ink);
+    margin-bottom: 16px;
+    transition: background var(--trans-speed), border-color var(--trans-speed),
+                color var(--trans-speed), transform 0.1s;
+}
+.btn-connect:active { transform: scale(0.99); }
+
+/* Connected swaps the solid fill for the accent pill the rest of the site
+   uses for "this is the one that is on". */
+.btn-connect.connected {
+    background: var(--accent-fill);
+    border-color: var(--accent-line);
+    color: var(--primary);
 }
 
 .btn-connect.connecting { opacity: 0.75; cursor: progress; }
 .btn-connect:disabled { cursor: not-allowed; }
-@keyframes connect-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.55 } }
+@keyframes connect-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
 .btn-connect.connecting { animation: connect-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
     .btn-connect.connecting { animation: none; }
 }
 
-.btn-connect { 
-    width: 100%; 
-    padding: 12px; 
-    border: none; 
-    border-radius: 25px; 
-    font-weight: 600; 
-    cursor: pointer; 
-    font-size: 0.95rem; 
-    background: var(--primary); 
-    color: white; 
-    margin-bottom: 15px; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
-    transition: background var(--trans-speed), transform 0.1s; 
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+    transition: opacity 0.3s;
 }
 
-.btn-connect.connected { background: #00b894; }
+.controls-row { display: flex; gap: 8px; margin-bottom: 4px; }
 
-.control-group { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 6px; 
-    margin-bottom: 10px; 
-    transition: opacity 0.3s; 
+.control-pill {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
 }
 
-.controls-row { display: flex; gap: 10px; margin-bottom: 5px; }
+/* The site's micro-label: ~10px, uppercase, wide tracking, muted. Everything
+   labelled the same way in this file copies this.
 
-.control-pill { 
-    background: var(--surface); 
-    border-radius: 15px; 
-    padding: 10px; 
-    flex: 1; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center; 
-    box-shadow: 0 2px 5px var(--shadow); 
+   0.65rem is 10.4px and it is a floor, not a preference: this app gets read at
+   a table, and tests/integration.html fails the build on any preset-UI text
+   under 10px. Do not introduce a smaller step without a reason that survives
+   that check. */
+.control-pill label,
+.setting-label {
+    font-size: 0.65rem;
+    color: var(--text-light);
+    margin-bottom: 3px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    line-height: 1.4;
 }
 
-.control-pill label { 
-    font-size: 0.65rem; 
-    color: var(--text-light); 
-    margin-bottom: 4px; 
-    font-weight: 700; 
-    text-transform: uppercase; 
+input[type="number"] {
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-align: center;
+    width: 100%;
+    background: transparent;
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
-
-input[type="number"] { 
-    border: none; 
-    font-size: 1.1rem; 
-    font-weight: 800; 
-    color: var(--primary); 
-    text-align: center; 
-    width: 100%; 
-    background: transparent; 
-}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"]:focus { outline: none; }
 input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--text-light); }
 
-.mode-switch { 
-    display: flex; 
-    background: rgba(0,0,0,0.05); 
-    border-radius: 20px; 
-    padding: 3px; 
-    width: 100%; 
-    margin-bottom: 10px; 
+/* --- SEGMENTED SWITCH (mode, spin, language) --- */
+.mode-switch {
+    display: flex;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+    width: 100%;
+    margin-bottom: 10px;
 }
-[data-theme="night"] .mode-switch { background: rgba(255,255,255,0.1); }
 
-.mode-option { 
-    flex: 1; 
-    text-align: center; 
-    padding: 8px; 
-    font-size: 0.75rem; 
-    border-radius: 18px; 
-    cursor: pointer; 
-    color: var(--text-light); 
-    font-weight: 600; 
-    transition: all var(--trans-speed); 
+.mode-option {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-light);
+    /* box-sizing is not global in this file, and 8px of padding either side of
+       a 13px line box lands at 29px - under the 32px floor the rest of the app
+       holds to. */
+    box-sizing: border-box;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--trans-speed);
 }
-.mode-option.active { 
-    background: var(--surface); 
-    color: var(--primary); 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+.mode-option.active {
+    background: var(--accent-fill);
+    color: var(--primary);
 }
 
 /* The language picker reuses .mode-switch inside a settings row, which is a
@@ -326,181 +484,189 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     justify-content: center;
 }
 
-.level-select { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
+/* --- DIFFICULTY --- */
+.level-select { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; }
 
-.lvl-dot { 
-    width: 32px; 
-    height: 32px; 
-    border-radius: 50%; 
-    background: var(--surface); 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-size: 0.9rem; 
-    font-weight: bold; 
-    color: var(--text-light); 
-    cursor: pointer; 
-    border: 2px solid transparent; 
-    box-shadow: 0 2px 5px var(--shadow); 
-    transition: all var(--trans-speed); 
+.lvl-dot {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all var(--trans-speed);
 }
 
-.lvl-dot.active { 
-    border-color: var(--primary); 
-    color: var(--primary); 
-    transform: scale(1.1); 
+.lvl-dot.active {
+    background: var(--accent-fill);
+    border-color: var(--accent-line);
+    color: var(--primary);
 }
 
-.section-label { 
-    font-size: 0.85rem; 
-    font-weight: 600; 
-    color: var(--text-light); 
-    margin-bottom: 8px; 
-    padding-left: 8px; 
-    text-transform: uppercase; 
-    letter-spacing: 0.5px; 
+.section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    margin-bottom: 8px;
+    padding-left: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
-/* --- TABS & DRILL GRID --- */
-.tabs-container { 
-    background: var(--card-bg); 
-    border-radius: 20px; 
-    padding: 10px; 
-    margin-bottom: 20px; 
-    display: grid; 
-    grid-template-columns: 1fr 1fr 1fr; 
-    gap: 10px; 
+/* --- TABS --- */
+.tabs-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
 }
 
-.tab-btn { 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center; 
-    gap: 4px; 
-    padding: 12px 5px; 
-    border-radius: 16px; 
-    border: 1px solid transparent; 
-    background: transparent; 
-    color: var(--text-light); 
-    font-weight: 600; 
-    font-size: 0.75rem; 
-    cursor: pointer; 
-    transition: all var(--trans-speed); 
+.tab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 11px 5px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-light);
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all var(--trans-speed);
     text-align: center;
 }
 
-.tab-btn.active { 
-    background: var(--surface); 
-    border: 1px solid var(--primary); 
-    color: var(--primary); 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+.tab-btn.active {
+    background: var(--accent-fill);
+    border-color: var(--accent-line);
+    color: var(--primary);
 }
 
-.icon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 10px; height: 10px; margin-bottom: 2px; }
-.icon-dot { background-color: var(--text-light); border-radius: 50%; opacity: 0.5; }
-.tab-btn.active .icon-dot { background-color: var(--primary); opacity: 1; }
+.icon-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    width: 9px;
+    height: 9px;
+}
+.icon-dot { background-color: currentColor; border-radius: 2px; opacity: 0.45; }
+.tab-btn.active .icon-dot { opacity: 1; }
 
-/* === REDESIGNED DRILL LIST (Single Column) === */
-.drill-list { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px; 
-    margin-bottom: 10px; 
+/* --- DRILL LIST --- */
+.drill-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
 }
 .hidden { display: none !important; }
 
-/* === WIDE BUTTON STYLE === */
-.btn-drill { 
+.btn-drill {
     width: 100%;
-    min-height: 60px;
-    padding: 0 15px;
+    min-height: 56px;
+    padding: 0 14px;
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    gap: 15px; /* Spacing between icon, text, badge */
-    
-    background: var(--surface); 
-    border: 1px solid transparent; 
-    border-radius: 12px; 
-    color: var(--btn-text); 
-    box-shadow: 0 1px 3px var(--shadow); 
-    position: relative; 
-    transition: transform 0.1s, background-color 0.2s;
-    user-select: none; 
-    -webkit-user-select: none; 
+    gap: 14px;
+
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    position: relative;
+    transition: transform 0.1s, background-color var(--trans-speed),
+                border-color var(--trans-speed), color var(--trans-speed);
+    user-select: none;
+    -webkit-user-select: none;
     cursor: pointer;
 }
 
-.btn-drill:active { transform: scale(0.98); }
-.btn-drill.running { border-color: var(--primary); background: var(--primary-dim); color: var(--primary); }
-.btn-drill:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; background: rgba(0,0,0,0.05); }
-
-/* Left-side visual icon */
-.btn-drill .drill-icon { 
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: 3px; 
-    width: 14px; 
-    height: 14px; 
-    flex-shrink: 0; 
-    opacity: 0.7;
+.btn-drill:active { transform: scale(0.99); }
+.btn-drill.running {
+    border-color: var(--accent-line);
+    background: var(--accent-fill);
+    color: var(--primary);
 }
-.btn-drill .drill-icon .d-dot { background-color: #b2bec3; border-radius: 50%; transition: background-color var(--trans-speed); }
+.btn-drill:disabled { opacity: 0.5; cursor: not-allowed; background: var(--card-bg); }
+
+.btn-drill .drill-icon {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    opacity: 0.55;
+}
+.btn-drill .drill-icon .d-dot {
+    background-color: currentColor;
+    border-radius: 2px;
+    transition: background-color var(--trans-speed);
+}
 .btn-drill.running .drill-icon .d-dot { background-color: var(--primary); }
 
-/* Text Label */
-.btn-drill span { 
-    flex: 1; 
-    text-align: left; 
-    font-size: 0.95rem; 
-    font-weight: 600; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
+.btn-drill span {
+    flex: 1;
+    text-align: left;
+    font-size: 0.92rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Random Badge (Right side now) */
-.mark-random { 
+.mark-random {
     position: static;
-    width: 22px; 
-    height: 22px; 
-    border: 1.5px solid var(--danger); 
-    color: var(--danger); 
-    border-radius: 50%; 
-    font-size: 0.65rem; 
-    font-weight: 900; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    background: transparent; 
-    line-height: 1; 
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid var(--danger);
+    color: var(--danger-ink);
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    line-height: 1;
     flex-shrink: 0;
 }
 
-/* Sorting Grip Handle */
 .drill-grab-handle {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
+    width: 26px;
     height: 100%;
     cursor: grab;
     color: var(--text-light);
-    opacity: 0.3;
-    font-size: 1.4rem;
-    margin-left: 5px;
+    opacity: 0.35;
+    font-size: 1.3rem;
+    margin-left: 2px;
     border-left: 1px solid var(--border);
-    padding-left: 10px;
+    padding-left: 8px;
     flex-shrink: 0;
     transition: opacity 0.2s;
 }
-
-.drill-grab-handle:hover {
-    opacity: 1;
-    color: var(--primary);
-}
+.drill-grab-handle:hover { opacity: 1; color: var(--primary); }
 
 .btn-drill.dragging {
     opacity: 0.5;
@@ -508,182 +674,253 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     border: 1px dashed var(--text-light);
 }
 
-/* --- FOOTER & LOGS --- */
-#status-text { 
-    text-align: center; 
-    font-size: 0.8rem; 
-    color: var(--primary); 
-    font-weight: 700; 
-    height: 20px; 
-    margin-bottom: 5px; 
-    letter-spacing: 0.5px; 
-    text-transform: uppercase; 
+/* --- STATUS, FOOTER, LOG --- */
+#status-text {
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--primary);
+    font-weight: 700;
+    height: 18px;
+    margin-bottom: 6px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
 }
 
-.log-box { 
-    margin-top: 10px; 
-    background: #2d3436; 
-    color: #00cec9; 
-    padding: 12px; 
-    border-radius: 10px; 
-    font-family: monospace; 
-    font-size: 0.65rem; 
-    height: 120px; 
-    overflow-y: auto; 
-    display: none; 
-    border: 1px solid #636e72; 
-    line-height: 1.4; 
+.log-box {
+    margin-top: 10px;
+    background: var(--log-bg);
+    color: var(--primary);
+    padding: 12px;
+    border-radius: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    height: 120px;
+    overflow-y: auto;
+    display: none;
+    border: 1px solid var(--border);
+    line-height: 1.5;
 }
-.log-box div { margin-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; }
-
-.footer-row { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-top: 20px; 
-    font-size: 0.8rem; 
-    color: var(--text-light); 
-    font-weight: 600; 
-    padding: 0 5px; 
+.log-box div {
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2px;
 }
 
-/* --- SWAP BUTTON (Between Balls) --- */
+.footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    font-size: 0.65rem;
+    color: var(--text-light);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0 2px;
+}
+
+/* Visually hidden, still announced. Used to name a control's destination
+   without lengthening the line it sits on. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* The running totals, as a way into the statistics screen.
+   The negative margin gives it the 40px tap target the rest of the app holds
+   to without adding 40px of height to a one-line footer. */
+.stats-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    margin: -8px 0 -8px -6px;
+    padding: 0 10px 0 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.stats-link:hover {
+    color: var(--primary);
+    background: var(--hover);
+    border-color: var(--border);
+}
+.stats-link-icon { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.8; }
+
+/* --- SWAP BUTTON (between balls) --- */
 .swap-zone {
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 2px 0;
-    margin: -8px 0 8px 0; /* Pulls elements closer to look connected */
+    margin: -8px 0 8px 0;   /* pulls the two halves together */
     position: relative;
     z-index: 5;
 }
-
-/* Optional: A line behind the button to connect the balls visually */
 .swap-zone::before {
     content: '';
     position: absolute;
     left: 50%;
     top: 0;
     bottom: 0;
-    width: 2px;
+    width: 1px;
     background: var(--border);
     transform: translateX(-50%);
     z-index: -1;
 }
 
 .btn-swap {
-    background: var(--surface);
+    background: var(--input-bg);
     border: 1px solid var(--border);
     color: var(--text-light);
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: 1rem;
     line-height: 1;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     transition: all 0.2s ease;
 }
-
 .btn-swap:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    transform: scale(1.1);
+    background: var(--accent-fill);
+    border-color: var(--accent-line);
+    color: var(--primary);
+    transform: scale(1.08);
+}
+
+/* The "+ new drill" button at the foot of a custom tab. Same look as the
+   swap button it reuses, just a size up. ui.js applies this class rather than
+   writing an inline cssText, which is what kept the border pinned to one
+   theme's colour. */
+.btn-drill-add {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    color: var(--primary);
+    border-color: var(--accent-line);
 }
 
 .checkbox-wrapper { display: flex; align-items: center; gap: 6px; }
-#stats-display { font-variant-numeric: tabular-nums; }
+#stats-display { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 
-/* TOAST - Z-Index updated to 300 to show over modal */
-#toast { 
-    visibility: hidden; 
-    min-width: 250px; 
-    background-color: #333; 
-    color: #fff; 
-    text-align: center; 
-    border-radius: 50px; 
-    padding: 16px; 
-    position: fixed; 
-    z-index: 300; 
-    left: 50%; 
-    bottom: 30px; 
-    transform: translateX(-50%); 
-    font-size: 0.9rem; 
-    opacity: 0; 
-    transition: opacity 0.5s, bottom 0.5s; 
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
+/* --- TOAST (z-index 300, over every modal) --- */
+#toast {
+    visibility: hidden;
+    min-width: 250px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-align: center;
+    border-radius: 10px;
+    padding: 14px 18px;
+    position: fixed;
+    z-index: 300;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 0.85rem;
+    opacity: 0;
+    box-shadow: 0 10px 30px var(--shadow);
+    transition: opacity 0.3s, bottom 0.3s;
 }
 #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
 
-/* --- MODALS --- */
-.modal-overlay { 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    background: rgba(0,0,0,0.85); 
-    backdrop-filter: blur(8px); 
-    z-index: 200; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    opacity: 0; 
-    pointer-events: none; 
-    transition: opacity 0.3s; 
+/* ==========================================================================
+   MODALS
+   Every modal is a .modal-overlay at z-index 200. A nested one has to come
+   LATER in index.html to stack on top.
+   ========================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
 }
 .modal-overlay.open { opacity: 1; pointer-events: auto; }
 
-.modal { 
-    background: var(--surface); 
-    width: 95%; 
-    max-width: 400px; 
-    max-height: 90vh; 
-    border-radius: 25px; 
-    padding: 20px; 
-    box-shadow: 0 20px 50px rgba(0,0,0,0.4); 
-    display: flex; 
-    flex-direction: column; 
-    overflow: hidden; 
+.modal {
+    background: var(--surface);
+    width: 95%;
+    max-width: 400px;
+    max-height: 90vh;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 24px 60px var(--shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-/* MODAL HEADER - GENERAL */
-.modal-header { 
-    display: flex; 
-    align-items: center; 
-    gap: 15px; 
-    margin-bottom: 15px; 
-    padding-bottom: 10px; 
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
     width: 100%;
 }
 
-.modal-title { 
-    font-weight: normal; 
-    color: var(--text); 
-    font-size: 1.1rem; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-    flex: 1;       
-    min-width: 0; 
+.modal-title {
+    font-weight: 500;
+    color: var(--text);
+    font-size: 1.02rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
     text-align: left;
     margin-right: 10px;
 }
 
-/* EDITOR MODAL HEADER SPECIFIC */
-/* Switches to column layout for Editor only */
+.modal-close {
+    font-size: 1.4rem;
+    color: var(--text-light);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color var(--trans-speed);
+}
+.modal-close:hover { color: var(--text); }
+
+.modal-body { overflow-y: auto; flex: 1; padding-right: 5px; }
+
+/* --- EDITOR MODAL HEADER (two rows) --- */
 #editor-modal .modal-header {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
 }
 
-/* Row 1: Title and Close */
 #editor-modal .header-top {
     display: flex;
     justify-content: space-between;
@@ -692,7 +929,6 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     min-width: 0;
 }
 
-/* New Title Container allowing full width and edit icon */
 #editor-modal .title-container {
     display: flex;
     align-items: center;
@@ -704,22 +940,21 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 
 #editor-drill-name {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--text);
-    white-space: nowrap; 
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 #editor-drill-edit-icon {
-    font-size: 1rem;
-    opacity: 0.5;
-    flex-shrink: 0; /* Ensures icon never disappears */
+    font-size: 0.95rem;
+    opacity: 0.6;
+    flex-shrink: 0;   /* the edit affordance must never disappear */
     color: var(--primary);
 }
 
-/* Row 2: Actions */
 #editor-modal .header-actions {
     display: flex;
     align-items: center;
@@ -727,43 +962,38 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     width: 100%;
 }
 
-/* Adjustments for buttons inside new layout */
-.btn-header-share { margin-right: 0; } 
+.btn-header-share { margin-right: 0; }
 .random-toggle-container { margin-right: 0; }
 
-.modal-close { font-size: 1.5rem; color: var(--text-light); cursor: pointer; line-height: 1; }
-.modal-body { overflow-y: auto; flex: 1; padding-right: 5px; }
+/* ==========================================================================
+   DRILL EDITOR
+   ========================================================================== */
 
-/* --- EDITOR SPECIFIC (Smart Grid Layout) --- */
-
-.ball-group { 
-    border: 1px solid var(--border); 
-    border-radius: 12px; 
-    margin-bottom: 15px; 
-    overflow: hidden; 
-    background: var(--bg); 
+.ball-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: var(--bg);
     transition: opacity 0.3s;
 }
+.ball-group.inactive { opacity: 0.5; border-style: dashed; }
 
-.ball-group.inactive {
-    opacity: 0.5;
-    border-style: dashed;
-}
-
-.group-title { 
-    background: var(--card-bg); 
-    padding: 8px 12px; 
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    color: var(--text-light); 
-    text-transform: uppercase; 
-    border-bottom: 1px solid var(--border); 
+.group-title {
+    background: var(--card-bg);
+    padding: 9px 12px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-/* Toggle Switch for Active/Inactive Ball */
+/* --- toggles --- */
 .ball-toggle {
     display: flex;
     align-items: center;
@@ -773,140 +1003,135 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 
 .toggle-switch {
     position: relative;
-    width: 30px;
-    height: 16px;
-    background: #b2bec3;
+    width: 32px;
+    height: 18px;
+    background: var(--switch-off);
     border-radius: 15px;
     transition: background 0.2s;
 }
-
 .toggle-switch::after {
     content: '';
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 12px;
-    height: 12px;
-    background: white;
+    width: 14px;
+    height: 14px;
+    background: var(--text-light);
     border-radius: 50%;
-    transition: transform 0.2s;
+    transition: transform 0.2s, background 0.2s;
 }
 
-.ball-toggle.active .toggle-switch {
-    background: var(--primary);
-}
+.ball-toggle.active .toggle-switch { background: var(--primary); }
+.ball-toggle.active .toggle-switch::after { transform: translateX(14px); background: var(--on-accent); }
 
-.ball-toggle.active .toggle-switch::after {
-    transform: translateX(14px);
-}
-
-/* Random Toggle (Header) */
 .random-toggle-container {
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
 }
+.random-toggle-container .toggle-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
 .random-toggle-container input { display: none; }
 .random-toggle-container input:checked + .toggle-switch { background: var(--primary); }
-.random-toggle-container input:checked + .toggle-switch::after { transform: translateX(14px); }
+.random-toggle-container input:checked + .toggle-switch::after { transform: translateX(14px); background: var(--on-accent); }
 
-/* Round Plus Button */
 .btn-add-opt {
     background: transparent;
-    border: 1px solid var(--primary); 
+    border: 1px solid var(--accent-line);
     color: var(--primary);
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 400;
     line-height: 1;
     padding: 0 0 2px 0;
     transition: all 0.2s;
 }
+.btn-add-opt:hover { background: var(--accent-fill); transform: scale(1.08); }
 
-.btn-add-opt:hover {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.1);
-}
-
-.option-card { 
-    padding: 10px; 
-    border-bottom: 1px solid var(--border); 
-    position: relative; 
-}
+.option-card { padding: 10px; border-bottom: 1px solid var(--border); position: relative; }
 .option-card:last-child { border-bottom: none; }
 
-.option-label { 
-    font-size: 0.65rem; 
-    font-weight: 700; 
-    color: var(--primary); 
-    margin-bottom: 5px; 
-    text-transform: uppercase; 
-    display: block; 
+.option-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: block;
 }
 
-/* --- GRID & INPUT STYLES (Replaced Sliders) --- */
-
-.editor-grid { 
-    display: grid; 
-    grid-template-columns: 1fr 1fr 1fr; 
-    gap: 8px; 
+/* --- the speed / spin / depth / placement grid --- */
+.editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
     margin-bottom: 10px;
 }
 
-.editor-field { 
-    display: flex; 
-    flex-direction: column; 
-    background: var(--surface);
+.editor-field {
+    display: flex;
+    flex-direction: column;
+    background: var(--input-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 4px;
+    padding: 5px;
+    min-width: 0;
 }
 
-.field-header { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 2px;
+.field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1px;
     padding: 0 4px;
+    gap: 4px;
 }
 
-.field-header label { 
-    font-size: 0.65rem; 
-    color: var(--text-light); 
-    font-weight: 700; 
+.field-header label {
+    font-size: 0.65rem;
+    color: var(--text-light);
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
 }
 
-.field-header .range-hint { 
-    font-size: 0.58rem; 
-    /* was a hardcoded #b2bec3 (1.9:1 on white) - unreadable on light themes */
-    color: var(--text-light); 
-    opacity: 0.85;
+.field-header .range-hint {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-light);
+    opacity: 0.8;
+    white-space: nowrap;
 }
 
-/* Fast Input Styling */
-.editor-field input { 
+.editor-field input {
     border: none;
     background: transparent;
-    font-size: 0.95rem; 
-    color: var(--text); 
-    font-weight: 700; 
-    text-align: center; 
-    width: 100%; 
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text);
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
     padding: 4px 0;
-    -moz-appearance: textfield; 
+    -moz-appearance: textfield;
 }
 .editor-field input:focus { outline: none; color: var(--primary); }
 
-/* Spin Toggle Row */
+/* --- topspin / backspin --- */
 .spin-row {
     display: flex;
     align-items: center;
@@ -916,215 +1141,255 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 
 .spin-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-light);
     text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
 .spin-capsule {
     display: flex;
-    background: var(--bg);
+    background: var(--input-bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 2px;
 }
 
 .sc-opt {
-    padding: 4px 12px;
+    padding: 5px 12px;
     font-size: 0.65rem;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 6px;
     cursor: pointer;
     color: var(--text-light);
     transition: all 0.2s;
 }
 
+/* The neutral selected state first, then the two semantic fills. editor.js
+   and presetUi.js also set `background` inline on the selected .sc-opt; both
+   write var(--spin-top) / var(--spin-back), so the token and the markup agree. */
 .sc-opt.active {
-    background: var(--text); /* Default dark/light contrast */
-    color: var(--bg);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: var(--card-bg);
+    color: var(--text);
+}
+.sc-opt:first-child.active { background: var(--spin-top); color: var(--on-accent); }
+.sc-opt:last-child.active { background: var(--spin-back); color: var(--on-accent); }
+
+/* --- per-ball actions --- */
+.card-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+.btn-action {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text);
 }
 
-/* Color Coding for Toggle */
-.sc-opt:first-child.active { background: #e17055; color: white; } /* Topspin */
-.sc-opt:last-child.active { background: #0984e3; color: white; } /* Backspin */
-
-/* --- EDITOR ACTION BUTTONS --- */
-.card-actions { 
-    display: flex; 
-    gap: 8px; 
-    margin-top: 5px; 
-}
-
-.btn-action { 
-    flex: 1; 
-    padding: 8px; 
-    border-radius: 8px; 
-    border: none; 
-    font-size: 0.75rem; 
-    font-weight: 700; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    transition: background 0.2s; 
-    text-transform: uppercase; 
-    color: white; 
-}
-
-.btn-act-test { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
-.btn-act-test:hover { background: var(--text-light); color: white; }
+.btn-act-test { background: var(--input-bg); border-color: var(--border); }
+.btn-act-test:hover { border-color: var(--accent-line); color: var(--primary); }
 .btn-act-test:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-act-clone { background: #0984e3; }
-.btn-act-clone:hover { background: #00cec9; }
+.btn-act-clone { background: var(--spin-back); color: var(--on-accent); }
+.btn-act-clone:hover { opacity: 0.88; }
 
-.btn-act-del { background: var(--danger); }
-.btn-act-del:hover { opacity: 0.8; }
+.btn-act-del { background: var(--danger); color: var(--on-accent); }
+.btn-act-del:hover { opacity: 0.88; }
 .btn-act-del:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* Share Button */
 .btn-header-share {
     background: transparent;
     border: none;
     color: var(--primary);
     cursor: pointer;
-    padding: 5px;
+    /* 7px of padding around a 20px glyph is a 34px target. At 5px it came out
+       at 30px, under the 32px floor everything else here is held to. */
+    padding: 7px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s;
+    transition: transform 0.2s, color 0.2s;
     flex-shrink: 0;
 }
 .btn-header-share:hover { transform: scale(1.1); color: var(--text); }
-.btn-header-share svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-header-share svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* --- MODAL FOOTER --- */
-.modal-footer { 
-    margin-top: 15px; 
-    display: flex; 
-    gap: 8px; 
+/* ==========================================================================
+   MODAL FOOTER
+   ========================================================================== */
+
+.modal-footer {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
     align-items: stretch;
 }
 
-.btn-modal { 
-    padding: 12px 8px; 
-    border-radius: 10px; 
-    border: none; 
-    font-weight: 600; 
-    cursor: pointer; 
-    font-size: 0.8rem; 
+.btn-modal {
+    padding: 11px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.72rem;
     text-transform: uppercase;
+    letter-spacing: 0.04em;
     display: flex;
     align-items: center;
     justify-content: center;
-    white-space: nowrap; 
-    transition: transform 0.1s, opacity 0.2s;
+    white-space: nowrap;
+    transition: background var(--trans-speed), border-color var(--trans-speed),
+                color var(--trans-speed), transform 0.1s;
 }
-.btn-modal:active { transform: scale(0.96); }
+.btn-modal:active { transform: scale(0.97); }
 
-.btn-delete-drill { 
-    background: var(--danger); 
-    color: white; 
-    width: 44px; 
-    flex: 0 0 44px; 
+.btn-delete-drill {
+    background: var(--danger);
+    color: var(--on-accent);
+    width: 44px;
+    flex: 0 0 44px;
     padding: 0;
 }
 .btn-delete-drill svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-delete-drill:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.btn-test-combo { 
+.btn-test-combo {
     background: transparent;
-    border: 2px solid var(--primary); 
-    color: var(--primary); 
-    flex: 1.2; 
-}
-[data-theme="night"] .btn-test-combo { border-color: var(--primary); color: var(--primary); }
-.btn-test-combo:hover { background: var(--primary-dim); }
-
-.btn-save-as { 
-    background: transparent;
-    border: 2px solid var(--text);
-    color: var(--text); 
+    border-color: var(--accent-line);
+    color: var(--primary);
     flex: 1.2;
 }
-.btn-save-as:hover { background: rgba(0,0,0,0.05); }
-[data-theme="night"] .btn-save-as:hover { background: rgba(255,255,255,0.1); }
+.btn-test-combo:hover { background: var(--accent-fill); }
 
-.btn-save { 
+.btn-save-as {
     background: transparent;
-    border: 2px solid var(--primary);
-    color: var(--primary); 
-    flex: 1.5; 
+    border-color: var(--border);
+    color: var(--text);
+    flex: 1.2;
 }
-.btn-save:hover { background: var(--primary-dim); }
+.btn-save-as:hover { background: var(--hover); }
 
+.btn-save {
+    background: var(--primary);
+    color: var(--primary-solid-ink);
+    flex: 1.5;
+}
+.btn-save:hover { opacity: 0.9; }
 
-/* --- RUN OVERLAY --- */
-#run-ui { 
-    display: none; 
-    flex-direction: column; 
-    align-items: center; 
-    width: 100%; 
-    justify-content: center; 
-    text-align: center; 
+/* ==========================================================================
+   RUN OVERLAY
+   ========================================================================== */
+
+#run-ui {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    justify-content: center;
+    text-align: center;
 }
 .modal-overlay.open #run-ui { display: flex; }
 
-.countdown-circle { position: relative; width: 200px; height: 200px; margin-bottom: 30px; }
+.countdown-circle { position: relative; width: 190px; height: 190px; margin-bottom: 28px; }
 .countdown-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.track { fill: none; stroke: var(--ring-track); stroke-width: 8; }
-.progress { fill: none; stroke: var(--primary); stroke-width: 8; stroke-dasharray: 565; stroke-dashoffset: 0; stroke-linecap: round; }
-
-.center-text { 
-    position: absolute; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center; 
+.track { fill: none; stroke: var(--ring-track); stroke-width: 6; }
+.progress {
+    fill: none;
+    stroke: var(--ring-color);
+    stroke-width: 6;
+    stroke-dasharray: 565;
+    stroke-dashoffset: 0;
+    stroke-linecap: round;
 }
 
-.count-val { font-size: 4.5rem; font-weight: 800; color: var(--text); line-height: 1; font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
-.status-label { font-size: 0.9rem; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+.center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
 
-.run-controls { display: flex; flex-direction: column; gap: 15px; width: 100%; margin-top: 10px; }
-.btn-run-ctrl { width: 100%; padding: 15px; border-radius: 15px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; transition: transform 0.1s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.btn-run-ctrl:active { transform: scale(0.95); }
-.btn-pause { background: var(--card-bg); color: var(--text); }
-.btn-stop-run { 
-    background: var(--danger); 
-    color: white; 
-    padding: 30px;      /* Doubled padding (was 15px) */
-    font-size: 1.5rem;  /* Larger text */
-    margin-top: 10px;   /* Extra spacing from pause button */
+.count-val {
+    font-family: var(--font-mono);
+    font-size: 4.2rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.status-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-top: 8px;
+}
+
+.run-controls { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px; }
+.btn-run-ctrl {
+    width: 100%;
+    padding: 14px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.btn-run-ctrl:active { transform: scale(0.97); }
+.btn-pause { background: var(--input-bg); color: var(--text); }
+.btn-stop-run {
+    background: var(--danger);
+    color: var(--on-accent);
+    border-color: transparent;
+    padding: 26px;     /* doubled - this is the one you hit in a hurry */
+    font-size: 1.3rem;
+    margin-top: 6px;
 }
 .pulse-anim { animation: pulse 1s infinite; }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
-/* --- LAST PLAYED HIGHLIGHT --- */
-.btn-drill.last-played {
-    border-color: var(--primary); /* subtle highlight border */
-    background: var(--surface);   /* keep background clean or use var(--primary-dim) */
-}
-
-/* Optional: Add a small indicator icon */
+/* --- last played --- */
+.btn-drill.last-played { border-color: var(--accent-line); }
 .btn-drill.last-played::after {
-    content: '●'; /* Dot indicator */
-    color: var(--primary);
+    content: '';
     position: absolute;
-    right: 10px; /* Adjust based on your button padding */
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 0.8rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
 }
+
 /* ==========================================================================
    BALL PRESETS
-   A library of named ball recipes that can be dropped into a drill with
-   their placement/depth variations expanded. See js/presets.js.
+   A library of named ball recipes that can be dropped into a drill with their
+   placement/depth variations expanded. See js/presets.js.
    ========================================================================== */
 
 /* "Add from preset", used at the top of the drill editor body and again under
@@ -1138,124 +1403,191 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     gap: 7px;
     padding: 11px;
     margin: 0 0 14px 0;
-    border: 2px dashed var(--primary);
-    border-radius: 12px;
-    background: var(--primary-dim);
-    color: var(--primary-ink);
-    font-size: 0.78rem;
-    font-weight: 800;
+    border: 1px dashed var(--accent-line);
+    border-radius: 10px;
+    background: var(--accent-fill);
+    color: var(--primary);
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.08em;
     cursor: pointer;
-    transition: filter 0.2s, transform 0.1s;
+    transition: background 0.2s, transform 0.1s;
 }
-.preset-entry:hover { filter: brightness(0.97); }
+.preset-entry:hover { background: var(--primary-dim); }
 .preset-entry:active { transform: scale(0.99); }
 .preset-entry svg { flex-shrink: 0; width: 16px; height: 16px; fill: none; stroke: currentColor; }
 
-/* --- PRESET CARDS (picker) --- */
+/* --- the picker --- */
 .preset-card {
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--bg);
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 11px;
+    margin-bottom: 8px;
 }
 .preset-card-top { display: flex; align-items: flex-start; gap: 4px; }
-.preset-name { font-weight: 800; font-size: 1rem; color: var(--text); flex: 1; word-break: break-word; }
-.preset-sub { font-size: 0.72rem; color: var(--text); opacity: 0.8; font-weight: 600; margin-top: 2px; }
+.preset-name { font-weight: 700; font-size: 0.95rem; color: var(--text); flex: 1; word-break: break-word; }
+.preset-sub { font-size: 0.7rem; color: var(--text-light); font-weight: 600; margin-top: 3px; }
 .preset-edit-btn {
-    background: transparent; border: none; color: var(--text-light);
-    cursor: pointer; width: 34px; height: 34px;            /* >=32px touch target */
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: color 0.2s;
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    width: 34px;
+    height: 34px;            /* >=32px touch target */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.2s;
 }
 .preset-edit-btn:hover { color: var(--primary); }
 .preset-edit-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-.preset-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.preset-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
 .preset-chip {
-    font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 20px;
-    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
     white-space: nowrap;
 }
-.preset-chip b { color: var(--primary-ink); font-weight: 800; }
+.preset-chip b { color: var(--primary); font-weight: 700; }
 .preset-chip.placement b { color: var(--text); }
-.preset-chip-axis { font-size: 0.68rem; color: var(--text); opacity: 0.75; }
+.preset-chip-axis { font-size: 0.65rem; color: var(--text-light); }
 
 .preset-actions { display: flex; gap: 6px; margin-top: 10px; }
 .btn-preset-add {
-    flex: 1; padding: 9px 4px; border-radius: 8px; border: 2px solid var(--primary);
-    background: transparent; color: var(--primary-ink); font-size: 0.7rem; font-weight: 800;
-    cursor: pointer; text-transform: uppercase; white-space: nowrap;
+    flex: 1;
+    padding: 9px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--accent-line);
+    background: transparent;
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 0.66rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
     transition: background 0.2s, transform 0.1s;
 }
-.btn-preset-add:hover { background: var(--primary-dim); }
+.btn-preset-add:hover { background: var(--accent-fill); }
 .btn-preset-add:disabled { color: var(--text-light); border-color: var(--border); background: transparent; }
-.btn-preset-add:active { transform: scale(0.96); }
-.btn-preset-add.solid { background: var(--primary); color: var(--primary-solid-ink); }
+.btn-preset-add:active { transform: scale(0.97); }
+.btn-preset-add.solid { background: var(--primary); border-color: var(--primary); color: var(--primary-solid-ink); }
 .btn-preset-add:disabled { opacity: 0.55; cursor: not-allowed; }
 
-.preset-empty { text-align: center; color: var(--text-light); font-size: 0.85rem; padding: 25px 10px; line-height: 1.5; }
+.preset-empty { text-align: center; color: var(--text-light); font-size: 0.82rem; padding: 24px 10px; line-height: 1.6; }
 
-.btn-preset-new { border: 2px solid var(--primary); background: transparent; color: var(--primary-ink); flex: 1; }
-.btn-preset-new:hover { background: var(--primary-dim); }
+.btn-preset-new { background: transparent; border-color: var(--accent-line); color: var(--primary); flex: 1; }
+.btn-preset-new:hover { background: var(--accent-fill); }
 
-.btn-delete-preset { background: var(--danger); color: white; width: 44px; flex: 0 0 44px; padding: 0; }
+.btn-delete-preset { background: var(--danger); color: var(--on-accent); width: 44px; flex: 0 0 44px; padding: 0; }
 .btn-delete-preset svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-delete-preset[hidden] { display: none; }
 
-/* --- PRESET EDITOR --- */
+/* --- the preset editor --- */
 .preset-name-input {
     box-sizing: border-box;   /* width:100% + padding + border would overflow right */
-    width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--primary-ink); font-weight: 800; font-size: 1.1rem;
-    text-align: center; margin-bottom: 12px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 12px;
 }
-.preset-name-input:focus { outline: none; border-color: var(--primary); }
+.preset-name-input:focus { outline: none; border-color: var(--accent-line); color: var(--primary); }
 
 /* One variation axis: a list of label + value rows. */
 .axis-block {
-    border: 1px solid var(--border); border-radius: 10px;
-    background: var(--bg); padding: 8px; margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    padding: 9px;
+    margin-bottom: 10px;
 }
 .axis-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.axis-title { font-size: 0.68rem; font-weight: 800; color: var(--text); text-transform: uppercase; }
-.axis-hint { font-size: 0.68rem; color: var(--text); opacity: 0.75; font-weight: 600; margin-top: -2px; margin-bottom: 8px; line-height: 1.4; }
+.axis-title { font-size: 0.65rem; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.1em; }
+.axis-hint { font-size: 0.66rem; color: var(--text-light); font-weight: 500; margin-top: -2px; margin-bottom: 8px; line-height: 1.45; }
 .axis-row { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
 .axis-row:last-child { margin-bottom: 0; }
 .axis-row input {
     box-sizing: border-box;   /* the app is not globally border-box */
-    border: 1px solid var(--border); background: var(--surface); color: var(--text);
-    border-radius: 7px; padding: 6px 4px; font-weight: 700; text-align: center;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 4px;
+    font-family: inherit;
+    font-weight: 600;
+    text-align: center;
 }
-.axis-row input:focus { outline: none; border-color: var(--primary); color: var(--primary-ink); }
-.axis-row .axis-label-input { flex: 1 1 0; min-width: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
-.axis-row .axis-value-input { width: 64px; min-width: 0; flex: 0 0 64px; font-size: 0.9rem; }
+.axis-row input:focus { outline: none; border-color: var(--accent-line); color: var(--primary); }
+.axis-row .axis-label-input { flex: 1 1 0; min-width: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.axis-row .axis-value-input { width: 64px; min-width: 0; flex: 0 0 64px; font-family: var(--font-mono); font-size: 0.85rem; }
 .axis-del-btn {
-    background: transparent; border: none; color: var(--text-light); cursor: pointer;
-    width: 34px; height: 34px;                                /* >=32px touch target */
-    display: flex; align-items: center; justify-content: center;
-    flex: 0 0 34px;                                            /* no shrink, no overflow */
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    width: 34px;
+    height: 34px;                                /* >=32px touch target */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 34px;                              /* no shrink, no overflow */
+    transition: color 0.2s;
 }
-.axis-del-btn:hover { color: var(--danger); }
+.axis-del-btn:hover { color: var(--danger-ink); }
 .axis-del-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-axis-add {
-    width: 100%; margin-top: 6px; padding: 10px; border-radius: 7px;
-    border: 1px dashed var(--border); background: transparent; color: var(--text);
-    font-size: 0.72rem; font-weight: 700; cursor: pointer; text-transform: uppercase;
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px;
+    border-radius: 7px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-light);
+    font-family: inherit;
+    font-size: 0.66rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
-.btn-axis-add:hover { border-color: var(--primary); color: var(--primary-ink); }
+.btn-axis-add:hover { border-color: var(--accent-line); color: var(--primary); }
 .axis-standard-btn {
-    width: 100%; margin-top: 6px; padding: 10px; border-radius: 7px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text);
-    font-size: 0.7rem; font-weight: 700; cursor: pointer; text-transform: uppercase;
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.66rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: border-color 0.2s, color 0.2s;
 }
-.axis-standard-btn:hover { border-color: var(--primary); color: var(--primary-ink); }
+.axis-standard-btn:hover { border-color: var(--accent-line); color: var(--primary); }
 
 /* "Save this ball as a preset" on an option card */
-.btn-act-preset { flex: 0 0 42px; background: var(--card-bg); color: var(--text); padding: 8px 0; }
-.btn-act-preset:hover { color: var(--primary-ink); }
+.btn-act-preset { flex: 0 0 42px; background: var(--input-bg); color: var(--text); border-color: var(--border); padding: 8px 0; }
+.btn-act-preset:hover { color: var(--primary); }
 .btn-act-preset svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ==========================================================================
@@ -1288,14 +1620,16 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 18px 0 14px 0;
+    padding: 16px 0 12px 0;
     position: sticky;
     top: 0;
-    background: var(--bg);
+    background: var(--header-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     z-index: 1;
     border-bottom: 1px solid var(--border);
 }
-.settings-header h1 { margin: 0; font-size: 1.3rem; color: var(--text); }
+.settings-header h1 { margin: 0; font-size: 1.05rem; font-weight: 500; color: var(--text); }
 
 .settings-back {
     display: flex;
@@ -1303,24 +1637,26 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     gap: 5px;
     min-height: 40px;
     padding: 8px 14px 8px 10px;
-    border: none;
-    border-radius: 22px;
-    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--input-bg);
     color: var(--text);
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.1s, border-color 0.2s, color 0.2s;
 }
-.settings-back:active { transform: scale(0.96); }
+.settings-back:active { transform: scale(0.97); }
+.settings-back:hover { border-color: var(--accent-line); color: var(--primary); }
 .settings-back svg { flex-shrink: 0; }
 
-.settings-section { margin-top: 22px; }
+.settings-section { margin-top: 20px; }
 .settings-section-title {
-    font-size: 0.68rem;
-    font-weight: 800;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.1em;
     color: var(--text-light);
     margin-bottom: 8px;
     padding-left: 2px;
@@ -1334,81 +1670,167 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     padding: 12px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     margin-bottom: 8px;
 }
 .settings-row-main { flex: 1; min-width: 0; }
-.settings-row-title { font-size: 0.92rem; font-weight: 700; color: var(--text); }
-.settings-row-desc { font-size: 0.74rem; color: var(--text-light); margin-top: 2px; line-height: 1.35; }
-.danger-text { color: var(--danger); font-weight: 600; }
+.settings-row-title { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+.settings-row-desc { font-size: 0.72rem; color: var(--text-light); margin-top: 3px; line-height: 1.4; }
+.danger-text { color: var(--danger-ink); font-weight: 600; }
 
 .settings-btn {
     flex-shrink: 0;
     min-height: 40px;
     min-width: 74px;
     padding: 10px 16px;
-    border-radius: 10px;
-    border: 2px solid var(--primary);
+    border-radius: 8px;
+    border: 1px solid var(--accent-line);
     background: transparent;
-    color: var(--primary-ink);
-    font-size: 0.78rem;
-    font-weight: 800;
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.06em;
     cursor: pointer;
     transition: background 0.2s, transform 0.1s;
 }
-.settings-btn:hover { background: var(--primary-dim); }
-.settings-btn:active { transform: scale(0.96); }
-.settings-btn.danger { border-color: var(--danger); color: var(--danger); }
-.settings-btn.danger:hover { background: rgba(214, 48, 49, 0.1); }
+.settings-btn:hover { background: var(--accent-fill); }
+.settings-btn:active { transform: scale(0.97); }
+.settings-btn.danger { border-color: var(--danger); color: var(--danger-ink); }
+.settings-btn.danger:hover { background: var(--danger-dim); }
 
 /* --- theme picker --- */
-.theme-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
+.theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .theme-card {
     display: flex;
     align-items: center;
     gap: 9px;
-    min-height: 56px;
+    min-height: 54px;
     padding: 12px;
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
     color: var(--text);
-    font-size: 0.88rem;
-    font-weight: 700;
+    font-family: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
     cursor: pointer;
     position: relative;
-    transition: border-color 0.2s, transform 0.1s;
+    transition: border-color 0.2s, transform 0.1s, background 0.2s;
 }
 .theme-card:active { transform: scale(0.98); }
-.theme-card.active { border-color: var(--primary); }
+.theme-card:hover { border-color: var(--accent-line); }
+.theme-card.active { border-color: var(--accent-line); background: var(--accent-fill); color: var(--primary); }
 .theme-swatch {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     flex-shrink: 0;
     border: 1px solid var(--border);
 }
 .theme-name { flex: 1; text-align: left; }
 .theme-check {
     display: none;
-    color: var(--primary-ink);
+    color: var(--primary);
     font-weight: 800;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     line-height: 1;
 }
 .theme-card.active .theme-check { display: block; }
 
 .settings-foot {
-    margin-top: 28px;
+    margin-top: 26px;
     text-align: center;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     color: var(--text-light);
 }
+
+/* --- About --- */
+.about-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 4px 0 2px;
+}
+.about-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.about-version {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-light);
+}
+
+.about-link, .about-original {
+    display: inline-block;
+    text-decoration: none;
+    font-weight: 700;
+    border-radius: 9px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.about-link {
+    margin-top: 6px;
+    padding: 11px 22px;
+    background: var(--primary);
+    color: var(--primary-solid-ink);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+.about-link:hover { opacity: 0.9; }
+
+/* The site the app is published inside. A link rather than another button:
+   it is a reference, not the main action, and three equal-weight buttons in a
+   row would flatten the hierarchy. */
+.about-site {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    margin-top: 4px;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+.about-site:hover { background: var(--hover); border-color: var(--accent-line); }
+.about-site-name {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 0.01em;
+}
+.about-site-blurb {
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--text-light);
+}
+
+.about-credits {
+    margin-top: 10px;
+    padding-top: 14px;
+    width: 100%;
+    border-top: 1px solid var(--border);
+}
+.about-thanks {
+    margin: 0 0 10px;
+    font-size: 0.74rem;
+    line-height: 1.55;
+    color: var(--text-light);
+}
+.about-original {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-line);
+    color: var(--primary);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+}
+.about-original:hover { background: var(--accent-fill); }
 
 /* ==========================================================================
    STATISTICS SCREEN
@@ -1438,11 +1860,12 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     gap: 8px;
     padding: 10px 12px;
     margin-bottom: 14px;
+    border: 1px solid var(--accent-line);
     border-radius: 10px;
-    background: var(--primary-dim);
-    color: var(--primary-ink);
-    font-size: 0.78rem;
-    font-weight: 700;
+    background: var(--accent-fill);
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
 /* --- four numbers across the top --- */
@@ -1455,28 +1878,30 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .stat-tile {
     padding: 12px 10px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--surface);
     text-align: center;
     min-width: 0;                 /* stop a long duration forcing the grid wide */
 }
 .stat-value {
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
     line-height: 1.2;
+    font-variant-numeric: tabular-nums;
     word-break: break-word;
 }
 .stat-label {
-    font-size: 0.66rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.1em;
     color: var(--text-light);
-    margin-top: 3px;
+    margin-top: 4px;
 }
 
-.stats-section { margin-top: 22px; }
+.stats-section { margin-top: 20px; }
 
 /* --- 14-day bar chart --- */
 .chart {
@@ -1486,7 +1911,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     height: 110px;
     padding: 10px 8px 0 8px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--surface);
 }
 .chart-col {
@@ -1499,20 +1924,17 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .chart-bar {
     width: 100%;
     background: var(--primary);
-    border-radius: 4px 4px 0 0;
+    border-radius: 3px 3px 0 0;
     min-height: 2px;
 }
-.chart-bar.empty { background: var(--border); }
-.chart-labels {
-    display: flex;
-    gap: 4px;
-    padding: 4px 8px 0 8px;
-}
+.chart-bar.empty { background: var(--card-bg); }
+.chart-labels { display: flex; gap: 4px; padding: 4px 8px 0 8px; }
 .chart-label {
     flex: 1 1 0;
     min-width: 0;
     text-align: center;
-    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
     color: var(--text-light);
     font-weight: 600;
 }
@@ -1520,7 +1942,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 /* --- most played drills --- */
 .rank-list {
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--surface);
     padding: 4px 10px;
 }
@@ -1533,14 +1955,15 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 .rank-row:last-child { border-bottom: none; }
 .rank-pos {
-    font-size: 0.72rem;
-    font-weight: 800;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--text-light);
     min-width: 14px;
 }
 .rank-name {
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-size: 0.8rem;
+    font-weight: 600;
     color: var(--text);
     flex: 1 1 0;
     min-width: 0;
@@ -1551,21 +1974,22 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .rank-bar {
     flex: 0 0 34%;
     max-width: 110px;
-    height: 7px;
-    border-radius: 4px;
-    background: var(--border);
+    height: 6px;
+    border-radius: 3px;
+    background: var(--input-bg);
     overflow: hidden;
 }
 .rank-bar > span {
     display: block;
     height: 100%;
-    border-radius: 4px;
+    border-radius: 3px;
     background: var(--primary);
 }
 .rank-count {
-    font-size: 0.8rem;
-    font-weight: 800;
-    color: var(--primary-ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--primary);
     min-width: 20px;
     text-align: right;
 }
@@ -1573,7 +1997,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 /* --- the session log --- */
 .session-list {
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--surface);
     padding: 2px 10px;
     margin-bottom: 10px;
@@ -1588,18 +2012,19 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .session-row:last-child { border-bottom: none; }
 .session-main { flex: 1 1 0; min-width: 0; }
 .session-when {
-    font-size: 0.84rem;
-    font-weight: 700;
+    font-size: 0.82rem;
+    font-weight: 600;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 .session-meta {
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
     color: var(--text-light);
-    font-weight: 600;
-    margin-top: 2px;
+    font-weight: 500;
+    margin-top: 3px;
 }
 .session-meta .dot { margin: 0 2px; }
 .session-del {
@@ -1616,76 +2041,79 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     cursor: pointer;
     transition: color 0.2s, background 0.2s;
 }
-.session-del:hover { color: var(--danger-ink); background: var(--primary-dim); }
+.session-del:hover { color: var(--danger-ink); background: var(--danger-dim); }
 .session-del svg { fill: none; stroke: currentColor; }
 
 .stats-clear {
     width: 100%;
     min-height: 44px;
     padding: 11px;
-    border: 2px solid var(--danger-ink);
-    border-radius: 10px;
+    border: 1px solid var(--danger);
+    border-radius: 9px;
     background: transparent;
     color: var(--danger-ink);
-    font-size: 0.78rem;
-    font-weight: 800;
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.06em;
     cursor: pointer;
     transition: background 0.2s, transform 0.1s;
 }
-.stats-clear:hover { background: var(--primary-dim); }
+.stats-clear:hover { background: var(--danger-dim); }
 .stats-clear:active { transform: scale(0.98); }
 
 .stats-foot-note {
     text-align: center;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     color: var(--text-light);
-    margin-top: 8px;
+    margin-top: 10px;
+    line-height: 1.5;
 }
 
 .stats-empty {
     text-align: center;
     color: var(--text-light);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     padding: 40px 14px;
     line-height: 1.6;
 }
 
 /* ==========================================================================
    INSTALLED APP
-   The app can be installed to the home screen, which runs it in standalone
-   display mode with no browser chrome. The only layout problem that creates
-   is the cutout: Android and iOS report their status bar and notch as
-   "safe area insets", and viewport-fit=cover in index.html lets the page draw
-   straight through them, which is what makes it look like a real app. This is
-   the other half of that trade - putting the content back inside the area
-   that is actually visible.
+   The app installs to the home screen and runs in standalone display mode
+   with no browser chrome. The layout problem that creates is the cutout:
+   Android and iOS report their status bar and notch as "safe area insets",
+   and viewport-fit=cover in index.html lets the page draw straight through
+   them, which is what makes it look like a real app. This is the other half
+   of that trade - putting the content back inside the area actually visible.
 
    Every inset is 0 on a device with no cutout, so all of this collapses to
-   the padding values that were already there. It is deliberately NOT wrapped
-   in a @media (display-mode: standalone) block: the same phone in a browser
-   tab has the same cutout, and the padding is right in both.
+   padding. It is deliberately NOT wrapped in a
+   @media (display-mode: standalone) block: the same phone in a browser tab
+   has the same cutout, and the padding is right in both.
    ========================================================================== */
 
 body {
-    padding-top: max(20px, env(safe-area-inset-top));
+    padding-top: max(0px, env(safe-area-inset-top));
     padding-right: max(15px, env(safe-area-inset-right));
     padding-bottom: max(20px, env(safe-area-inset-bottom));
     padding-left: max(15px, env(safe-area-inset-left));
 }
 
+/* The header is sticky, so it carries the top inset itself rather than
+   letting body's padding scroll away underneath it. */
+header { padding-top: calc(14px + env(safe-area-inset-top)); }
+
 /* Settings and Statistics are position:fixed inset:0, so they live outside
    body's padding box and need the top inset of their own - their sticky
    header is what would otherwise sit under the status bar. */
-.settings-shell {
-    padding-top: env(safe-area-inset-top);
-}
+.settings-shell { padding-top: env(safe-area-inset-top); }
 
 /* Modals are centred by flexbox, and centring treats the top of the viewport
    as usable. border-box is required and is not global in this file: without
-   it, padding on a width:100%/height:100% element would grow the overlay past
-   the screen and the editor would gain a horizontal scrollbar. */
+   it, padding on a width:100%/height:100% element would grow the overlay
+   past the screen and the editor would gain a horizontal scrollbar. */
 .modal-overlay {
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top);
@@ -1694,6 +2122,4 @@ body {
 
 /* The toast is pinned near the bottom, which on a gesture-navigation phone is
    exactly where the home indicator is drawn. */
-#toast.show {
-    bottom: calc(50px + env(safe-area-inset-bottom));
-}
+#toast.show { bottom: calc(50px + env(safe-area-inset-bottom)); }

@@ -1,4 +1,4 @@
-# Nova S Pro Drill Control
+# Nova Drill | Tenisdemesa.ar
 
 A pretty web client for the Nova S Pro table tennis robot. 
 This tool can be used as a replacement for the original app, removing the requirements for server connectivity and user login.
@@ -6,6 +6,10 @@ This tool can be used as a replacement for the original app, removing the requir
 An independent, actively developed continuation of the original
 [**olanga/nova**](https://github.com/olanga/nova). See
 [Credits](#credits) and [What this fork adds](#what-this-fork-adds).
+
+Repository: **[Ceneka/nova](https://github.com/Ceneka/nova)** · App:
+**<https://nova.tenisdemesa.ar/>** · Introduced on
+[tenisdemesa.ar/nova](https://tenisdemesa.ar/nova)
 
 | Main | Editor | Countdown |
 | :---: | :---: | :---: |
@@ -15,7 +19,8 @@ An independent, actively developed continuation of the original
 
 **Online/Offline:**
 
-  * Visit: <https://ceneka.github.io/nova/> (deployed from `main` by GitHub Actions)
+  * Visit: <https://nova.tenisdemesa.ar/> (the published app)
+  * Mirror: <https://ceneka.github.io/nova/> (deployed from `main` by GitHub Actions)
   * Self hosting: https is required
 
 **Local:**
@@ -46,7 +51,7 @@ shows whether the offline copy is ready yet.
 
   * **Fully customizable drills** Add and remove drills and balls. Share, export and import settings.
   * **Data Persistence:** Settings and drills saved to browser local storage.
-  * **Themes:** 4 options, including dark mode.
+  * **Themes:** 4 options, all dark — one shared shell in four accent colours.
   * **Languages:** English and Spanish, switchable in Settings. The first visit follows your browser's language; after that the app remembers your choice.
   * **Settings screen:** themes, language, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
   * **Statistics:** a stored history of every session you have trained, with totals, a 14-day chart, your most-played drills, and per-session delete.
@@ -136,6 +141,7 @@ B;1;Drill B1;7.5;5;back;50;5;60;1
 Work done here on top of the original, most of it driven by things the
 upstream app could not do or did not get right:
 
+  * **A new look** — the app now shares the visual system of [tenisdemesa.ar](https://tenisdemesa.ar): a dark, low-chroma shell with one bright neon accent, the same DM Sans / JetBrains Mono pairing and the same micro-label treatment. The four themes are now four accent hues over one shared set of surfaces rather than three light themes and one dark one, so the app and the site it ships inside read as one thing.
   * **Ball presets** — a library of named ball recipes dropped into any drill with placement and depth variations expanded, in their own JSON/CSV format so they cannot break the shared drill CSV.
   * **Settings as a full screen** — themes, language, presets, statistics and data resets moved out of the hamburger menu, which now carries only drill actions.
   * **Translations** — English and Spanish, with a hand-rolled i18n layer rather than a dependency, so the app still installs from a plain file download with no build step. Your drills, presets and shared CSV stay in the language you typed them in; only the interface around them is translated.
@@ -161,6 +167,52 @@ Upstream documentation that still applies:
 
 Spinsight measurements are based on findings by
 [smee](https://github.com/smee/nova-s-custom-drills) and plunder.
+
+The visual system — the palette, the type pairing, the micro-labels — is
+[tenisdemesa.ar](https://tenisdemesa.ar)'s, so that the app looks like it
+belongs on the site that introduces it.
+
+## Design
+
+The whole interface is built on CSS custom properties in `css/style.css`.
+There is no preprocessor and no build step, so a theme is a block of
+declarations and nothing else:
+
+| Token | What it is |
+| --- | --- |
+| `--bg` / `--surface` / `--card-bg` / `--input-bg` | the four dark surfaces, darkest to lightest |
+| `--text` / `--text-light` | body copy and muted labels |
+| `--border` | the hairline everything is divided by |
+| `--primary` | the neon accent, and the theme's identity |
+| `--accent-fill` / `--accent-line` | the "this one is on" pill, the way the site draws it |
+| `--on-accent` | text that sits **on** `--primary` or `--danger` |
+| `--danger` / `--danger-ink` | destructive fill, and destructive text |
+| `--spin-top` / `--spin-back` | topspin is amber, backspin is blue, in every theme |
+
+Two rules that are easy to break by accident:
+
+  * **`--primary` and `--danger` are fills.** Text on them is `--on-accent`,
+    a near-black. White is only 3.9:1 on the danger red, so a white label on a
+    red button fails AA without looking wrong.
+  * **Never hardcode a colour in JS.** A hex in a template string pins one
+    theme's value and silently stops following the other three. That is how
+    topspin ended up blue in every theme for a while.
+
+`tests/integration.html` re-checks contrast for the preset and statistics
+screens in all four themes on every push, so a bad pair fails the build rather
+than shipping.
+
+### Fonts
+
+DM Sans and JetBrains Mono, self-hosted under `fonts/` as four `woff2`
+subsets (latin and latin-ext for each). Both are
+[SIL Open Font License 1.1](https://openfontlicense.org/).
+
+They are committed and served from the app rather than pulled from a CDN
+deliberately: this app's whole reason for existing is working with no signal
+at a table, and a webfont that only arrives over the network is a webfont
+that falls back to the system stack at exactly the wrong moment. `sw.js`
+precaches all four, so an installed copy is typed correctly offline too.
 
 ## Development
 

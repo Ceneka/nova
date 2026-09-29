@@ -22,7 +22,8 @@ python3 -m http.server 8123 --bind 127.0.0.1
 # open http://127.0.0.1:8123/
 ```
 
-Deployed version: <https://ceneka.github.io/nova/> (from `main`, see Deployment)
+Deployed: <https://nova.tenisdemesa.ar/> — the published app.
+Mirror from `main`: <https://ceneka.github.io/nova/> (see Deployment)
 
 ## Layout
 
@@ -34,6 +35,7 @@ sw.js               service worker: precache + offline. Hand-written, see Instal
 icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
 tools/make-icons.sh regenerates icons/*.png. Not part of the build
 css/style.css       all styling, one file, CSS custom properties per theme
+fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
 js/
   main.js           entry point (loaded by index.html); wires window.* bindings
   state.js          app state + localStorage + drill CSV import/export
@@ -168,6 +170,17 @@ Rules that have bitten people before:
 modals (200), reached from a **row in Settings** rather than the hamburger
 menu, per the rule that non-drill-action surfaces belong in Settings.
 
+**It has two ways in, and they are not the same route.** The Settings row, and
+the running totals in the footer of the drill list. `openStatsView(from)`
+records which, and `applyBackLabel()` points the back button at whatever is
+actually underneath — "Settings" from the row, "Drill" from the footer.
+Closing needs no such care (it just uncovers whatever is there), but a button
+labelled "Settings" sitting over the drill list promises a screen you cannot
+get to from there. Set the `data-i18n` / `data-i18n-attr` keys as well as the
+text: `applyI18n()` re-walks them on every language change, so an attribute
+left pointing at the other key puts the wrong label back on the next switch.
+Do not add a second Escape listener for the footer route — see below.
+
 Two traps here, both of which cost a debugging round:
 
 - **`openStatsView()` must remove `hidden`, `closeStatsView()` must put it
@@ -179,9 +192,9 @@ Two traps here, both of which cost a debugging round:
   registered first, closes Statistics, and then Settings sees a closed
   Statistics and closes itself too — one keypress, both screens.
 
-`--danger` is a *fill* colour (white text sits on top of it) and falls under
-4.5:1 as text in three of the four themes. Destructive labels use the new
-`--danger-ink`, which is per-theme and does clear AA.
+`--danger` is a *fill* colour and text on it is `--on-accent`, not white —
+white is 3.9:1 on the danger red. Destructive **labels** use `--danger-ink`,
+which is a lighter red that does clear AA as text. See Design.
 
 ## Translations
 
@@ -200,6 +213,15 @@ Three ways to reach a string:
 `applyI18n()` walks the first two; it runs in `main.js` before anything else
 renders, and again on every `locale-changed`. The English text stays in
 `index.html` so the page reads correctly even if the module never loads.
+
+**The app's name is written in four places and nothing ties them together:**
+`app.title` in *both* dictionaries, the `<title>` fallback text in
+`index.html`, `manifest.webmanifest`'s `name`, and `settings.foot`. Change one
+and the app is called something different in the tab, under its own icon, and
+in its About box — so the suite asserts they all agree. `short_name` and the
+`apple-mobile-web-app-title` are deliberately *not* the full name: a launcher
+truncates them around 12 characters. The name is a brand, so it is identical
+in `en.js` and `es.js` and must not be translated.
 
 **`js/locales/en.js` is the source of truth for the key set.** A value is a
 string, or `{one, other}` for anything that counts — English and Spanish share
@@ -255,6 +277,65 @@ picks the language from `navigator.languages`; any later choice is stored in
 `nova_lang` and always wins, so a trip through an English browser cannot undo
 it.
 
+## Design
+
+The visual system is [tenisdemesa.ar](https://tenisdemesa.ar)'s, so the app
+and the site that introduces it read as one thing. A dark, low-chroma shell
+with one bright neon accent, DM Sans for the interface and JetBrains Mono for
+anything numeric, and micro-labels at ~10px uppercase with wide tracking.
+
+`css/style.css` is the only stylesheet and it is hand-written. There is no
+preprocessor, so a theme is a block of declarations and nothing else:
+
+| Token | What it is |
+| --- | --- |
+| `--bg` / `--surface` / `--card-bg` / `--input-bg` | the four dark surfaces |
+| `--text` / `--text-light` | body copy, muted labels |
+| `--border` | the hairline everything is divided by |
+| `--primary` | the neon accent, and the theme's identity |
+| `--accent-fill` / `--accent-line` | the "this one is on" pill |
+| `--on-accent` | text that sits **on** `--primary` or `--danger` |
+| `--danger` / `--danger-ink` | destructive fill, and destructive text |
+| `--spin-top` / `--spin-back` | topspin is amber, backspin is blue, in every theme |
+
+Rules that have bitten people before:
+
+- **All four themes are dark now**, and they share every neutral; only
+  `--primary`, `--accent-fill` and `--accent-line` differ. The **ids** are
+  unchanged (`standard`, `ocean`, `forest`, `night`) so a stored
+  `nova_theme_pref` still resolves — the *look* changed, the key did not.
+- **`--primary` and `--danger` are fills, not text colours.** Text on them is
+  `--on-accent`, a near-black. White is 3.9:1 on the danger red, so a white
+  label on a red button fails AA without looking wrong. This replaces the old
+  note that `--danger` "falls under 4.5:1 as text in three of the four
+  themes", which is now true of all four.
+- **Never hardcode a colour in JS.** A hex in a template string pins one
+  theme's value and silently stops following the other three. That is how
+  topspin rendered blue in every theme for a while: `editor.js` and
+  `presetUi.js` each wrote an inline `background` that disagreed with the
+  stylesheet, and the inline one won. Colour the control from CSS
+  (`.sc-opt:first-child` / `:last-child`) and let the template emit classes.
+  `settingsUi.js`'s `THEMES` swatches are the one deliberate exception — they
+  are a *picture* of a theme, not a themed value.
+- **No text below 10px.** The micro-label floor is `0.65rem` (10.4px). The
+  suite fails the build on any preset-UI text under 10px, and the app is read
+  at a table.
+- **The suite re-checks contrast in all four themes** for the preset and
+  statistics screens, so a bad pair fails the build instead of shipping. It
+  also enforces 32px minimum tap targets there and 40px in Statistics.
+  Changes outside those two screens are not covered — check them by hand.
+
+**Fonts are self-hosted under `fonts/`** — four `woff2` subsets, DM Sans and
+JetBrains Mono, latin and latin-ext, both SIL OFL 1.1. They are committed and
+precached by `sw.js` rather than pulled from a CDN because the whole point of
+this app is working with no signal, and a webfont that only arrives over the
+network falls back to the system stack at exactly the wrong moment. Adding a
+weight means adding a file to `PRECACHE` too.
+
+`converter.html` is standalone and has no `data-theme`, so it carries the
+`standard` palette inline rather than reading `css/style.css`. It is a copy,
+not a shared import — if you change a token, change it there too.
+
 ## Installing (PWA)
 
 The app installs to the home screen and runs offline. Four files, and the
@@ -291,7 +372,7 @@ A **real registration cannot be tested in the headless suite**: under
 `--virtual-time-budget` a *successful* registration never settles and the page
 hangs, while a failed one rejects immediately. (It is the virtual clock, not
 headless - over CDP against a real browser the same worker activates,
-precaches 28 files, and the app boots with the network switched off.) So
+precaches 33 files, and the app boots with the network switched off.) So
 `tests/integration.html` evaluates the real `sw.js` through `new Function` with
 a fake `self`/`caches`/`Request`/`fetch` and drives its own `install`,
 `activate` and `fetch` handlers. That covers the logic; the browser half is
@@ -326,7 +407,8 @@ the canvas or it gets cut in half on a real home screen.
   `factoryReset()` wipes all of them (it calls `localStorage.clear()`; the key
   list here is documentation, not a second implementation).
 - **Styling**: CSS custom properties (`--primary`, `--surface`, `--danger`,
-  …) so all four themes work for free. Never hardcode a colour in JS.
+  …) so all four themes work for free. Never hardcode a colour in JS — see
+  Design for the tokens and the rules behind them.
 - **Modals** all share `.modal-overlay` at `z-index: 200`; a nested modal must
   appear **later in `index.html`** to stack on top. Toasts are `z-index: 300`.
 - **The hamburger menu carries only drill actions** (download / export /
@@ -364,11 +446,13 @@ anyway). In-range values round-trip exactly.
 `main`. There is no build step, so the "build" job copies files and that is
 deliberate — see the top of this file.
 
-**What ships**: `index.html`, `css/`, `js/`, `images/`, `icons/`,
+**What ships**: `index.html`, `css/`, `js/`, `images/`, `icons/`, `fonts/`,
 `manifest.webmanifest`, `sw.js`, `converter.html`, `nova_drills_v2_example.csv`,
 `README.md`. `sw.js` and the manifest are not optional extras - without them
 the site still works in a tab but can never be installed and never opens
-offline, which is most of what it is for.
+offline, which is most of what it is for. `fonts/` is not optional either: it
+is precached, and a shipped-but-empty `fonts/` silently leaves the app on the
+system font stack.
 
 **What does not**, and why — extend this list rather than reverting to "copy
 the whole repo":
@@ -381,7 +465,7 @@ the whole repo":
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 286 browser checks in `tests/integration.html`, driven through
+and the 300 browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -405,12 +489,12 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (286 checks, needs the HTTP server above):
+Browser integration (300 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(286) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(300) or FAIL(n)
 ```
 
 Open it in a normal browser to see each check. It drives the real editor, the

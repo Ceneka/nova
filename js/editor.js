@@ -224,20 +224,23 @@ function renderEditor() {
             const optDiv = document.createElement('div');
             optDiv.className = 'option-card';
 
-            // --- UPDATED: Swap Colors for Top/Back Toggle (Top=Blue, Back=Red) ---
+            // Top and back spin are coloured by the stylesheet
+            // (.sc-opt:first-child / :last-child) off the --spin-top and
+            // --spin-back tokens. This used to also write an inline background
+            // per option, and the two copies disagreed: the inline colours were
+            // left over from an older palette and won, so topspin rendered
+            // blue. One definition, in css/style.css, is the only way this
+            // stays true across a theme change.
             const toggleHtml = `
                 <div class="spin-row">
                     <span class="spin-label">${t('editor.rotation')}</span>
                     <div class="spin-capsule">
-                        <div class="sc-opt ${type === 'top' ? 'active' : ''}" 
-                             style="${type === 'top' ? 'background:#0984e3' : ''}"
+                        <div class="sc-opt ${type === 'top' ? 'active' : ''}"
                              onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'top')">${t('unit.top')}</div>
-                        <div class="sc-opt ${type === 'back' ? 'active' : ''}" 
-                             style="${type === 'back' ? 'background:var(--danger)' : ''}"
+                        <div class="sc-opt ${type === 'back' ? 'active' : ''}"
                              onclick="window.handleTypeToggle(${stepIndex}, ${optIndex}, 'back')">${t('unit.back')}</div>
                     </div>
                 </div>`;
-            // ---------------------------------------------------------------------
 
             // NOTE: 'Drop' and 'Speed' use onchange to prevent re-rendering while typing negative numbers or clearing input
             const inputsHtml = `

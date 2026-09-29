@@ -1,6 +1,6 @@
 {
-  "name": "Nova Drill Control",
-  "short_name": "Nova",
+  "name": "Nova Drill | Tenisdemesa.ar",
+  "short_name": "Nova Drill",
   "description": "Build, save and run table tennis drills on the Nova S Pro robot.",
   "lang": "en",
   "dir": "ltr",
@@ -13,8 +13,8 @@
   "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "any",
 
-  "theme_color": "#f5f6fa",
-  "background_color": "#f5f6fa",
+  "theme_color": "#0b1013",
+  "background_color": "#0b1013",
 
   "categories": ["sports", "utilities", "productivity"],
   "prefer_related_applications": false,
