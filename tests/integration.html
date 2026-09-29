@@ -614,10 +614,10 @@ eq('exactly one theme is selected', document.querySelectorAll('#settings-body .t
 // to 2.8 phone screens of 29 rows, with the AI section alone being sixteen flat
 // siblings. These assert the shape, because the shape is the fix.
 const settingsGroups = [...document.querySelectorAll('#settings-body details.settings-group')];
-eq('eight collapsible settingsGroups', settingsGroups.length, 8);
+eq('nine collapsible settingsGroups', settingsGroups.length, 9);
 eq('in a deliberate order',
    settingsGroups.map(g => g.dataset.group).join(','),
-   'appearance,language,ai,presets,drills,statistics,app,data');
+   'appearance,language,ai,presets,drills,statistics,app,account,data');
 ok('each is a real <details>, so it works with the keyboard and no JS',
    settingsGroups.every(g => g.tagName === 'DETAILS' && !!g.querySelector('summary.settings-group-head')));
 ok('every row is a comfortable tap target',
@@ -635,7 +635,62 @@ ok('a closed group shows what is inside it',
    && /sessions?$/.test(groupNotes[5]),
    JSON.stringify(groupNotes));
 ok('and the ones with nothing to say simply have no note',
-   groupNotes[4] === '' && groupNotes[7] === '', JSON.stringify(groupNotes));
+   groupNotes[4] === '' && groupNotes[8] === '', JSON.stringify(groupNotes));
+
+// --- the account group ------------------------------------------------------
+//
+// Signing in is optional and the screen must never imply otherwise: the group
+// exists, it says what it is for, and it never appears on the way to a drill.
+const accountGroup = document.querySelector('[data-group="account"]');
+ok('the account group is on the screen', !!accountGroup);
+ok('its row says what state it is in, closed',
+   accountGroup.querySelector('.settings-group-note')?.textContent.trim() === 'Not signed in',
+   accountGroup.querySelector('.settings-group-note')?.textContent);
+ok('signed out it offers exactly one action: sign in',
+   !!accountGroup.querySelector('[data-row="sign-in"]')
+   && !accountGroup.querySelector('[data-row="sign-out"]')
+   && !accountGroup.querySelector('[data-row="backup-now"]')
+   && !accountGroup.querySelector('[data-row="restore-backup"]'));
+
+// The one promise that makes the backup safe to offer at all.
+ok('the group says the AI key stays on this device',
+   (accountGroup.textContent || '').includes('never backed up'));
+
+// The signed-in state arrives out of localStorage, so a crafted entry is the
+// hostile-input case, and the email is the only string on this screen that did
+// not come from the dictionary. It has to land as text.
+localStorage.setItem('nova_account', JSON.stringify({
+    access: 'a'.repeat(10),
+    refresh: 'r'.repeat(10),
+    expiresAt: Date.now() + 600000,
+    user: { id: '1', email: '<img src=x onerror="window.__novaXss=1">', name: null }
+}));
+renderSettings();
+const accountAfter = document.querySelector('[data-group="account"]');
+ok('a crafted account email creates no elements',
+   accountAfter.querySelectorAll('img').length === 0 && !window.__novaXss);
+ok('and it is rendered as text',
+   (accountAfter.querySelector('.settings-row-title')?.textContent || '')
+       .includes('<img src=x onerror'));
+ok('signed in, the backup and sign-out rows appear',
+   !!accountAfter.querySelector('[data-row="backup-now"]')
+   && !!accountAfter.querySelector('[data-row="restore-backup"]')
+   && !!accountAfter.querySelector('[data-row="sign-out"]')
+   && !accountAfter.querySelector('[data-row="sign-in"]'));
+ok('and the closed row now says so',
+   accountAfter.querySelector('.settings-group-note')?.textContent.trim() === 'Signed in',
+   accountAfter.querySelector('.settings-group-note')?.textContent);
+// Signed in but never backed up, which is the state every first session is in.
+ok('an account with no backup says so rather than showing a blank',
+   (accountAfter.querySelector('[data-row="account-state"] .settings-row-desc')?.textContent || '')
+       .includes('Not backed up yet'));
+
+// Signing out is the one button that can be pressed without a server.
+localStorage.removeItem('nova_account');
+renderSettings();
+ok('removing the stored account returns the screen to signed out',
+   !!document.querySelector('[data-group="account"] [data-row="sign-in"]')
+   && !document.querySelector('[data-group="account"] [data-row="backup-now"]'));
 
 ok('the AI assistant is its own group',
    !!document.querySelector('#settings-body [data-group="ai"] [data-section="ai"]'));
@@ -680,7 +735,7 @@ ok('only the common groups are expanded on arrival',
    liveGroups.filter(g => g.open).map(g => g.dataset.group).join(',') === 'appearance,language',
    liveGroups.filter(g => g.open).map(g => g.dataset.group).join(',') || 'nothing open');
 ok('so the long sections cost one summary row each, not twelve',
-   liveGroups.length === 8 && liveGroups.filter(g => g.open).length < liveGroups.length);
+   liveGroups.length === 9 && liveGroups.filter(g => g.open).length < liveGroups.length);
 
 document.querySelector('[data-group="presets"] .settings-group-head').click();
 ok('tapping a group opens it',

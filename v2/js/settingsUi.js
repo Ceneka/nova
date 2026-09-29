@@ -17,6 +17,8 @@ import {
 import { chat } from './aiClient.js';
 import { isScreenLockSupported } from './aiVoice.js';
 import { getInstallState, promptInstall, isOfflineReady } from './pwa.js';
+import { isSignedIn, getUser, startSignIn, signOut } from './account.js';
+import { pushBundle, restoreFromCloud, getLastSyncAt } from './sync.js';
 import { t, getLang, setLang, LANGUAGES } from './i18n.js';
 
 /**
@@ -438,6 +440,98 @@ function appGroupNote() {
     return t('settings.offlinePreparingShort');
 }
 
+/**
+ * The account group.
+ *
+ * Two states and no third: signed out, or signed in with a backup button. Both
+ * say plainly that this is optional - the app above this group works with no
+ * account at all, and copy that implies otherwise would be a lie the user only
+ * finds out about when they decline.
+ *
+ * The email goes through `esc()`. It is the user's own address rather than
+ * something a stranger typed, but it is the only untrusted string on this
+ * screen, and one `esc()` is cheaper than being the screen where that changes.
+ */
+function accountHtml() {
+    const user = getUser();
+    // The key reassurance is outside the branch on purpose. It is the thing
+    // that makes signing in feel safe, so it is the thing to read *before*
+    // signing in - hiding it behind a session would put it exactly one step
+    // too late.
+    const keyRow = `
+        <div class="settings-row" data-row="key-stays-here">
+            <div class="settings-row-main">
+                <div class="settings-row-desc">${t('account.keyStaysHere')}</div>
+            </div>
+        </div>`;
+
+    if (!isSignedIn() || !user) {
+        return `
+            <div class="settings-row" data-row="sign-in">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('account.signIn')}</div>
+                    <div class="settings-row-desc">${t('account.signInDesc')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleSignIn()">${t('account.signIn')}</button>
+            </div>${keyRow}`;
+    }
+    const lastSync = getLastSyncAt();
+    const when = lastSync ? formatWhen(lastSync) : '';
+    return `
+        <div class="settings-row" data-row="account-state">
+            <div class="settings-row-main">
+                <div class="settings-row-title">${esc(user.email || user.name || t('account.signedInShort'))}</div>
+                <div class="settings-row-desc">${when ? t('account.backupAt', { when: esc(when) }) : t('account.backupNever')}</div>
+            </div>
+        </div>
+        <div class="settings-row" data-row="backup-now">
+            <div class="settings-row-main">
+                <div class="settings-row-title">${t('account.backupNow')}</div>
+                <div class="settings-row-desc">${t('account.backupNowDesc')}</div>
+            </div>
+            <button class="settings-btn" onclick="window.handleCloudBackup()">${t('action.save')}</button>
+        </div>
+        <div class="settings-row" data-row="restore-backup">
+            <div class="settings-row-main">
+                <div class="settings-row-title">${t('account.restore')}</div>
+                <div class="settings-row-desc">${t('account.restoreDesc')}</div>
+            </div>
+            <button class="settings-btn" onclick="window.handleCloudRestore()">${t('action.restore')}</button>
+        </div>
+        <div class="settings-row" data-row="sign-out">
+            <div class="settings-row-main">
+                <div class="settings-row-title">${t('account.signOut')}</div>
+                <div class="settings-row-desc">${t('account.signOutDesc')}</div>
+            </div>
+            <button class="settings-btn" onclick="window.handleSignOut()">${t('account.signOut')}</button>
+        </div>${keyRow}`;
+}
+
+/** What the closed row says, per the rule that a collapsed group is scannable. */
+function accountGroupNote() {
+    return isSignedIn() ? t('account.signedInShort') : t('account.signedOutShort');
+}
+
+/**
+ * A timestamp in the app's own language, not a machine one.
+ *
+ * `toLocaleString` with no options is deliberately not what is wanted here -
+ * "1/2/2026, 3:04:05 PM" is a date a person reads, and the settings list is
+ * full of sentences rather than a data table.
+ */
+function formatWhen(iso) {
+    try {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString(getLang(), {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
+    } catch {
+        return '';
+    }
+}
+
 export function renderSettings() {
     const body = document.getElementById('settings-body');
     if (!body) return;
@@ -540,6 +634,7 @@ export function renderSettings() {
                             </div>
                         </div>
         `, appGroupNote())}
+        ${group('account', 'account.section', `${accountHtml()}`, accountGroupNote())}
         ${group('data', 'settings.data', `
                         <div class="settings-row" data-row="reset-stats">
                             <div class="settings-row-main">
@@ -780,8 +875,7 @@ document.addEventListener('stats-updated', () => { if (open) renderSettings(); }
  * already imports aiUi.js, so importing the other way would be a cycle. A
  * document event is the pattern the rest of the app uses for exactly that
  * (AGENTS.md, "Cross-module talk goes through CustomEvents").
- */
-export function openSettingsAt(group) {
+ */export function openSettingsAt(group) {
     if (typeof group === 'string' && group) pendingGroup = group;
     openSettings();
 }
@@ -801,12 +895,84 @@ document.addEventListener('pwa-state-changed', () => { if (open) renderSettings(
 // hidden screen would throw away the scroll position for nothing.
 document.addEventListener('locale-changed', () => { if (open) renderSettings(); });
 
+// --- the account and backup handlers -----------------------------------------
+//
+// All four act on the screen they are on, so each one redraws rather than
+// patching a single row: the group's status note changes ("not signed in" ->
+// "signed in", "never backed up" -> a timestamp) and the note lives on the
+// summary row, which a one-row patch would miss.
+
+/** Leave for the site's own login. There is nothing to render on the way out. */
+export async function handleSignIn() {
+    try {
+        await startSignIn();
+    } catch (err) {
+        console.error('Could not start sign-in', err);
+        showToast(t('account.backupFailed'));
+    }
+}
+
+export async function handleSignOut() {
+    await signOut();
+    showToast(t('account.signOut'));
+    renderSettings();
+}
+
+export async function handleCloudBackup() {
+    if (!isSignedIn()) {
+        showToast(t('account.needAccount'));
+        return;
+    }
+    const result = await pushBundle();
+    if (!result.ok) {
+        // Deliberately the same message for "not signed in" and "the network
+        // is down": this screen has no way to tell the user which, and
+        // guessing wrong is worse than saying it did not go through.
+        showToast(t('account.backupFailed'));
+        return;
+    }
+    showToast(t('account.backupDone'));
+    renderSettings();
+}
+
+export async function handleCloudRestore() {
+    if (!isSignedIn()) {
+        showToast(t('account.needAccount'));
+        return;
+    }
+    // This overwrites the drills on this device, so it asks first. The answer
+    // is the user's decision about their own data, never a default.
+    if (!confirm(t('account.restoreConfirm'))) return;
+
+    const result = await restoreFromCloud();
+    if (!result.ok) {
+        showToast(t('account.restoreFailed'));
+        return;
+    }
+    if (!result.saved || result.applied === null) {
+        showToast(t('account.restoreNone'));
+        return;
+    }
+
+    // A reload is not laziness here, it is the only way it works: the drill
+    // lists, the preset library and the stats totals are all read from
+    // localStorage once at start-up and held in memory. Writing the values
+    // back without reloading would restore the data and leave the screen
+    // showing what was there before.
+    showToast(t('account.restoreDone', { n: result.applied }));
+    setTimeout(() => location.reload(), 600);
+}
+
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.handleSettingsTheme = handleSettingsTheme;
 window.handleSettingsLang = handleSettingsLang;
 window.handlePresetImportPick = handlePresetImportPick;
 window.handleInstallApp = handleInstallApp;
+window.handleSignIn = handleSignIn;
+window.handleSignOut = handleSignOut;
+window.handleCloudBackup = handleCloudBackup;
+window.handleCloudRestore = handleCloudRestore;
 window.handleAiField = handleAiField;
 window.handleAiVoiceMode = handleAiVoiceMode;
 window.handleAiToggle = handleAiToggle;

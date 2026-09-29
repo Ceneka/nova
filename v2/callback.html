@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Nova · Iniciar sesión</title>
+    <!--
+      Standalone, like converter.html: this page is reached by a redirect from
+      tenisdemesa.ar and shares no runtime with the app. It imports exactly one
+      module, js/account.js, because that is where the PKCE verifier lives and
+      it must be redeemed on the origin that generated it.
+
+      It is deliberately NOT in the service worker's PRECACHE. A sign-in needs
+      the network by definition, and precaching a page that can only fail
+      offline would put a dead page in the offline fallback path.
+    -->
+    <style>
+        :root { color-scheme: dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0b0d10;
+            color: #e8eaed;
+            font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .box { max-width: 340px; text-align: center; }
+        h1 { font-size: 1.25rem; margin: 0 0 8px; font-weight: 600; }
+        p { font-size: .9rem; color: #9aa0a6; line-height: 1.5; margin: 0; }
+        .micro {
+            font-size: .65rem;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: #6b7075;
+            margin-top: 20px;
+        }
+        a { color: #35e0c0; }
+        .error { color: #ff8a7a; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1 id="title">Iniciando sesión…</h1>
+        <p id="msg">Un momento.</p>
+        <p class="micro" id="foot"><a href="./">Volver a Nova</a></p>
+    </div>
+
+    <script type="module">
+        import { completeSignIn } from './js/account.js';
+
+        // The strings live here rather than in the dictionary: this page is a
+        // one-shot handoff with two outcomes, and pulling the whole i18n
+        // runtime and both dictionaries in to say "signing in" is not worth a
+        // network round trip that may be about to be redirected anyway.
+        const COPY = {
+            es: {
+                working: 'Iniciando sesión…',
+                done: 'Sesión iniciada. Volviendo a Nova…',
+                missing_code: 'No llegó el código de acceso.',
+                state_mismatch: 'La solicitud no coincide con la que inició este dispositivo.',
+                no_pending_signin: 'Este dispositivo no inició este inicio de sesión.',
+                token_exchange_failed: 'No se pudo completar el inicio de sesión.',
+                bad_token_response: 'La respuesta del servidor no era válida.'
+            },
+            en: {
+                working: 'Signing you in…',
+                done: 'Signed in. Taking you back to Nova…',
+                missing_code: 'No authorization code came back.',
+                state_mismatch: 'This request does not match the one this device started.',
+                no_pending_signin: 'This device did not start this sign-in.',
+                token_exchange_failed: 'Could not complete the sign-in.',
+                bad_token_response: 'The server response was not valid.'
+            }
+        };
+
+        const lang = (() => {
+            try {
+                return localStorage.getItem('nova_lang') === 'en' ? 'en' : 'es';
+            } catch {
+                return 'es';
+            }
+        })();
+        const copy = COPY[lang];
+
+        const title = document.getElementById('title');
+        const msg = document.getElementById('msg');
+
+        function fail(key) {
+            title.textContent = lang === 'es' ? 'No se pudo iniciar sesión' : 'Could not sign you in';
+            msg.textContent = copy[key] || copy.token_exchange_failed;
+            msg.className = 'error';
+        }
+
+        (async () => {
+            const params = new URLSearchParams(location.search);
+            const code = params.get('code');
+            const state = params.get('state');
+
+            // The provider reports a refusal in the query string rather than an
+            // error code, so there is nothing to redeem.
+            if (params.get('error')) {
+                fail('token_exchange_failed');
+                return;
+            }
+
+            let result;
+            try {
+                result = await completeSignIn({ code, state });
+            } catch (err) {
+                console.error('Nova sign-in failed', err);
+                fail('token_exchange_failed');
+                return;
+            }
+
+            if (!result.ok) {
+                fail(result.error);
+                return;
+            }
+
+            title.textContent = lang === 'es' ? 'Sesión iniciada' : 'Signed in';
+            msg.textContent = copy.done;
+            // `result.returnTo` was captured by `startSignIn()` on this origin
+            // before the redirect left, so it cannot have been supplied by
+            // anything on the query string.
+            location.replace(result.returnTo || './');
+        })();
+    </script>
+</body>
+</html>

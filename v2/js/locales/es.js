@@ -321,6 +321,36 @@ export const es = {
         foot: 'Nova Drill | Tenisdemesa.ar · Versión 2.4a'
     },
 
+    // --- account.js / sync.js: la cuenta de tenisdemesa.ar ---
+    //
+    // Todo esto es opcional. La app guarda todo en localStorage y funciona sin
+    // cuenta, así que esta sección es sólo un respaldo y el texto nunca da a
+    // entender que la app la necesite.
+    account: {
+        section: 'Cuenta y respaldo',
+        signedInShort: 'Sesión iniciada',
+        signedOutShort: 'Sin sesión',
+        signIn: 'Iniciar sesión',
+        signInDesc: 'Usá tu cuenta de tenisdemesa.ar para tener un respaldo de tus drills.',
+        signOut: 'Cerrar sesión',
+        signOutDesc: 'Tus drills quedan en este dispositivo. Sólo se borra el respaldo.',
+        backupNow: 'Respaldar ahora',
+        backupNowDesc: 'Envía tus drills, presets e historial a tu cuenta.',
+        restore: 'Restaurar respaldo',
+        restoreDesc: 'Reemplaza lo que hay en este dispositivo por el último respaldo.',
+        backupNever: 'Todavía sin respaldo',
+        backupAt: 'Respaldado {when}',
+        backupFailed: 'No se pudo hacer el respaldo.',
+        backupDone: 'Respaldo hecho.',
+        restoreNone: 'Todavía no hay ningún respaldo para restaurar.',
+        restoreFailed: 'No se pudo restaurar.',
+        restoreConfirm: '¿Reemplazar los drills de este dispositivo por tu último respaldo?',
+        restoreDone: 'Se restauraron {n} cosas.',
+        needAccount: 'Primero iniciá sesión.',
+        // Lo único que alguien podría suponer que el respaldo se lleva.
+        keyStaysHere: 'Tu clave de IA queda en este dispositivo y nunca se respalda.'
+    },
+
     // --- ui.js: la pestaña IA ---
     ia: {
         emptyList: 'Todavía no hay nada. Armá un ejercicio en el asistente IA y guardalo, y aparece acá.',

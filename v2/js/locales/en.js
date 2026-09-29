@@ -313,6 +313,36 @@ export const en = {
         foot: 'Nova Drill | Tenisdemesa.ar · Version 2.4a'
     },
 
+    // --- account.js / sync.js: the tenisdemesa.ar account ---
+    //
+    // Everything here is optional. The app is localStorage-first and works
+    // with no account, so this section is a backup and nothing else, and the
+    // copy never implies the app needs it.
+    account: {
+        section: 'Account & backup',
+        signedInShort: 'Signed in',
+        signedOutShort: 'Not signed in',
+        signIn: 'Sign in',
+        signInDesc: 'Use your tenisdemesa.ar account to keep a backup of your drills.',
+        signOut: 'Sign out',
+        signOutDesc: 'Your drills stay on this device. Only the backup is removed.',
+        backupNow: 'Back up now',
+        backupNowDesc: 'Sends your drills, presets and history to your account.',
+        restore: 'Restore backup',
+        restoreDesc: 'Replaces what is on this device with the last backup.',
+        backupNever: 'Not backed up yet',
+        backupAt: 'Backed up {when}',
+        backupFailed: 'The backup did not go through.',
+        backupDone: 'Backed up.',
+        restoreNone: 'There is no backup to restore yet.',
+        restoreFailed: 'The restore did not go through.',
+        restoreConfirm: 'Replace the drills on this device with your last backup?',
+        restoreDone: 'Restored {n} items.',
+        needAccount: 'Sign in first.',
+        // The one thing somebody might assume a backup sweeps up.
+        keyStaysHere: 'Your AI API key stays on this device and is never backed up.'
+    },
+
     // --- ui.js: the IA tab ---
     ia: {
         emptyList: 'Nothing here yet. Build a drill in the AI assistant and save it, and it shows up here.',

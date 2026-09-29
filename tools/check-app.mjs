@@ -386,7 +386,7 @@ const must = [
     // The header crowd the assistant's mic introduced: the title and the two
     // floating controls must never touch, and the title must stay centred.
     [settingsState.screens <= 1.05, `settings lands in one screen (${settingsState.screens})`],
-    [settingsState.groups === 8, 'settings is eight collapsible groups'],
+    [settingsState.groups === 9, 'settings is nine collapsible groups'],
     [settingsState.open === 2, 'only the two common groups are expanded'],
     [settingsState.smallestRow >= 44, 'every settings row is a usable tap target'],
     [overflows.length === 0, `no screen has a box past the edge (${overflows[0] || 'all clean'})`],

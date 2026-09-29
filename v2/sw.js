@@ -60,6 +60,11 @@ const PRECACHE = [
     'js/aiTerms.js',
     'js/aiVoice.js',
     'js/aiUi.js',
+    // The account and backup modules. `callback.html` itself is deliberately
+    // NOT here: it is only ever reached by a redirect that needs the network
+    // by definition, so precaching it would put a page that cannot succeed
+    // offline into the offline path.
+    'js/account.js',
     'js/ball.js',
     'js/bluetooth.js',
     'js/cloud.js',
@@ -77,6 +82,7 @@ const PRECACHE = [
     'js/state.js',
     'js/stats.js',
     'js/statsUi.js',
+    'js/sync.js',
     'js/ui.js',
     'js/utils.js',
 

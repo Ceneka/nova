@@ -47,6 +47,7 @@ once and never published to, and the workflow that would have done it is gone.
 v2/                 THE APP. Nothing outside this directory is part of it.
   index.html          markup for every screen and modal; inline onclick handlers
   converter.html      standalone tool, unrelated to the app runtime
+  callback.html       standalone sign-in handoff; imports js/account.js only
   manifest.webmanifest  install metadata; every path relative, see Installing
   sw.js               service worker: precache + offline. Hand-written, see Installing
   css/style.css       all styling, one file, CSS custom properties per theme
@@ -68,6 +69,8 @@ v2/                 THE APP. Nothing outside this directory is part of it.
     ui.js             drill lists, tabs, drag-and-drop, session summary
     bluetooth.js      Web Bluetooth + the wire packet format
     cloud.js          share-code upload/download
+    account.js        sign-in (redirect + PKCE) and authenticated fetch
+    sync.js           cloud backup: which keys travel, and which never do
     i18n.js           translation runtime: t(), applyI18n(), language state
     aiTerms.js        the assistant's vocabulary + parseUtterance()  <- read this
     aiMatch.js        deterministic preset matching
@@ -437,6 +440,74 @@ actually did. `startSequence()` is what made this possible - it is the
 in-memory entry point the assistant calls, and `startDrillSequence()` is now a
 thin wrapper over it.
 
+## The account and cloud backup
+
+`js/account.js` and `js/sync.js`, the `Account & backup` group in Settings, and
+`v2/callback.html`. The accounts belong to [tenisdemesa.ar](https://tenisdemesa.ar)
+— they are the site's own `users` table, reused, not a second account system
+living inside a PWA.
+
+**The rule that governs all of it: signing in is optional and gates nothing.**
+Not a drill, not the editor, not Bluetooth, not Tier 0. A user who never signs
+in loses the backup and nothing else, and the copy on that group must never
+imply otherwise. If a change ever makes an account required to use the app, it
+has broken the property the whole thing is for.
+
+### Why a redirect and not a password box
+
+The app is a static PWA on `nova.tenisdemesa.ar`; the accounts are on
+`tenisdemesa.ar`. Shipping a password field to a client to POST to somebody
+else's login endpoint is how credentials end up somewhere they should not be.
+So sign-in is a redirect to the site's own login — which it already has, Google
+included — and the site hands back a one-time code:
+
+1. `startSignIn()` mints a PKCE verifier into `sessionStorage` and navigates to
+   `/api/nova/auth/start` with the **challenge**.
+2. That endpoint uses the site's existing session, or bounces through `/login`
+   first, and redirects to `callback.html?code=…&state=…`.
+3. `completeSignIn()` exchanges code + verifier for a token pair.
+
+**The verifier never leaves the device**, so an intercepted redirect URL is not
+a login. `state` is compared against the copy stored in step 1 and consumed
+either way, so a callback this browser did not start is refused and a replayed
+one cannot be reused. `callback.html` is standalone — it imports
+`js/account.js` and nothing else, and carries its own copy of two strings
+rather than pulling in the dictionary, because it is a one-shot handoff.
+
+**`callback.html` is deliberately NOT in `PRECACHE`.** A sign-in needs the
+network by definition; precaching it would put a page that can only fail
+offline into the offline path. `converter.html` IS precached, which is the
+difference between the two standalone pages.
+
+### The API never gets the AI key
+
+`collectBundle()` walks `SYNC_KEYS`, a fixed list, and
+`applyBundle()` writes only keys on that list. That is the whole safety
+argument, and it is why it must never become "upload everything in
+`localStorage`": `nova_ai_config` holds a BYOK API key that is by definition
+never sent to us. `LOCAL_ONLY_KEYS` restates the excluded keys next to it so
+the pairing is visible, and `tests/account.test.mjs` fails if the key ever
+appears in a bundle.
+
+The same test pins the second invariant: a restore is a server response and is
+treated as hostile — it cannot write a key the app does not know about, and it
+does not *delete* one the backup did not carry, because an older backup
+restoring onto a newer app would otherwise quietly reset what the newer
+version added.
+
+**A restore reloads the page, and that is not laziness.** The drill lists, the
+preset library and the stats totals are all read from `localStorage` once at
+start-up and held in memory; writing the values back without reloading restores
+the data and leaves the screen showing what was there before.
+
+### Why the sync is not a sync
+
+Last write wins, one opaque blob per user. A real merge would need the server to
+understand the drill format, and that format is a compatibility surface this
+app owns and versions by itself. The server bounds the payload size and checks
+it is an object; it does not re-implement the app's normalisers, which would
+drift out of step with the format they normalise.
+
 ## Translations
 
 English and Spanish. **No i18n library** — `js/i18n.js` is ~200 lines, because
@@ -599,8 +670,9 @@ rules that go with them:
   published under a path prefix, and an absolute `start_url` would launch the
   installed app at the domain root and 404.
 
-Cross-origin requests are never answered or cached - `js/cloud.js` points at
-someone else's PocketBase, and a cached "code not found" is worse than none.
+Cross-origin requests are never answered or cached - `js/cloud.js` and
+`js/account.js` both point at `tenisdemesa.ar`, and a cached "code not found"
+is worse than none.
 
 `sw.js` self-updates: `VERSION` is the cache name, so a deploy installs a whole
 new shell, `skipWaiting()` + `clients.claim()` mean it reaches an open page
@@ -678,9 +750,11 @@ Ball, table and dotted trail in the app's own mint (`--primary`) and amber
 - **Storage keys**: `custom_drills`, `custom_data`, `drill_order`,
   `user_defaults`, `nova_stats`, `nova_theme_pref`, `nova_last_played`,
   `nova_ball_presets`, `nova_sessions`, `nova_active_session`, `nova_lang`,
-  `nova_ai_drills`, `nova_ai_config`.
+  `nova_ai_drills`, `nova_ai_config`, plus the account trio
+  `nova_account`, `nova_last_sync`, `nova_api_base`.
   `factoryReset()` wipes all of them (it calls `localStorage.clear()`; the key
   list here is documentation, not a second implementation).
+  `nova_api_base` is developer-only — there is no UI that writes it.
 - **Styling**: CSS custom properties (`--primary`, `--surface`, `--danger`,
   …) so all four themes work for free. Never hardcode a colour in JS — see
   Design for the tokens and the rules behind them.
@@ -864,27 +938,32 @@ regression, a half-translated dictionary, and a settings group that renders
 empty — none of which breaks a page load, and therefore none of which
 anything else would see. Keep them.
 
-`node --test tests/*.test.mjs` (three suites - the preset engine, the
-assistant's core, and the model tier against a fake endpoint; the live
-counterpart is `tools/live-check.mjs`) and the browser checks in
+`node --test tests/*.test.mjs` (four suites - the preset engine, the
+assistant's core, the model tier against a fake endpoint, and the account
+/ backup invariants; the live counterpart is `tools/live-check.mjs`) and the
+browser checks in
 `tests/integration.html`. `tools/run-checks.sh` runs both in one command and
 starts the server if it is not already up.
 
-**The share-code feature does not belong to this repo.** `js/cloud.js` points
-at `https://nova.varandal.de/api/...`, the original author's PocketBase
-instance. Anyone using this deployment uploads and downloads drills through
-that third-party server. If you want your own, self-host PocketBase and change
-`API_URL`.
+**Share codes are served by this project's own site, with a legacy fallback.**
+`js/cloud.js` now points at `https://tenisdemesa.ar/api/nova/share` — the Next
+app in `~/L/tdm-scrapper/web`, which reuses the site's `users` table. Codes
+already handed out live in the original author's PocketBase at
+`nova.varandal.de`, and people have them written down, so `downloadLegacy()`
+still reads them — but only after the new API has answered 404. Nothing new is
+ever written to that instance. The old note here said the feature "does not
+belong in this repo"; it does not belong in the *browser*, and now it does not
+belong on somebody else's *server* either.
 
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 90 unit tests, no dependencies
+node --test tests/*.test.mjs            # 109 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (505 checks, needs the HTTP server above):
+Browser integration (515 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
