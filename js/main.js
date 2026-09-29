@@ -226,6 +226,11 @@ window.closeEditor = closeEditor;
 window.saveDrillChanges = saveDrillChanges;
 window.togglePause = togglePause;
 window.stopRun = stopRun;
+// The rest of the run API is on window, and the thing that STARTS a run was
+// not: it was reachable only through handleDrillClick, which refuses without
+// a robot connected. That made the countdown unreachable for anything driving
+// the real page - including tools/screenshots.mjs.
+window.startDrillSequence = startDrillSequence;
 
 window.handleDrillClick = (key, btn) => {
     if (!bleState.isConnected) {

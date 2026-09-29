@@ -82,7 +82,27 @@ await send('Page.enable');
 // cost a confusing "undefined" while wiring the wake word up.
 await send('Network.enable');
 await send('Network.setCacheDisabled', { cacheDisabled: true });
+
+// AND the service worker, which is the bigger trap. `sw.js` precaches the
+// whole shell and answers index.html and css/style.css FROM THAT CACHE,
+// revalidating only in the background - so a profile left over from a previous
+// run measures the last build, one load behind, with no warning. Setting the
+// cache to `disabled` above does not touch it; the worker still answers.
+// The only honest answer is to throw the shell away before measuring.
 await send('Page.navigate', { url: URL_UNDER_TEST });
+await send('Runtime.evaluate', {
+    expression: `(async () => {
+        for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+        for (const k of await caches.keys()) if (k.startsWith('nova-shell-')) await caches.delete(k);
+    })()`,
+    returnByValue: true,
+    awaitPromise: true
+});
+
+// ...and reload, because the page that just loaded was itself served by the
+// worker we have only now unregistered.
+await send('Page.reload', { ignoreCache: true });
+await new Promise(r => setTimeout(r, 1500));
 
 // Let the modules load, the service worker register and the first paint settle.
 await new Promise(r => setTimeout(r, 4000));
@@ -182,6 +202,41 @@ console.log('  containing block', menuState.inStickyHeader ? 'the sticky header'
 console.log('  header position  ', menuState.headerSticky);
 console.log('  still on screen  ', `${menuState.top}..${menuState.bottom}`);
 
+// The header: the title is centred and the two 40px controls float over its
+// right margin, so the two must never touch. They did, by 7px, on a 375px
+// iPhone SE - which is why the name has a short form below 460px.
+const headerWidths = [];
+for (const width of [320, 360, 375, 414, 430, 460, 500, 768]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: true });
+    await send('Page.reload', { ignoreCache: true });
+    await new Promise(r => setTimeout(r, 700));
+    const r = await send('Runtime.evaluate', {
+        expression: `(() => {
+            const h = document.querySelector('header h1').getBoundingClientRect();
+            const g = document.querySelector('.ai-open-wrap').getBoundingClientRect();
+            return JSON.stringify({
+                titleCentre: Math.round((h.left + h.right) / 2),
+                viewCentre: Math.round(innerWidth / 2),
+                gap: Math.round(g.left - h.right),
+                overlap: h.right > g.left,
+                groupInside: g.right <= innerWidth + 0.5,
+                scrollW: document.documentElement.scrollWidth,
+                win: innerWidth
+            });
+        })()`,
+        returnByValue: true
+    });
+    headerWidths.push({ width, ...JSON.parse(r.result.value) });
+}
+await send('Emulation.setDeviceMetricsOverride', { width: 500, height: 932, deviceScaleFactor: 1, mobile: true });
+await send('Page.reload', { ignoreCache: true });
+await new Promise(r => setTimeout(r, 800));
+
+console.log('--- the header, across phone widths');
+for (const h of headerWidths) {
+    console.log(`  ${String(h.width).padStart(3)}px  gap=${String(h.gap).padStart(3)}  centred=${h.titleCentre === h.viewCentre}  overlap=${h.overlap}  scrollW=${h.scrollW}`);
+}
+
 ws.close();
 
 console.log('--- page');
@@ -227,7 +282,13 @@ const must = [
     [menuState.scrolled > 0, 'the page actually scrolled, so this is a real test'],
     [menuState.inStickyHeader, 'the menu is anchored to the sticky header'],
     [menuState.headerSticky === 'sticky', 'the header is sticky'],
-    [menuState.insideViewport, 'the menu is still on screen after scrolling']
+    [menuState.insideViewport, 'the menu is still on screen after scrolling'],
+    // The header crowd the assistant's mic introduced: the title and the two
+    // floating controls must never touch, and the title must stay centred.
+    ...headerWidths.map(h => [
+        !h.overlap && h.groupInside && h.scrollW <= h.win + 1 && h.titleCentre === h.viewCentre,
+        `the header is clean at ${h.width}px (gap ${h.gap}px)`
+    ])
 ];
 for (const [pass, what] of must) {
     if (!pass) { failed = true; console.log(`FAIL  ${what}`); }

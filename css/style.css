@@ -218,6 +218,13 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* The title is the ONLY thing in the flow and stays genuinely centred.
+       The buttons float over the header's right margin, which is what the
+       hamburger always did. Reserving a grid column for them instead - the
+       obvious-looking fix - costs the title its width: at 430px a 1fr-auto-1fr
+       grid leaves the title 208px for 219px of text, and at 320px it leaves
+       98px, so it clips either way. Floating needs no space reserved, because
+       the title is short enough to stop short of the buttons on its own. */
     position: sticky;
     top: 0;
     z-index: 90;
@@ -227,6 +234,26 @@ header {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
+}
+header h1 {
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The narrow form of the name. Below the breakpoint the short one is shown and
+   the long one leaves the box entirely - `display: none`, not a smaller font,
+   because at 320px the full name and two 40px buttons cannot both fit at any
+   readable size.
+   The number is arithmetic, not a guess. With the group 86px wide floating
+   over a 15px margin, the clear space between a centred name and the group is
+   `viewport/2 - 210px`; the full name needs ~16px of that to stop looking
+   crowded, so anything under ~453px gets the short form. */
+.brand-short { display: none; }
+@media (max-width: 460px) {
+    .brand-full { display: none; }
+    .brand-short { display: inline; }
 }
 
 h1 {
@@ -2389,10 +2416,26 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
    is what keeps the two controls a pair; the header centres its children, so
    without it the mic would sit against the title and the menu would drift. */
 .ai-open-wrap {
+    /* Floated over the header's right margin, like the hamburger always was,
+       with `right: 15px` because the header carries a -15px margin and is
+       therefore 15px wider than the viewport on that side. */
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    z-index: 101;
+}
+/* Inside the wrapper the hamburger is a normal flex item again. Its
+   `position: absolute; right: 0` was for when it was the header's only
+   floating control, and it would pull it out of the group and back to the
+   header's right edge - on top of the mic. */
+.ai-open-wrap .menu-btn {
+    position: static;
+    margin: 0;
 }
 .ai-open-btn {
     display: flex;

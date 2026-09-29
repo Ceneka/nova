@@ -37,7 +37,16 @@
 <div class="container">
     
     <header>
-        <h1 data-i18n="app.title">Nova Drill | Tenisdemesa.ar</h1>
+        <!-- Two forms of one name. The header also floats two 40px controls
+             over its right margin, and on a 375px phone the full name and those
+             buttons cannot both fit at any readable size - they overlapped by
+             7px on an iPhone SE, which is not a screen anybody should have to
+             scroll a header for. The short form is the same brand, and it is
+             what a narrow header has always wanted. -->
+        <h1 class="brand">
+            <span class="brand-full" data-i18n="app.title">Nova Drill | Tenisdemesa.ar</span>
+            <span class="brand-short" data-i18n="app.shortTitle">Nova</span>
+        </h1>
         <div class="ai-open-wrap">
             <button class="ai-open-btn" onclick="window.openAiView()" data-i18n-attr="aria-label:a11y.openAi;title:menu.ai">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -30,7 +30,10 @@
 
 export const es = {
     app: {
-        title: 'Nova Drill | Tenisdemesa.ar'
+        title: 'Nova Drill | Tenisdemesa.ar',
+        // The narrow form of the name, for a header too small for the full one.
+        // A brand mark, so identical in both languages - see AGENTS.md.
+        shortTitle: 'Nova'
     },
 
     // --- index.html: the hamburger menu and the header ---

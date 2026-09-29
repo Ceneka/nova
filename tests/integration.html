@@ -1615,6 +1615,21 @@ V.releaseScreenLock();
     ok('and the header is sticky in the stylesheet',
        /position:\s*sticky/.test(await fetchText('css/style.css')));
 
+    // The title and the two floating controls have to be able to coexist. They
+    // overlapped by 7px on a 375px phone until the name gained a short form,
+    // so the markup for BOTH forms is asserted here - cheap, and it cannot
+    // rot. The geometry itself is checked by tools/check-app.mjs, which can
+    // change the viewport.
+    const brand = /<h1 class="brand">([\s\S]*?)<\/h1>/.exec(await fetchText('index.html'));
+    ok('the title has a long and a short form', !!brand
+        && /brand-full/.test(brand[1]) && /brand-short/.test(brand[1]));
+    ok('and only the short one is translated away, both are real i18n keys', (() => {
+        if (!brand) return false;
+        return /data-i18n="app\.title"/.test(brand[1]) && /data-i18n="app\.shortTitle"/.test(brand[1]);
+    })());
+    ok('with the short form hidden until a narrow breakpoint',
+       /\.brand-short\s*\{\s*display:\s*none/.test(await fetchText('css/style.css')));
+
     const menu = document.getElementById('theme-menu');
     const header = document.getElementById('harness-header');
     header.style.position = 'sticky';

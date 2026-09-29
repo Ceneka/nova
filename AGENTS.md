@@ -34,6 +34,10 @@ manifest.webmanifest  install metadata; every path relative, see Installing
 sw.js               service worker: precache + offline. Hand-written, see Installing
 icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
 tools/make-icons.sh regenerates icons/*.png. Not part of the build
+tools/run-checks.sh both deploy gates in one command
+tools/check-app.mjs boots the real index.html over CDP
+tools/screenshots.mjs regenerates images/*.png for the README
+tools/live-check.mjs one live call against a real endpoint, BYOK
 css/style.css       all styling, one file, CSS custom properties per theme
 fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
 js/
@@ -635,6 +639,15 @@ the canvas or it gets cut in half on a real home screen.
   geometry on the real page. Note `right: 30px` on `.theme-menu`: the header has
   a `-15px` margin and is therefore 30px wider than `.container`, and the menu
   has to be pushed back to keep its right edge on the same pixel.
+- **The header title is the only thing in the flow; the two controls float.**
+  The title stays genuinely centred and `.ai-open-wrap` is `position: absolute`
+  over the header's right margin. Reserving a grid column for the buttons looks
+  like the tidier fix and is not: `1fr auto 1fr` leaves the title 208px for
+  219px of text at 430px, and 98px at 320px, so it clips at every width. The
+  name therefore has a short form (`.brand-short`, below 460px) - the
+  breakpoint is arithmetic, not taste: the clear space is `viewport/2 - 210px`,
+  so under ~453px the full name and two 40px buttons cannot both fit. They
+  overlapped by 7px on a 375px iPhone SE before this.
 - **The hamburger menu carries only drill actions** (download / export /
   import drills, Settings, About). Anything that is not an action you reach
   for mid-session belongs in the Settings screen (`js/settingsUi.js`), which is
@@ -748,7 +761,7 @@ node --test tests/*.test.mjs            # 90 unit tests, no dependencies
 tools/run-checks.sh
 ```
 
-Browser integration (476 checks, needs the HTTP server above):
+Browser integration (479 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
