@@ -1,4 +1,5 @@
-# Assembled by .github/workflows/pages.yml; never committed.
+# Assembled by tools/prepare-site.sh (Cloudflare's build command, and the
+# ci.yml site job); never committed.
 _site/
 
 # OS / editor noise

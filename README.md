@@ -20,7 +20,6 @@ Repository: **[Ceneka/nova](https://github.com/Ceneka/nova)** · App:
 **Online/Offline:**
 
   * Visit: <https://nova.tenisdemesa.ar/> (the published app)
-  * Mirror: <https://ceneka.github.io/nova/> (deployed from `main` by GitHub Actions)
   * Self hosting: https is required
 
 **Local:**
@@ -235,7 +234,7 @@ upstream app could not do or did not get right:
   * **Fixes** — connecting silently doing nothing, the 20-drill category cap, the Settings back button, preset field overflow, and three identical-looking preset entry points in the editor.
   * **An AI assistant** — a spoken or typed sentence becomes a drill, in English or Spanish. The common commands are parsed on the device with no key, no account and no network; your own model is optional and only widens what it understands. Drills it builds live in their own tab until you move one into Custom A/B/C.
   * **Installable PWA** — a web manifest, a service worker and a real icon set, so the app installs to the home screen and opens offline.
-  * **Continuous deployment** — pushing to `main` runs the test suites and publishes to GitHub Pages. There is still no build step.
+  * **Continuous deployment** — pushing to `main` runs the test suites, and the site is published by Cloudflare Pages. There is still no build step.
 
 The drill CSV format, the ball array and the Bluetooth packet format are
 unchanged, so drills remain interchangeable with the original app.
@@ -320,9 +319,10 @@ sources; regenerate the PNGs with `tools/make-icons.sh` after editing one
 add or remove a file the app loads, update its `PRECACHE` list. The integration
 suite fails if you forget.
 
-Pushing to `main` runs both suites and, if they pass, publishes to GitHub
-Pages (`.github/workflows/pages.yml`). Nothing to build — the app is served
-as-is.
+Pushing to `main` runs both suites (`.github/workflows/ci.yml`), and
+Cloudflare Pages publishes the branch. Nothing to build — `tools/prepare-site.sh`
+copies a curated subset of files into `_site/`, which is also what CI checks, so
+`tests/`, `1.3/` and `tools/` stay off the public site.
 
 The assistant's core (`aiTerms`, `aiMatch`, `aiCompile`, `aiClient`) imports
 cleanly under bare Node and `aiClient` takes its `fetch` **by injection**, so

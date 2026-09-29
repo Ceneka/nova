@@ -23,7 +23,9 @@ python3 -m http.server 8123 --bind 127.0.0.1
 ```
 
 Deployed: <https://nova.tenisdemesa.ar/> — the published app.
-Mirror from `main`: <https://ceneka.github.io/nova/> (see Deployment)
+This repository's own deployment is Cloudflare Pages, built from `main` (see
+Deployment). There is no working GitHub Pages mirror: it was configured once
+and never published to, and the workflow that would have done it is gone.
 
 ## Layout
 
@@ -34,7 +36,9 @@ manifest.webmanifest  install metadata; every path relative, see Installing
 sw.js               service worker: precache + offline. Hand-written, see Installing
 icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
 tools/make-icons.sh regenerates icons/*.png. Not part of the build
-tools/run-checks.sh both deploy gates in one command
+tools/prepare-site.sh copies the publishable site into _site/, and is both
+#   Cloudflare's build command and the ci.yml site job
+tools/run-checks.sh both test gates in one command
 tools/check-app.mjs boots the real index.html over CDP
 tools/screenshots.mjs regenerates images/*.png for the README
 tools/live-check.mjs one live call against a real endpoint, BYOK
@@ -572,8 +576,8 @@ rules that go with them:
   fails the first time the phone loses signal. Adding `js/foo.js` and
   importing it anywhere turns the check red until you add it. It has already
   caught `js/pwa.js` once.
-- **Every path in the manifest is relative** (`./`, `icons/...`). GitHub Pages
-  serves this from `/nova/`, and an absolute `start_url` would launch the
+- **Every path in the manifest is relative** (`./`, `icons/...`). The app is
+  published under a path prefix, and an absolute `start_url` would launch the
   installed app at the domain root and 404.
 
 Cross-origin requests are never answered or cached - `js/cloud.js` points at
@@ -757,9 +761,14 @@ Rules that have bitten people before:
 
 ## Deployment
 
-`.github/workflows/pages.yml` publishes to GitHub Pages on every push to
-`main`. There is no build step, so the "build" job copies files and that is
-deliberate — see the top of this file.
+The site is served by **Cloudflare Pages**, which builds from the branch
+itself. Build command `tools/prepare-site.sh`, output directory `_site/`.
+There is no build step - see the top of this file - so "build" here means
+copy a curated subset of files, and that is deliberate.
+
+**One script, two consumers.** `tools/prepare-site.sh` is both Cloudflare's
+build command and the `site` job in `.github/workflows/ci.yml`, so the thing
+CI checks is the thing that gets published rather than the checkout.
 
 **What ships**: `index.html`, `css/`, `js/`, `images/`, `icons/`, `fonts/`,
 `manifest.webmanifest`, `sw.js`, `converter.html`, `nova_drills_v2_example.csv`,
@@ -769,30 +778,38 @@ offline, which is most of what it is for. `fonts/` is not optional either: it
 is precached, and a shipped-but-empty `fonts/` silently leaves the app on the
 system font stack.
 
-**What does not**, and why — extend this list rather than reverting to "copy
-the whole repo":
+**What does not**, and why — extend the list in the script rather than
+reverting it to "copy the whole repo":
 
 | Excluded | Reason |
 | --- | --- |
 | `tests/` | development only; it stubs the page chrome the app expects |
 | `1.3/` | a frozen older release, would publish a second stale app at `/1.3/` |
-| `tools/` | the icon regeneration script; the PNGs it writes are committed |
+| `tools/` | this script and the icon regeneration; the PNGs it writes are committed |
 | `AGENTS.md` | instructions for coding agents, not for users |
 
-Two gates run before anything is deployed: `node --test tests/*.test.mjs`
-(three suites - the preset engine, the assistant's core, and the model tier
-against a fake endpoint; the live counterpart is `tools/live-check.mjs`) and
-the browser checks in `tests/integration.html`, driven through headless Chrome
-in the same way as documented below. A failure
-blocks the deploy. `tools/run-checks.sh` runs both in one command.
+The script ends with the two checks that catch what a copy cannot: every
+local `src=`/`href=` in `index.html` resolves to a file that was actually
+copied (the "added a new module and forgot the directory" check), and every
+entry in `sw.js`'s `PRECACHE` exists in the artifact. Both name the offending
+file and exit non-zero, so a bad build fails instead of shipping a site that
+opens fine online and dies the first time it is offline.
 
-The workflow also verifies that every local `src=`/`href=` in `index.html`
-resolves to a file that was actually copied. That is the check that catches
-"added a new module and forgot to copy the directory".
+### The tests are not a deploy gate any more
 
-**One manual step after the first push:** repo Settings -> Pages -> Build and
-deployment -> Source must be set to **GitHub Actions**. The workflow cannot do
-this itself.
+They are `.github/workflows/ci.yml`, and they are the *only* thing that runs
+them: Cloudflare publishes a branch that fails its tests, and nothing else in
+this repository would notice. There is no build step, no bundler and no test
+runner in production, so what these two commands catch is the export-format
+regression, a half-translated dictionary, and a settings group that renders
+empty — none of which breaks a page load, and therefore none of which
+anything else would see. Keep them.
+
+`node --test tests/*.test.mjs` (three suites - the preset engine, the
+assistant's core, and the model tier against a fake endpoint; the live
+counterpart is `tools/live-check.mjs`) and the browser checks in
+`tests/integration.html`. `tools/run-checks.sh` runs both in one command and
+starts the server if it is not already up.
 
 **The share-code feature does not belong to this repo.** `js/cloud.js` points
 at `https://nova.varandal.de/api/...`, the original author's PocketBase
@@ -808,7 +825,7 @@ node --test tests/*.test.mjs            # 90 unit tests, no dependencies
 tools/run-checks.sh
 ```
 
-Browser integration (491 checks, needs the HTTP server above):
+Browser integration (505 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
