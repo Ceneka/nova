@@ -22,10 +22,10 @@ globalThis.localStorage = {
     clear: () => store.clear()
 };
 
-const CFG = await import('../js/aiConfig.js');
-const CLI = await import('../js/aiClient.js');
-const A = await import('../js/aiAgent.js');
-const T = await import('../js/aiTerms.js');
+const CFG = await import('../v2/js/aiConfig.js');
+const CLI = await import('../v2/js/aiClient.js');
+const A = await import('../v2/js/aiAgent.js');
+const T = await import('../v2/js/aiTerms.js');
 
 const KEY = 'sk-or-v1-THISISASECRETVALUE1234';
 const SLOT = {
@@ -466,7 +466,7 @@ test('a model-authored name is cut on a word, not mid-word', async () => {
     });
     assert.ok(!made.error, JSON.stringify(made));
 
-    const { getDraft } = await import('../js/aiStore.js');
+    const { getDraft } = await import('../v2/js/aiStore.js');
     const draft = getDraft();
     assert.ok(draft.name.length <= 40, draft.name);
     assert.ok(!/\s$/.test(draft.name), `no trailing space: "${draft.name}"`);
@@ -489,7 +489,7 @@ test('the API speech-in path has TWO wire formats, and picks by provider', async
     // "no such endpoint" for what turned out to be the wrong REQUEST SHAPE, not
     // a bad model. OpenAI takes multipart with a file part; OpenRouter takes
     // JSON with base64 input_audio. Guessing between them is a 404.
-    const V = await import('../js/aiVoice.js');
+    const V = await import('../v2/js/aiVoice.js');
     globalThis.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
     globalThis.FormData = class {
         constructor() { this.parts = []; }
@@ -546,7 +546,7 @@ test('the API speech-in path has TWO wire formats, and picks by provider', async
 });
 
 test('the wake phrase matches only at the start, folded and de-punctuated', async () => {
-    const V = await import('../js/aiVoice.js');
+    const V = await import('../v2/js/aiVoice.js');
 
     // The three things a recogniser hands back that a naive startsWith misses.
     assert.deepEqual(V.matchWakePhrase('Hey Nova push b fuerte'),
@@ -568,7 +568,7 @@ test('the wake phrase matches only at the start, folded and de-punctuated', asyn
 });
 
 test('a wake word mid-sentence does not fire', async () => {
-    const V = await import('../js/aiVoice.js');
+    const V = await import('../v2/js/aiVoice.js');
     // A wake word that fires anywhere is worse than no wake word at all: it
     // would answer to "dame un nova al medio".
     for (const said of ['empujame un drive', 'dame un nova al medio', 'necesito un push', '']) {
@@ -577,7 +577,7 @@ test('a wake word mid-sentence does not fire', async () => {
 });
 
 test('the wake phrase list is the user\'s, and junk in it is dropped', async () => {
-    const V = await import('../js/aiVoice.js');
+    const V = await import('../v2/js/aiVoice.js');
     assert.equal(V.matchWakePhrase('hola nova', ['hola nova'])?.phrase, 'hola nova');
     assert.equal(V.matchWakePhrase('hey nova', ['hola nova']), null, 'their list replaces ours');
     // An empty list must not mean "never wake up".
@@ -585,7 +585,7 @@ test('the wake phrase list is the user\'s, and junk in it is dropped', async () 
 });
 
 test('the screen lock is requested, released, and re-acquired after the browser takes it', async () => {
-    const V = await import('../js/aiVoice.js');
+    const V = await import('../v2/js/aiVoice.js');
     V.releaseScreenLock();
 
     let asked = 0;
@@ -631,7 +631,7 @@ test('wake phrases and the screen lock survive a junk configuration', async () =
         removeItem: (k) => store2.delete(k),
         clear: () => store2.clear()
     };
-    const { getAiConfig, setAiConfig, normalizeConfig } = await import('../js/aiConfig.js');
+    const { getAiConfig, setAiConfig, normalizeConfig } = await import('../v2/js/aiConfig.js');
 
     assert.equal(normalizeConfig(null).wake.enabled, false, 'arming is never on by default');
     assert.equal(normalizeConfig(null).screenLock, true);
@@ -673,6 +673,6 @@ test('a confirmation hook can say yes', async () => {
 });
 
 // Small indirections so the two tests above read cleanly.
-const P = await import('../js/presets.js');
+const P = await import('../v2/js/presets.js');
 function P_reset() { P.resetPresetsToDefaults(); }
 function A_getPresets() { return P.getPresets(); }

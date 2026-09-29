@@ -20,9 +20,9 @@ globalThis.localStorage = {
 };
 
 const { B, makeBall, calculateRPMs, reverseCalculate, normalizeBall, freqToBpm, bpmToFreq, maxScatterFor } =
-    await import('../js/ball.js');
+    await import('../v2/js/ball.js');
 
-const P = await import('../js/presets.js');
+const P = await import('../v2/js/presets.js');
 
 const preset = (over = {}) => P.normalizePreset({
     id: 'p_test', name: 'Test', speed: 4, spin: 1.5, type: 'top',

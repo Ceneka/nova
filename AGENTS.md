@@ -13,72 +13,91 @@ Web Bluetooth API and keeps all user data in `localStorage`.
 browser. Adding tooling would break the "download the files and host them
 anywhere" property that is the point of this project.
 
+**The app lives in `v2/`, and that directory is the whole of it.** Everything
+else in the repository — `tests/`, `tools/`, `AGENTS.md`, `images/`, the sample
+CSV — is not part of the app and is not published. This is not so much an
+architecture decision as the cheapest possible deploy: Cloudflare Pages serves
+a configured output directory at the domain root, so pointing it at `v2/` with
+**no build command** publishes the app and nothing else. The alternative was a
+copy script whose file list had to be kept in step with the repository by hand.
+
+`v2/` rather than the root because the root cannot be the publish directory
+while it also holds the tests. What that cost: `1.3/` — a frozen older release
+that was *already* an app in a subdirectory — had to go. It is recoverable from
+git history, or from the `archive/1.3` tag.
+
 ## Running it
 
 ES modules need HTTP; `file://` will not work.
 
 ```bash
 python3 -m http.server 8123 --bind 127.0.0.1
-# open http://127.0.0.1:8123/
+# open http://127.0.0.1:8123/v2/                      <- the app
+# open http://127.0.0.1:8123/tests/integration.html   <- the suite
 ```
 
 Deployed: <https://nova.tenisdemesa.ar/> — the published app.
-This repository's own deployment is Cloudflare Pages, built from `main` (see
-Deployment). There is no working GitHub Pages mirror: it was configured once
-and never published to, and the workflow that would have done it is gone.
+This repository's own deployment is Cloudflare Pages, output directory `v2/`
+(see Deployment). There is no working GitHub Pages mirror: it was configured
+once and never published to, and the workflow that would have done it is gone.
 
 ## Layout
 
 ```
-index.html          markup for every screen and modal; inline onclick handlers
-converter.html      standalone tool, unrelated to the app runtime
-manifest.webmanifest  install metadata; every path relative, see Installing
-sw.js               service worker: precache + offline. Hand-written, see Installing
-icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
-tools/make-icons.sh regenerates icons/*.png. Not part of the build
-tools/prepare-site.sh copies the publishable site into _site/, and is both
-#   Cloudflare's build command and the ci.yml site job
-tools/run-checks.sh both test gates in one command
-tools/check-app.mjs boots the real index.html over CDP
-tools/screenshots.mjs regenerates images/*.png for the README
-tools/live-check.mjs one live call against a real endpoint, BYOK
-#   check-app.mjs also audits all 11 screens, at two widths, for boxes
-#   that reach past the edge of the screen
-css/style.css       all styling, one file, CSS custom properties per theme
-fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
-js/
-  main.js           entry point (loaded by index.html); wires window.* bindings
-  state.js          app state + localStorage + drill CSV import/export
-  constants.js      factory drills, physics constants, BLE identifiers
-  ball.js           the ball array: layout, RPM maths, limits   <- read this
-  presets.js        ball preset model, expansion, file formats   <- read this
-  presetUi.js       preset picker + preset editor UI
-  stats.js          training history: session log + selectors    <- read this
-  statsUi.js        the statistics screen
-  settingsUi.js     full-screen settings view (themes, presets, data)
-  pwa.js           service worker registration, install prompt, theme colour
-  editor.js         drill editor: renders ball cards, handles edits
-  runner.js         plays a drill over Bluetooth
-  ui.js             drill lists, tabs, drag-and-drop, session summary
-  bluetooth.js      Web Bluetooth + the wire packet format
-  cloud.js          share-code upload/download
-  i18n.js           translation runtime: t(), applyI18n(), language state
-  aiTerms.js        the assistant's vocabulary + parseUtterance()  <- read this
-  aiMatch.js        deterministic preset matching
-  aiCompile.js      intent + preset -> real steps, via makeBall()
-  aiStore.js        nova_ai_drills, the IA category, and the draft
-  aiConfig.js       BYOK storage, endpoint building, key redaction
-  aiClient.js       OpenAI-compatible transport + the bounded agent loop
-  aiAgent.js        the tools the model may call
-  aiVoice.js        speech in/out, the wake word, the screen lock
-  aiUi.js           the assistant panel
-  locales/
-    en.js           English dictionary, and the source of truth for the keys
-    es.js           Español
-  utils.js          toast, log, clamp, MD5, the drill-name fold
+v2/                 THE APP. Nothing outside this directory is part of it.
+  index.html          markup for every screen and modal; inline onclick handlers
+  converter.html      standalone tool, unrelated to the app runtime
+  manifest.webmanifest  install metadata; every path relative, see Installing
+  sw.js               service worker: precache + offline. Hand-written, see Installing
+  css/style.css       all styling, one file, CSS custom properties per theme
+  fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
+  icons/              PWA icon set; *.svg are the sources for tools/make-icons.sh
+  js/
+    main.js           entry point (loaded by index.html); wires window.* bindings
+    state.js          app state + localStorage + drill CSV import/export
+    constants.js      factory drills, physics constants, BLE identifiers
+    ball.js           the ball array: layout, RPM maths, limits   <- read this
+    presets.js        ball preset model, expansion, file formats   <- read this
+    presetUi.js       preset picker + preset editor UI
+    stats.js          training history: session log + selectors    <- read this
+    statsUi.js        the statistics screen
+    settingsUi.js     full-screen settings view (themes, presets, data)
+    pwa.js            service worker registration, install prompt, theme colour
+    editor.js         drill editor: renders ball cards, handles edits
+    runner.js         plays a drill over Bluetooth
+    ui.js             drill lists, tabs, drag-and-drop, session summary
+    bluetooth.js      Web Bluetooth + the wire packet format
+    cloud.js          share-code upload/download
+    i18n.js           translation runtime: t(), applyI18n(), language state
+    aiTerms.js        the assistant's vocabulary + parseUtterance()  <- read this
+    aiMatch.js        deterministic preset matching
+    aiCompile.js      intent + preset -> real steps, via makeBall()
+    aiStore.js        nova_ai_drills, the IA category, and the draft
+    aiConfig.js       BYOK storage, endpoint building, key redaction
+    aiClient.js       OpenAI-compatible transport + the bounded agent loop
+    aiAgent.js        the tools the model may call
+    aiVoice.js        speech in/out, the wake word, the screen lock
+    aiUi.js           the assistant panel
+    locales/
+      en.js           English dictionary, and the source of truth for the keys
+      es.js           Espanol
+    utils.js          toast, log, clamp, MD5, the drill-name fold
+images/             README screenshots. The app never loads any of these.
+tools/
+  make-icons.sh      regenerates v2/icons/*.png. Not part of the build
+  run-checks.sh      both test gates in one command
+  check-app.mjs      boots the real v2/index.html over CDP
+  screenshots.mjs    regenerates images/*.png for the README
+  live-check.mjs     one live call against a real endpoint, BYOK
+  #   check-app.mjs also audits all 11 screens, at two widths, for boxes
+  #   that reach past the edge of the screen
 tests/              node unit tests + a browser integration page
-1.3/                archived older version, do not edit
+nova_drills_v2_example.csv   a sample of the shared drill CSV, for reference
 ```
+
+Paths inside this document are written relative to `v2/` - `js/ball.js` means
+`v2/js/ball.js`. That is the one place the shorthand is allowed to mislead, so
+the commands above spell it out.
 
 ## The ball array — the single most important thing to understand
 
@@ -771,38 +790,36 @@ Rules that have bitten people before:
 ## Deployment
 
 The site is served by **Cloudflare Pages**, which builds from the branch
-itself. Build command `tools/prepare-site.sh`, output directory `_site/`.
-There is no build step - see the top of this file - so "build" here means
-copy a curated subset of files, and that is deliberate.
+itself: **no build command**, output directory **`v2`**. Leave the build
+command field blank (or `exit 0`).
 
-**One script, two consumers.** `tools/prepare-site.sh` is both Cloudflare's
-build command and the `site` job in `.github/workflows/ci.yml`, so the thing
-CI checks is the thing that gets published rather than the checkout.
+**The output directory is served at the domain root.** This is the whole
+reason the layout works, and it is worth knowing before anyone "helpfully"
+adds a build step: Cloudflare serves what is in the output directory at the
+apex, so `v2/` never appears in a URL. The service worker's scope is `/`, and
+`manifest.webmanifest`'s `"./"` is correct as written. The folder name is a
+repository label, not a URL segment.
 
-**What ships**: `index.html`, `css/`, `js/`, `images/`, `icons/`, `fonts/`,
-`manifest.webmanifest`, `sw.js`, `converter.html`, `nova_drills_v2_example.csv`,
-`README.md`. `sw.js` and the manifest are not optional extras - without them
-the site still works in a tab but can never be installed and never opens
+**What ships is whatever is in `v2/`.** `index.html`, `css/`, `js/`, `icons/`,
+`fonts/`, `manifest.webmanifest`, `sw.js` and `converter.html`. Nothing else
+does, and nothing has to remember to exclude it — `tests/`, `tools/`,
+`AGENTS.md`, `images/` and the sample CSV are simply not in that directory.
+There is no file list anywhere to fall out of step with the repository.
+
+Two of those files are not optional extras. Without `sw.js` and the manifest
+the site still works in a tab, but it can never be installed and never opens
 offline, which is most of what it is for. `fonts/` is not optional either: it
 is precached, and a shipped-but-empty `fonts/` silently leaves the app on the
 system font stack.
 
-**What does not**, and why — extend the list in the script rather than
-reverting it to "copy the whole repo":
-
-| Excluded | Reason |
-| --- | --- |
-| `tests/` | development only; it stubs the page chrome the app expects |
-| `1.3/` | a frozen older release, would publish a second stale app at `/1.3/` |
-| `tools/` | this script and the icon regeneration; the PNGs it writes are committed |
-| `AGENTS.md` | instructions for coding agents, not for users |
-
-The script ends with the two checks that catch what a copy cannot: every
-local `src=`/`href=` in `index.html` resolves to a file that was actually
-copied (the "added a new module and forgot the directory" check), and every
-entry in `sw.js`'s `PRECACHE` exists in the artifact. Both name the offending
-file and exit non-zero, so a bad build fails instead of shipping a site that
-opens fine online and dies the first time it is offline.
+The `site` job in `.github/workflows/ci.yml` asks two questions about `v2/`
+directly, because the directory *is* the artifact: every local `src=`/`href=`
+in `v2/index.html` resolves inside `v2/`, and every entry in `v2/sw.js`'s
+`PRECACHE` exists there. Both name the offending file and exit non-zero, so an
+incomplete shell fails the build instead of shipping a site that opens fine
+online and dies the first time it is offline. These were the checks the copy
+script ran against its output; they got simpler when the output stopped being
+a copy.
 
 ### The tests are not a deploy gate any more
 
@@ -891,7 +908,9 @@ wait. Do not remove it as "test-only cruft".
 
 ## Things that look like bugs but are not
 
-- The `1.3/` directory is a frozen old release. Ignore it.
+- There is no `1.3/` any more. It was a frozen old release kept as a
+  directory, which is what made a second app one URL away; it is the git
+  `archive/1.3` tag now.
 - `converter.html` is standalone and shares no code with the app.
 - `normalizeDrills()` in `state.js` exists to upgrade pre-v2 stored drills
   whose steps were flat arrays instead of arrays-of-arrays.

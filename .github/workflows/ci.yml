@@ -1,7 +1,7 @@
 name: Tests
 
-# The gates, with no deploy. This used to also publish to GitHub Pages; the
-# site is served by Cloudflare Pages now, which builds from the branch itself.
+# The gates, with no deploy. The site is served by Cloudflare Pages, which
+# builds from the branch itself: no build command, output directory `v2/`.
 #
 # Keeping the gates is the reason this file still exists. Cloudflare will
 # happily publish a branch that fails its tests, and nothing else in this
@@ -10,8 +10,9 @@ name: Tests
 # a half-translated dictionary, and a settings group that renders empty -
 # none of which breaks a page load, so none of which anything else would see.
 #
-# tools/prepare-site.sh is run here too, so CI checks the ARTIFACT that would
-# be published rather than only the checkout. See AGENTS.md.
+# The `site` job is the check that used to need a copy script. v2/ IS the
+# published artifact, so "is it complete?" is a question about a directory
+# rather than about a list somebody has to remember to update. See AGENTS.md.
 
 on:
   push:
@@ -82,23 +83,76 @@ jobs:
           esac
 
   site:
-    name: Assemble the site
+    name: Check the published tree
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      # The same script Cloudflare runs as its build command. Running it here
-      # means the thing that is checked is the thing that is published: the
-      # curated file list, the local-reference check and the precache check all
-      # fail the build rather than quietly shipping a site that dies offline.
-      - name: Prepare the publishable site
-        run: tools/prepare-site.sh
+      # There is no copy step, so "what ships" is whatever is in v2/. These two
+      # checks are the ones the copy script used to run against its output,
+      # pointed at the directory itself. Both name the offending file and exit
+      # non-zero, so an incomplete shell fails the build instead of shipping a
+      # site that opens fine online and dies the first time it is offline.
+      - name: Every local reference in v2/index.html resolves inside v2/
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, pathlib, sys
+          site = pathlib.Path('v2')
+          missing = []
+          for ref in re.findall(r'(?:src|href)="([^"]+)"', (site / 'index.html').read_text()):
+              if ref.startswith(('http://', 'https://', '//', '#', 'data:', 'mailto:')):
+                  continue
+              ref = ref.split('#')[0].split('?')[0]
+              if not ref or ref.startswith('/'):
+                  continue
+              if not (site / ref).exists():
+                  missing.append(ref)
+          if missing:
+              sys.exit('::error::v2/index.html references files that are not there: ' + ', '.join(missing))
+          print('v2/index.html: every local asset is present')
+          PY
 
-      - name: List what would be published
-        run: find _site -type f | sort
+      # An app that ships a worker pointing at a file nobody added opens fine
+      # online and dies the first time it is offline, which is most of what the
+      # PWA is for. The browser suite walks the real import graph, but against
+      # the checkout; this asks the same question of v2/ itself.
+      - name: Every file the service worker precaches is in v2/
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, pathlib, sys
+          site = pathlib.Path('v2')
+          source = (site / 'sw.js').read_text()
+          body = re.search(r'const PRECACHE = \[(.*?)\];', source, re.S)
+          if not body:
+              sys.exit('::error::could not find the PRECACHE list in v2/sw.js')
+          entries = re.findall(r"'([^']+)'", body.group(1))
+          missing = [e for e in entries if e != 'SHELL' and not (site / e).exists()]
+          if missing:
+              sys.exit('::error::v2/sw.js precaches files that are not there: ' + ', '.join(missing))
+          print(f'v2/sw.js: all {len(entries) - 1} precached files are present')
+          PY
+
+      # sw.js and the manifest are not optional extras: without them the site
+      # works in a tab but can never be installed and never opens offline.
+      # icons/ and fonts/ are precached too - a self-hosted webfont that is not
+      # there falls back to the system stack the first time the phone is out of
+      # signal - so the check is on the FILES, not the directories.
+      - name: The files that must ship, ship
+        run: |
+          set -euo pipefail
+          for required in index.html converter.html sw.js manifest.webmanifest \
+                          fonts/dm-sans-latin.woff2 icons/icon-192.png icons/icon-512.png; do
+            test -f "v2/$required" || { echo "::error::not published: v2/$required" >&2; exit 1; }
+          done
+          echo "all required files are in v2/"
+
+      - name: List what will be published
+        run: find v2 -type f | sort
 
       - uses: actions/upload-artifact@v4
         with:
           name: site
-          path: _site
+          path: v2
           retention-days: 7

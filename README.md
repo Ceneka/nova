@@ -24,7 +24,8 @@ Repository: **[Ceneka/nova](https://github.com/Ceneka/nova)** · App:
 
 **Local:**
 
-  * Download repository files and host locally (e.g., `python3 -m http.server`).
+  * Download the `v2/` folder and host it anywhere (e.g., `python3 -m http.server`).
+    That folder *is* the app: no build step, no dependencies, nothing to install.
 
 **Requirements:**
 
@@ -260,7 +261,7 @@ belongs on the site that introduces it.
 
 ## Design
 
-The whole interface is built on CSS custom properties in `css/style.css`.
+The whole interface is built on CSS custom properties in `v2/css/style.css`.
 There is no preprocessor and no build step, so a theme is a block of
 declarations and nothing else:
 
@@ -290,15 +291,15 @@ than shipping.
 
 ### Fonts
 
-DM Sans and JetBrains Mono, self-hosted under `fonts/` as four `woff2`
+DM Sans and JetBrains Mono, self-hosted under `v2/fonts/` as four `woff2`
 subsets (latin and latin-ext for each). Both are
 [SIL Open Font License 1.1](https://openfontlicense.org/).
 
 They are committed and served from the app rather than pulled from a CDN
 deliberately: this app's whole reason for existing is working with no signal
 at a table, and a webfont that only arrives over the network is a webfont
-that falls back to the system stack at exactly the wrong moment. `sw.js`
-precaches all four, so an installed copy is typed correctly offline too.
+that falls back to the system stack at exactly the wrong moment.
+`v2/sw.js` precaches all four, so an installed copy is typed correctly offline too.
 
 ## Development
 
@@ -313,16 +314,18 @@ node --test tests/*.test.mjs              # unit tests, no dependencies
 tools/run-checks.sh                       # both gates, one command
 ```
 
-The PWA icons are committed like every other asset. `icons/*.svg` are the
+The PWA icons are committed like every other asset. `v2/icons/*.svg` are the
 sources; regenerate the PNGs with `tools/make-icons.sh` after editing one
-(needs ImageMagick). `sw.js` is also hand-written, not generated — when you
+(needs ImageMagick). `v2/sw.js` is also hand-written, not generated — when you
 add or remove a file the app loads, update its `PRECACHE` list. The integration
 suite fails if you forget.
 
-Pushing to `main` runs both suites (`.github/workflows/ci.yml`), and
-Cloudflare Pages publishes the branch. Nothing to build — `tools/prepare-site.sh`
-copies a curated subset of files into `_site/`, which is also what CI checks, so
-`tests/`, `1.3/` and `tools/` stay off the public site.
+Pushing to `main` runs both suites (`.github/workflows/ci.yml`). Cloudflare
+Pages publishes the `v2/` folder with **no build command at all** — it serves
+that directory at the domain root, so there is nothing to compile, nothing to
+copy, and no list of files to keep up to date. `tests/`, `tools/` and
+`AGENTS.md` stay off the public site because they are not in `v2/`, not
+because anything had to remember to exclude them.
 
 The assistant's core (`aiTerms`, `aiMatch`, `aiCompile`, `aiClient`) imports
 cleanly under bare Node and `aiClient` takes its `fetch` **by injection**, so

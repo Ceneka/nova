@@ -42,9 +42,9 @@ globalThis.localStorage = {
 globalThis.document = { addEventListener() {}, dispatchEvent() {} };
 globalThis.window = {};
 
-const { chat, runAgent, systemPrompt, MAX_ROUNDS } = await import('../js/aiClient.js');
-const { TOOLS, makeToolHandlers } = await import('../js/aiAgent.js');
-const { parseUtterance } = await import('../js/aiTerms.js');
+const { chat, runAgent, systemPrompt, MAX_ROUNDS } = await import('../v2/js/aiClient.js');
+const { TOOLS, makeToolHandlers } = await import('../v2/js/aiAgent.js');
+const { parseUtterance } = await import('../v2/js/aiTerms.js');
 
 const SLOT = { provider: 'openrouter', baseUrl: BASE, apiKey: KEY, model: MODEL };
 
@@ -112,8 +112,8 @@ try {
 
     // The point of the whole design: what came out the far end is a real ball
     // array, compiled by makeBall(), not anything the model typed.
-    const { getDraft } = await import('../js/aiStore.js');
-    const { normalizeBall } = await import('../js/ball.js');
+    const { getDraft } = await import('../v2/js/aiStore.js');
+    const { normalizeBall } = await import('../v2/js/ball.js');
     const draft = getDraft();
     check('a draft exists', !!draft);
     if (draft) {

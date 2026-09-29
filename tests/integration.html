@@ -16,7 +16,7 @@
     <meta charset="UTF-8">
     <title>PENDING</title>
     <meta name="theme-color" content="#0b1013">
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../../v2/css/style.css">
 </head>
 <body>
 <div id="editor-modal" class="modal-overlay"><div class="modal">
@@ -74,33 +74,33 @@
 <pre id="out"></pre>
 
 <script type="module">
-import { initData, currentDrills, userCustomDrills, importCustomDrills, exportCustomDrills } from '../js/state.js';
-import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
-import * as P from '../js/presets.js';
-import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
-import { asciiSlug, drillKeyName } from '../js/utils.js';
-import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
-import { bleState, connectDevice, setConnectTimeouts } from '../js/bluetooth.js';
-import { updateDrillButtonStates, renderDrillButtons, moveAiDrillTo, clearIaCategory, deleteAiDrillRow } from '../js/ui.js';
+import { initData, currentDrills, userCustomDrills, importCustomDrills, exportCustomDrills } from '../../v2/js/state.js';
+import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../../v2/js/editor.js';
+import * as P from '../../v2/js/presets.js';
+import { B, normalizeBall, makeBall, freqToBpm } from '../../v2/js/ball.js';
+import { asciiSlug, drillKeyName } from '../../v2/js/utils.js';
+import { DEFAULT_DRILLS, CATEGORIES } from '../../v2/js/constants.js';
+import { bleState, connectDevice, setConnectTimeouts } from '../../v2/js/bluetooth.js';
+import { updateDrillButtonStates, renderDrillButtons, moveAiDrillTo, clearIaCategory, deleteAiDrillRow } from '../../v2/js/ui.js';
 // Imported for its side effects only. Loading the PWA module on a page that is
 // not index.html - no service worker registration is made, but the theme-colour
 // observer and the install listeners all attach - is part of what is checked.
-import { isOfflineReady } from '../js/pwa.js';
+import { isOfflineReady } from '../../v2/js/pwa.js';
 document.addEventListener('connection-changed', updateDrillButtonStates);
-import '../js/presetUi.js';
-import { renderSettings } from '../js/settingsUi.js';
-import '../js/statsUi.js';
-import * as AI from '../js/aiUi.js';
-import * as AIS from '../js/aiStore.js';
-import * as AIT from '../js/aiTerms.js';
-import * as CFG from '../js/aiConfig.js';
-import * as CLI from '../js/aiClient.js';
-import * as AG from '../js/aiAgent.js';
-import * as V from '../js/aiVoice.js';
-import * as S from '../js/stats.js';
-import { t, setLang, getLang, initI18n, detectLang, applyI18n, drillDisplayName, axisLabel, LANGUAGES } from '../js/i18n.js';
-import { en } from '../js/locales/en.js';
-import { es } from '../js/locales/es.js';
+import '../../v2/js/presetUi.js';
+import { renderSettings } from '../../v2/js/settingsUi.js';
+import '../../v2/js/statsUi.js';
+import * as AI from '../../v2/js/aiUi.js';
+import * as AIS from '../../v2/js/aiStore.js';
+import * as AIT from '../../v2/js/aiTerms.js';
+import * as CFG from '../../v2/js/aiConfig.js';
+import * as CLI from '../../v2/js/aiClient.js';
+import * as AG from '../../v2/js/aiAgent.js';
+import * as V from '../../v2/js/aiVoice.js';
+import * as S from '../../v2/js/stats.js';
+import { t, setLang, getLang, initI18n, detectLang, applyI18n, drillDisplayName, axisLabel, LANGUAGES } from '../../v2/js/i18n.js';
+import { en } from '../../v2/js/locales/en.js';
+import { es } from '../../v2/js/locales/es.js';
 
 const results = [];
 const report = () => {
@@ -162,7 +162,7 @@ for (const cat of ['basic', 'combined', 'complex']) {
 let captured = null;
 const RealBlob = window.Blob;
 window.Blob = class extends RealBlob { constructor(parts, opts) { super(parts, opts); captured = parts.join(''); } };
-const { exportCustomDrills, importCustomDrills } = await import('../js/state.js');
+const { exportCustomDrills, importCustomDrills } = await import('../../v2/js/state.js');
 try { exportCustomDrills(); } finally { window.Blob = RealBlob; }
 
 const appCsv = captured.split('\n').filter(l => l && !/^A;|^B;|^C;/.test(l)).join('\n') + '\n';
@@ -1757,7 +1757,7 @@ V.releaseScreenLock();
 {
     // Fetched inline rather than through the section-21 `text` helper, which
     // is declared further down this block and would be in its dead zone here.
-    const fetchText = async (p) => (await fetch(new URL('../' + p, location.href))).text();
+    const fetchText = async (p) => (await fetch(new URL('../../v2/' + p, location.href))).text();
     const realHtml = await fetchText('index.html');
 
     ok('index.html puts the dropdown inside the header', (() => {
@@ -1965,7 +1965,7 @@ resetBle();
 // row. There is no PWA-shaped stand-in anywhere in this file, because a test
 // that checks a copy of the manifest is checking nothing.
 
-const root = new URL('../', location.href);
+const root = new URL('../../v2/', location.href);
 const text = async (p) => (await fetch(new URL(p, root))).text();
 
 /* --- the manifest --- */

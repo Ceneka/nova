@@ -25,13 +25,13 @@ globalThis.localStorage = {
     clear: () => store.clear()
 };
 
-const { B, makeBall, normalizeBall, maxScatterFor, freqToBpm } = await import('../js/ball.js');
-const { DEFAULT_DRILLS } = await import('../js/constants.js');
-const P = await import('../js/presets.js');
-const T = await import('../js/aiTerms.js');
-const M = await import('../js/aiMatch.js');
-const C = await import('../js/aiCompile.js');
-const A = await import('../js/aiStore.js');
+const { B, makeBall, normalizeBall, maxScatterFor, freqToBpm } = await import('../v2/js/ball.js');
+const { DEFAULT_DRILLS } = await import('../v2/js/constants.js');
+const P = await import('../v2/js/presets.js');
+const T = await import('../v2/js/aiTerms.js');
+const M = await import('../v2/js/aiMatch.js');
+const C = await import('../v2/js/aiCompile.js');
+const A = await import('../v2/js/aiStore.js');
 
 const library = P.DEFAULT_PRESETS.map(P.clonePreset);
 

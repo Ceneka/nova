@@ -14,7 +14,9 @@
  *   find an already-running one.
  */
 
-const URL_UNDER_TEST = process.argv[2] || 'http://127.0.0.1:8123/';
+// The app lives in v2/ - Cloudflare Pages serves that directory at the apex,
+// but a plain static server rooted at the repository serves it at /v2/.
+const URL_UNDER_TEST = process.argv[2] || 'http://127.0.0.1:8123/v2/';
 const PORT = process.env.CDP_PORT || 9222;
 
 const endpoint = await (async () => {

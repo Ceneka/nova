@@ -12,6 +12,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+cd v2   # the icons ship inside the app directory
 
 command -v convert >/dev/null || {
     echo "convert not found - install ImageMagick" >&2; exit 1; }
@@ -23,7 +24,7 @@ render() {
     printf '  %-34s %s\n' "$out" "$(identify -format '%wx%h %[channels]' "$out")"
 }
 
-echo "Rendering icons into icons/"
+echo "Rendering icons into v2/icons/"
 
 # "any" purpose icons. Full-bleed square: the platform applies its own mask.
 render icons/icon.svg icons/icon-192.png 192

@@ -33,7 +33,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = process.argv[2] || 'http://127.0.0.1:8123';
+// The app is served from v2/ by a repository-rooted static server. Cloudflare
+// Pages maps that directory to the apex, so the deployed URL has no /v2/ in
+// it - only this local one does.
+const BASE = process.argv[2] || 'http://127.0.0.1:8123/v2';
 const PORT = process.env.CDP_PORT || 9222;
 
 // The shapes the README already uses, so its table does not change.
