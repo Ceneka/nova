@@ -37,8 +37,9 @@ tools/make-icons.sh regenerates icons/*.png. Not part of the build
 tools/run-checks.sh both deploy gates in one command
 tools/check-app.mjs boots the real index.html over CDP
 tools/screenshots.mjs regenerates images/*.png for the README
-#   check-app.mjs also audits every screen for boxes past the edge
 tools/live-check.mjs one live call against a real endpoint, BYOK
+#   check-app.mjs also audits all 11 screens, at two widths, for boxes
+#   that reach past the edge of the screen
 css/style.css       all styling, one file, CSS custom properties per theme
 fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
 js/
