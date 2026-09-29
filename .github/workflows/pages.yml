@@ -153,6 +153,36 @@ jobs:
       - name: List what will be deployed
         run: find _site -type f | sort
 
+      # configure-pages answers 404 when the repository has no Pages site, and
+      # reports that as a bare stack trace in a step nobody thinks to read. The
+      # missing site is a repository SETTING, not something this file can fix,
+      # so say it in one line and where the button is. Everything above has
+      # already passed by the time this runs, which is the confusing part: the
+      # tests pass, the artifact assembles, and the deploy still will not start.
+      - name: Say what to fix if Pages is not enabled yet
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+                   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                   -H "X-GitHub-Api-Version: 2022-11-28" \
+                   "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pages")
+          case "$code" in
+            200)
+              echo "Pages site found (HTTP $code)."
+              ;;
+            404)
+              echo "::error title=GitHub Pages is not enabled for this repository::configure-pages has no site to configure, so the deploy cannot start. This is a repository setting, not a fault in the app: repo Settings -> Pages -> Build and deployment -> Source -> GitHub Actions, then re-run this workflow. Every gate above it already passed."
+              exit 1
+              ;;
+            *)
+              # A 401 or 403 means this check could not read the site, which is
+              # a different problem from the one it exists for. Say that rather
+              # than printing a reassuring line it did not earn; configure-pages
+              # reports the real fault if there is one.
+              echo "::warning title=Could not read the Pages site::This preflight got HTTP $code, not 200 or 404, so it cannot tell you whether Pages is enabled. It is not asserting that Pages is fine."
+              ;;
+          esac
+
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
