@@ -2,7 +2,7 @@ import { DEFAULT_DRILLS, CATEGORIES } from './constants.js';
 import { B, calculateRPMs, reverseCalculate, bpmToFreq, maxSpinFor } from './ball.js';
 import { loadPresets } from './presets.js';
 import { clearSessions } from './stats.js';
-import { showToast } from './utils.js';
+import { showToast, asciiSlug, drillKeyName } from './utils.js';
 import { t } from './i18n.js';
 
 export let currentDrills = {};
@@ -191,7 +191,7 @@ export function importCustomDrills(csvText) {
 
             if (category.startsWith('custom')) {
                 const name = nameRaw.substring(0, 40);
-                const key = `cust_${category.split('-')[1].toUpperCase()}_${name.replace(/\s+/g, '_')}`;
+                const key = `cust_${category.split('-')[1].toUpperCase()}_${drillKeyName(name)}`;
 
                 if (!customBuilder[key]) {
                     let exists = newCustomData[category].find(d => d.key === key);
@@ -303,7 +303,14 @@ export function exportCustomDrills() {
             drillList.forEach(drill => {
                 const sequence = currentDrills[drill.key] ? currentDrills[drill.key][1] : null; 
                 if (sequence) {
-                    appendDrillToCSV(setLabel, drill.name, sequence);
+                    // The app keeps the name the user typed - accents, commas,
+                    // emoji - but this file is a compatibility surface other
+                    // apps split on ';', and it has only ever carried ASCII
+                    // names, so the column gets the folded form. It is
+                    // byte-for-byte the same string for every name the field
+                    // accepted before the filter was lifted. A name with
+                    // nothing ASCII left in it ('🔥') still needs a cell.
+                    appendDrillToCSV(setLabel, asciiSlug(drill.name, 'Drill'), sequence);
                 }
             });
         }

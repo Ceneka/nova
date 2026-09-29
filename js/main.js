@@ -39,7 +39,7 @@ import {
     showSessionSummary 
 } from './ui.js';
 
-import { showToast } from './utils.js';
+import { showToast, drillKeyName } from './utils.js';
 
 // Registers the service worker and the install prompt
 import { registerServiceWorker } from './pwa.js';
@@ -311,7 +311,7 @@ window.performDownload = async () => {
 
         // Unique Key Generation
         const catChar = selectedDownloadCat.split('-')[1].toUpperCase();
-        const newKey = `cust_${catChar}_${name.replace(/\s+/g, '_')}_${Date.now()}`;
+        const newKey = `cust_${catChar}_${drillKeyName(name)}_${Date.now()}`;
 
         // Save Data
         userCustomDrills[selectedDownloadCat].push({ name: name, key: newKey });

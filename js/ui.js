@@ -11,7 +11,7 @@ import {
 } from './state.js';
 import { bleState } from './bluetooth.js';
 import { makeBall } from './ball.js';
-import { showToast, formatDuration } from './utils.js'; 
+import { showToast, formatDuration, drillKeyName } from './utils.js'; 
 import { openEditor } from './editor.js';
 import { t, drillDisplayName } from './i18n.js';
 
@@ -30,14 +30,9 @@ window.handleCreateNewDrill = (category) => {
         showToast(t('toast.nameTooLong25')); 
         return; 
     }
-    
-    if (!/^[a-zA-Z0-9.\-#\[\]><\+\)\( ]+$/.test(newName)) { 
-        showToast(t('toast.invalidCharacters')); 
-        return; 
-    }
 
     const catChar = category.split('-')[1].toUpperCase();
-    const newKey = `cust_${catChar}_${newName.replace(/\s+/g, '_')}_${Date.now()}`;
+    const newKey = `cust_${catChar}_${drillKeyName(newName)}_${Date.now()}`;
 
     userCustomDrills[category].push({ name: newName, key: newKey });
 

@@ -31,6 +31,12 @@
     <div id="preset-modal-title"></div><div id="preset-editor-body"></div>
     <button class="btn-delete-preset" onclick="window.deleteEditingPreset()"></button>
 </div></div>
+<div id="save-as-modal" class="modal-overlay"><div class="modal">
+    <input type="text" id="save-name" maxlength="40">
+    <div class="mode-switch" id="save-cat-switch">
+        <div class="mode-option active"></div><div class="mode-option"></div><div class="mode-option"></div>
+    </div>
+</div></div>
 <div id="theme-menu" class="theme-menu">
     <div class="theme-item" onclick="window.openSettings()">Settings</div>
     <div class="theme-item" onclick="window.openAboutModal()">About</div>
@@ -59,6 +65,7 @@ import { initData, currentDrills, userCustomDrills } from '../js/state.js';
 import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
 import * as P from '../js/presets.js';
 import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
+import { asciiSlug, drillKeyName } from '../js/utils.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
 import { bleState, connectDevice, setConnectTimeouts } from '../js/bluetooth.js';
 import { updateDrillButtonStates } from '../js/ui.js';
@@ -140,6 +147,104 @@ try { exportCustomDrills(); } finally { window.Blob = RealBlob; }
 
 const appCsv = captured.split('\n').filter(l => l && !/^A;|^B;|^C;/.test(l)).join('\n') + '\n';
 eq('shared drill CSV export unchanged by the refactor', appCsv, expected);
+
+/* ---- drill names are free text; the key and the CSV are the ASCII subset ---- */
+// The name field used to refuse anything outside [A-Za-z0-9.\-#[]><+() ], so a
+// name with an accent or a comma was rejected with a toast. The app now takes
+// the name as typed - accents, commas, emoji - and folds it in exactly two
+// places: the storage key, which is interpolated into a [data-key="..."]
+// selector, and the Name column of the shared CSV other apps split on ';'.
+{
+    const WILD = 'Saque Rápido, 🔥 (Rápido)';
+    const FOLDED = 'Saque Rapido (Rapido)';
+    // Anything a key may carry: it is pasted into a CSS attribute selector and
+    // used as an object key, so a quote or a bracket in it would throw.
+    const KEYISH = /^cust_[A-C]_[A-Za-z0-9._#\-\[\]><+()_]+_\d+$/;
+    const exported = () => {
+        let text = null;
+        window.Blob = class extends RealBlob { constructor(p, o) { super(p, o); text = p.join(''); } };
+        try { exportCustomDrills(); } finally { window.Blob = RealBlob; }
+        return text || '';
+    };
+
+    const nameInput = document.getElementById('save-name');
+    openEditor('push(b)');          // "save as" copies whatever the editor holds
+    nameInput.value = WILD;
+    window.selectSaveCategory('custom-a', document.querySelector('#save-cat-switch').children[0]);
+    window.performSaveAs();
+
+    const saved = userCustomDrills['custom-a'].find(d => d.name === WILD);
+    ok('a name with an accent, a comma and an emoji is accepted', !!saved,
+       JSON.stringify(userCustomDrills['custom-a'].map(d => d.name)));
+    ok('and is stored exactly as typed', saved?.name === WILD, saved?.name);
+    eq('the editor shows it exactly as typed', document.getElementById('editor-drill-name').textContent, WILD);
+    ok('the storage key is the folded name, not the typed one',
+       !!saved?.key.startsWith(`cust_A_Saque_Rapido_(Rapido)_`), saved?.key);
+    ok('the key carries nothing a selector or an object key can trip on',
+       KEYISH.test(saved?.key || '') && /^[\x20-\x7e]+$/.test(saved?.key || ''), saved?.key);
+
+    // The hazard the key has to survive: ui.js interpolates it into this
+    // selector to find the last-played button, and a quote throws a SyntaxError
+    // on the next render rather than at the point of the mistake.
+    const probe = document.createElement('div');
+    probe.style.display = 'none';
+    const fake = document.createElement('button');
+    fake.className = 'btn-drill';
+    fake.dataset.key = saved?.key;
+    probe.appendChild(fake);
+    document.body.appendChild(probe);
+    let resolves = false;
+    try { resolves = document.querySelector(`.btn-drill[data-key="${saved?.key}"]`) === fake; } catch (e) { resolves = false; }
+    probe.remove();
+    ok('the key resolves through the [data-key] selector the highlight uses', resolves, saved?.key);
+
+    const wildRow = exported().split('\n').find(l => l.startsWith('A;') && l.includes('Saque'));
+    eq('the shared CSV writes the folded name', wildRow?.split(';')[2], FOLDED);
+    eq('and the row still has exactly the ten columns', wildRow?.split(';').length, 10);
+    ok('and the row is pure ASCII', /^[\x20-\x7e]*$/.test(wildRow || ''), wildRow);
+
+    const realPrompt = window.prompt;
+    window.prompt = () => 'Renombrado, ya 🎾';
+    const oldKey = saved.key;       // the rename mutates the same entry object
+    try { window.handleRenameDrill(); } finally { window.prompt = realPrompt; }
+    const renamed = userCustomDrills['custom-a'].find(d => d.name === 'Renombrado, ya 🎾');
+    ok('renaming takes the same characters', !!renamed,
+       JSON.stringify(userCustomDrills['custom-a'].map(d => d.name)));
+    ok('and re-keys in ASCII', KEYISH.test(renamed?.key || ''), renamed?.key);
+    ok('the old key is gone and the drill moved with it',
+       !currentDrills[oldKey] && !!currentDrills[renamed?.key], oldKey);
+
+    nameInput.value = '🔥';
+    window.performSaveAs();
+    const emojiOnly = userCustomDrills['custom-a'].find(d => d.name === '🔥');
+    ok('a name with no ASCII in it at all still saves', !!emojiOnly,
+       JSON.stringify(userCustomDrills['custom-a'].map(d => d.name)));
+    ok('and still gets a usable key', /^cust_A_drill_\d+$/.test(emojiOnly?.key || ''), emojiOnly?.key);
+    const emojiNames = exported().split('\n').filter(l => l.startsWith('A;')).map(l => l.split(';')[2]);
+    ok('and exports a Name cell rather than an empty one', emojiNames.includes('Drill'), emojiNames.join(' | '));
+
+    // A hand-made file from another app, not one of ours: the name is taken as
+    // the file wrote it, and only the key is folded.
+    ok('the importer takes a row with accents and emoji',
+       importCustomDrills('Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps\n'
+                        + 'B;1;imported, ñ 🔥;5;2;top;50;0;60;2\n'));
+    const imported = userCustomDrills['custom-b'].find(d => d.name === 'imported, ñ 🔥');
+    ok('and keeps that name exactly as the file said it', !!imported,
+       JSON.stringify(userCustomDrills['custom-b'].map(d => d.name)));
+    ok('while still keying it in ASCII', /^cust_B_[A-Za-z0-9._#\-\[\]><+()_]+$/.test(imported?.key || ''), imported?.key);
+    ok('and the imported row is playable', !!currentDrills[imported?.key]?.[1]?.length);
+}
+
+// The fold itself, including the property the whole compatibility argument
+// rests on: a name the old field accepted has to fold to itself, or every
+// existing export would change under a user who never touched their drills.
+eq('a name the old field accepted folds to itself',
+   asciiSlug('Push(B) #2 [L] + (R)'), 'Push(B) #2 [L] + (R)');
+eq('accents are dropped, not turned into gaps', asciiSlug('Saque Rápido'), 'Saque Rapido');
+eq('a letter with its own stroke transliterates', asciiSlug('Straße'), 'Strasse');
+eq('emoji and commas collapse to single spaces', asciiSlug('🔥, a, b'), 'a b');
+eq('an empty fold takes the fallback the caller passed', asciiSlug('🔥', 'Drill'), 'Drill');
+eq('the key half joins the words with underscores', drillKeyName('Saque Rápido, 🔥'), 'Saque_Rapido');
 
 /* ---- 0. the preset entry point is the first thing in the editor ---- */
 openEditor('push(b)');

@@ -36,6 +36,48 @@ export function clamp(val, min, max) {
     return Math.max(min, Math.min(max, val));
 }
 
+// --- Drill names: free text in the app, ASCII where a file or a selector needs it ---
+// A drill name is whatever the user typed. Accents, commas and emoji are stored,
+// shown, shared and imported verbatim; there is no character filter on it any
+// more. Two places downstream still need a plainer string, and this is the one
+// place that produces it:
+//
+//   - the storage key, which is interpolated straight into a `[data-key="..."]`
+//     selector in updateLastPlayedHighlight(), so a quote or a bracket in a key
+//     would throw on the next render;
+//   - the Name column of the shared drill CSV, which other apps split on ';'
+//     and which has only ever carried ASCII, because the name field used to
+//     reject everything outside it.
+//
+// The character class is exactly the one the old validator allowed, so a name
+// that was legal before folds to itself and the export stays byte-for-byte
+// what it was. Everything else - accents, emoji, commas - becomes a space and
+// then collapses, which is why 'Sa,que' exports as 'Sa que'.
+// Letters that carry their own stroke rather than a combining mark, so NFKD
+// leaves them alone. Without this they would fold to a space and 'Straße'
+// would export as 'Stra e'.
+const LIGATURES = { 'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
+                     'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D', 'ł': 'l', 'Ł': 'L',
+                     'þ': 'th', 'Þ': 'TH', 'ð': 'd', 'Ð': 'D' };
+
+export function asciiSlug(name, fallback = '') {
+    const folded = String(name ?? '')
+        .replace(/[ßæÆœŒøØđĐłŁþÞðÐ]/g, c => LIGATURES[c])
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')              // the accents NFKD split off
+        .replace(/[^\x20-\x7e]/g, ' ')                // emoji, CJK, anything off ASCII
+        .replace(/[^A-Za-z0-9.\-#\[\]><+() ]+/g, ' ') // ; and , and friends
+        .replace(/\s+/g, ' ')
+        .trim();
+    return folded || fallback;
+}
+
+// The half of a `cust_<cat>_<name>_<timestamp>` key that comes from the name.
+// The category and the timestamp stay at the call sites.
+export function drillKeyName(name) {
+    return asciiSlug(name, 'drill').replace(/\s+/g, '_');
+}
+
 // Added missing function to fix UI crash
 export function toggleBodyScroll(lock) {
     if (lock) document.body.style.overflow = 'hidden';

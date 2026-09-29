@@ -56,7 +56,7 @@ js/
   locales/
     en.js           English dictionary, and the source of truth for the keys
     es.js           Español
-  utils.js          toast, log, clamp, MD5
+  utils.js          toast, log, clamp, MD5, the drill-name fold
 tests/              node unit tests + a browser integration page
 1.3/                archived older version, do not edit
 ```
@@ -440,6 +440,37 @@ One intentional behaviour change: the importer now clamps the BPM column to
 30-90 (it previously stored out-of-range values that the editor clamped later
 anyway). In-range values round-trip exactly.
 
+## Drill names are free text; the key and the CSV are not
+
+A drill name is **whatever the user typed** — accents, commas, emoji. There is
+no character filter on it, and there must not be one added back: the name goes
+into `localStorage`, into the UI through `textContent`, and into the share
+payload as JSON, all of which carry UTF-8 fine. (This was not always true. The
+name field rejected anything outside `[A-Za-z0-9.\-#[]><+() ]`, so "Saque
+Rápido" was refused with a toast.)
+
+Two downstream places need a plainer string, and `asciiSlug()` in `js/utils.js`
+is the only thing allowed to produce one:
+
+| Where | Why |
+| --- | --- |
+| the storage key, via `drillKeyName()` | `updateLastPlayedHighlight()` interpolates the key into `.btn-drill[data-key="${key}"]`, so a `"` or `]` in it throws a `SyntaxError` on the next render — not at the point of the mistake |
+| the CSV `Name` column, via `asciiSlug(drill.name, 'Drill')` | other apps split the row on `;`, and the file has only ever carried ASCII names |
+
+Rules that have bitten people before:
+
+- **Every place that mints a `cust_...` key goes through `drillKeyName()`** —
+  create, save-as, rename, the share-code download in `main.js` and the CSV
+  importer. All five take a name from outside the app (a prompt, a downloaded
+  payload, another app's file), so all five are hostile by default.
+- **The character class in `asciiSlug()` is the old validator's, on purpose.**
+  It is what makes the export byte-for-byte unchanged for every name that was
+  legal before the filter was lifted. Widening it is a compatibility change to
+  a shared file, and the suite says so out loud.
+- **The stored `name` is never folded.** Only the key and the CSV column are.
+  A folded name that comes back through an import is the export talking, not
+  the app mangling your data.
+
 ## Deployment
 
 `.github/workflows/pages.yml` publishes to GitHub Pages on every push to
@@ -465,7 +496,7 @@ the whole repo":
 | `AGENTS.md` | instructions for coding agents, not for users |
 
 Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the 300 browser checks in `tests/integration.html`, driven through
+and the browser checks in `tests/integration.html`, driven through
 headless Chrome in the same way as documented below. A failure blocks the
 deploy.
 
@@ -489,13 +520,18 @@ that third-party server. If you want your own, self-host PocketBase and change
 node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
 ```
 
-Browser integration (300 checks, needs the HTTP server above):
+Browser integration (329 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --disable-gpu --window-size=430,932 \
   --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(300) or FAIL(n)
+  | grep -o '<title>[^<]*'        # -> <title>PASS(329) or FAIL(n)
 ```
+
+Give it a throwaway `--user-data-dir`. The page drives the real importer and
+the real editor, both of which write to `localStorage`, so a second run
+against a warm profile starts from the previous run's drills and fails checks
+that have nothing to do with the change.
 
 Open it in a normal browser to see each check. It drives the real editor, the
 real importer, the real exporter, the real settings screen and the real

@@ -5,7 +5,7 @@ import {
 } from './ball.js';
 import { MAX_STEPS_PER_DRILL, getPresetById, buildVariantStep, buildSequenceSteps, buildSingleBall } from './presets.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
-import { showToast, clamp, toggleBodyScroll } from './utils.js';
+import { showToast, clamp, toggleBodyScroll, drillKeyName } from './utils.js';
 import { t, drillDisplayName } from './i18n.js';
 import { uploadDrill } from './cloud.js';
 
@@ -495,7 +495,6 @@ window.performSaveAs = () => {
     const newName = document.getElementById('save-name').value.trim();
     if(!newName) { showToast(t('toast.enterAName')); return; }
     if (newName.length > 40) { showToast(t('toast.nameTooLong')); return; }
-    if (!/^[a-zA-Z0-9.\-#\[\]><\+\)\( ]+$/.test(newName)) { showToast(t('toast.invalidCharacters')); return; }
 
     const targetCat = selectedSaveCat;
     if (userCustomDrills[targetCat].length >= 100) { 
@@ -503,7 +502,7 @@ window.performSaveAs = () => {
     }
 
     const catChar = targetCat.split('-')[1].toUpperCase(); 
-    const newKey = `cust_${catChar}_${newName.replace(/\s+/g, '_')}_${Date.now()}`;
+    const newKey = `cust_${catChar}_${drillKeyName(newName)}_${Date.now()}`;
     userCustomDrills[targetCat].push({ name: newName, key: newKey });
 
     let baseDrill = currentDrills[editingDrillKey] || { 1: [], 2: [], 3: [] }; 
@@ -559,8 +558,8 @@ window.handleRenameDrill = () => {
     const parts = editingDrillKey.split('_'); 
     const catChar = parts[1]; 
     const catListKey = `custom-${catChar.toLowerCase()}`;
-    const newKey = `cust_${catChar}_${newName.replace(/\s+/g, '_')}_${Date.now()}`;
-    
+    const newKey = `cust_${catChar}_${drillKeyName(newName)}_${Date.now()}`;
+
     const list = userCustomDrills[catListKey];
     const entry = list.find(d => d.key === editingDrillKey);
     

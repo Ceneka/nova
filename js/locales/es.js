@@ -347,7 +347,6 @@ export const es = {
         nameTooLong: 'Nombre demasiado largo',
         nameTooLong25: 'Nombre demasiado largo (máx. 25)',
         nameTooLong30: 'Nombre demasiado largo (máx. 30)',
-        invalidCharacters: 'Caracteres no válidos',
         bankFull: '¡El banco {bank} está lleno!',
         bankFullMax100: '¡Ese banco está lleno (máx. 100)!',
         categoryFull: 'La categoría está llena (máx. 100)',
