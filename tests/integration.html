@@ -37,10 +37,15 @@
         <div class="mode-option active"></div><div class="mode-option"></div><div class="mode-option"></div>
     </div>
 </div></div>
-<div id="theme-menu" class="theme-menu">
-    <div class="theme-item" onclick="window.openSettings()">Settings</div>
-    <div class="theme-item" onclick="window.openAboutModal()">About</div>
-</div>
+<!-- Mirrors index.html: the dropdown is INSIDE the header, which is sticky.
+     It used to be a sibling of the header inside .container, and because
+     .container does not scroll, the menu opened off the top of the screen. -->
+<header id="harness-header">
+    <div id="theme-menu" class="theme-menu">
+        <div class="theme-item" onclick="window.openSettings()">Settings</div>
+        <div class="theme-item" onclick="window.openAboutModal()">About</div>
+    </div>
+</header>
 <div id="settings-view" class="settings-view" hidden><div class="settings-shell">
     <header class="settings-header">
         <button class="settings-back" onclick="window.closeSettings()">Drills</button>
@@ -1589,6 +1594,45 @@ window.closeAiView();
 CFG.setAiConfig({ screenLock: true, wake: { enabled: false, phrases: ['hey nova', 'ok nova', 'nova'] } });
 defineWakeLock(undefined);
 V.releaseScreenLock();
+
+/* ---- 21a. the menu is anchored to the header, not the document ---- */
+// A regression that is invisible until you scroll: the dropdown was a child of
+// .container, which does not scroll, so `top: 58px` meant 58px from the top
+// of the DOCUMENT. The hamburger stayed on screen (it is in the sticky header),
+// so tapping it appeared to do nothing. Three ways to catch it, cheapest
+// first: the real markup, the relationship, and the geometry.
+{
+    // Fetched inline rather than through the section-21 `text` helper, which
+    // is declared further down this block and would be in its dead zone here.
+    const fetchText = async (p) => (await fetch(new URL('../' + p, location.href))).text();
+    const realHtml = await fetchText('index.html');
+
+    ok('index.html puts the dropdown inside the header', (() => {
+        const header = /<header[^>]*>([\s\S]*?)<\/header>/.exec(realHtml);
+        return !!header && /id="theme-menu"/.test(header[1]);
+    })(), 'the first <header> in the real file must contain #theme-menu');
+
+    ok('and the header is sticky in the stylesheet',
+       /position:\s*sticky/.test(await fetchText('css/style.css')));
+
+    const menu = document.getElementById('theme-menu');
+    const header = document.getElementById('harness-header');
+    header.style.position = 'sticky';
+    header.style.top = '0';
+
+    ok('its containing block is the header, not the page', menu.offsetParent === header,
+       menu.offsetParent?.tagName || 'none');
+    ok('which is sticky', getComputedStyle(header).position === 'sticky');
+
+    // Geometry, without needing a page tall enough to scroll: move the
+    // containing block and the menu must move with it.
+    const before = menu.getBoundingClientRect().top;
+    header.style.transform = 'translateY(-40px)';
+    const after = menu.getBoundingClientRect().top;
+    header.style.transform = '';
+    ok('and the menu follows the header, not the document',
+       Math.round(before - after) === 40, `moved ${Math.round(before - after)}px with the header`);
+}
 
 /* ---- 20. connecting to the robot ---- */
 

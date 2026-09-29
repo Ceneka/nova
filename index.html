@@ -52,9 +52,20 @@
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </div>
         </div>
-    </header>
 
-    <div id="theme-menu" class="theme-menu">
+        <!-- The dropdown lives INSIDE the header, and that is load-bearing.
+             The header is `position: sticky`, so it is also the containing
+             block for this absolutely-positioned child: `top: 58px` means 58px
+             below the header, wherever the header currently is.
+
+             It used to be a sibling of the header, inside .container. The
+             container is `position: relative` and does not move when you
+             scroll, so the menu was pinned 58px from the top of the DOCUMENT:
+             scroll down, tap the hamburger - which stays on screen, because
+             it is in the sticky header - and the menu opens 172px above the
+             top of the viewport. Tapping the menu did nothing and looked
+             like a dead button. -->
+        <div id="theme-menu" class="theme-menu">
         <div class="menu-title" data-i18n="menu.drill">Drill</div>
         <!-- The colour chips stand in for the icon each row would have. They
              are decorative, so they follow the palette's semantic colours
@@ -72,8 +83,9 @@
 
         <div class="theme-item" onclick="window.openSettings()"><span class="color-preview" style="background:var(--spin-top)"></span> <span data-i18n="menu.settings">Settings</span></div>
         <div class="theme-item" onclick="window.openAboutModal()" data-i18n="menu.about">About</div>
-    </div>
-    
+        </div>
+    </header>
+
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVUpload(event)">
     <input type="file" id="preset-file-input" accept=".json,.csv" style="display:none" onchange="handlePresetFileUpload(event)">
 

@@ -263,8 +263,14 @@ h1 {
 
 .theme-menu {
     position: absolute;
+    /* A child of the STICKY header, so these are measured from the header and
+       the dropdown follows it down the page. It was a child of .container
+       before, which does not scroll, and the menu opened off the top of the
+       screen. `right: 30px` rather than 15px: the header carries a -15px
+       margin, so it is 30px wider than the container and the menu has to be
+       pushed back to keep its right edge on the same pixel. */
     top: 58px;
-    right: 15px;
+    right: 30px;
     width: 210px;
     background: var(--menu-bg);
     backdrop-filter: blur(16px);

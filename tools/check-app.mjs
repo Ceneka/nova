@@ -145,6 +145,43 @@ const draft = await send('Runtime.evaluate', {
 });
 const draftState = JSON.parse(draft.result.value);
 
+// The dropdown is anchored to the sticky header, so it has to follow the page
+// down. It did not once: it was a child of .container, which does not scroll,
+// so `top: 58px` meant 58px from the top of the DOCUMENT and the menu opened
+// most of the way above the viewport - while the hamburger that opens it stayed
+// on screen, because that one IS in the header. Tapping it did nothing.
+const menu = await send('Runtime.evaluate', {
+    expression: `(() => {
+        window.scrollTo(0, 99999);
+        toggleMenu();
+        return new Promise(r => setTimeout(() => {
+            const m = document.getElementById('theme-menu');
+            const box = m.getBoundingClientRect();
+            r(JSON.stringify({
+                scrolled: Math.round(scrollY),
+                open: m.classList.contains('open'),
+                top: Math.round(box.top),
+                bottom: Math.round(box.bottom),
+                left: Math.round(box.left),
+                right: Math.round(box.right),
+                insideViewport: box.top >= 0 && box.bottom <= innerHeight
+                                    && box.left >= 0 && box.right <= innerWidth,
+                inStickyHeader: m.offsetParent === document.querySelector('header'),
+                headerSticky: getComputedStyle(document.querySelector('header')).position
+            }));
+        }, 300));
+    })()`,
+    returnByValue: true,
+    awaitPromise: true
+});
+await send('Runtime.evaluate', { expression: `toggleMenu(); scrollTo(0,0)`, returnByValue: true });
+const menuState = JSON.parse(menu.result.value);
+
+console.log('--- the menu, scrolled to the bottom');
+console.log('  containing block', menuState.inStickyHeader ? 'the sticky header' : 'NOT the header');
+console.log('  header position  ', menuState.headerSticky);
+console.log('  still on screen  ', `${menuState.top}..${menuState.bottom}`);
+
 ws.close();
 
 console.log('--- page');
@@ -186,7 +223,11 @@ const must = [
     [state.aiView && state.settingsView && state.statsView, 'all three full screens are present'],
     [state.openAiBtn, 'the assistant entry point is in the header'],
     [panelState.visible && panelState.hasComposer, 'the panel opens with a composer'],
-    [draftState.steps === 2, 'Tier 0 built two steps with no key and no network']
+    [draftState.steps === 2, 'Tier 0 built two steps with no key and no network'],
+    [menuState.scrolled > 0, 'the page actually scrolled, so this is a real test'],
+    [menuState.inStickyHeader, 'the menu is anchored to the sticky header'],
+    [menuState.headerSticky === 'sticky', 'the header is sticky'],
+    [menuState.insideViewport, 'the menu is still on screen after scrolling']
 ];
 for (const [pass, what] of must) {
     if (!pass) { failed = true; console.log(`FAIL  ${what}`); }

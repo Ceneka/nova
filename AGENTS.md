@@ -624,6 +624,17 @@ the canvas or it gets cut in half on a real home screen.
   Design for the tokens and the rules behind them.
 - **Modals** all share `.modal-overlay` at `z-index: 200`; a nested modal must
   appear **later in `index.html`** to stack on top. Toasts are `z-index: 300`.
+- **`#theme-menu` lives INSIDE `<header>`, and that is load-bearing.** The
+  header is `position: sticky`, so it is the containing block for the
+  absolutely-positioned dropdown and the menu follows the page down. It used to
+  be a sibling of the header inside `.container`, which does not scroll — so
+  `top: 58px` meant 58px from the top of the *document*, and scrolled down the
+  menu opened ~170px above the viewport while the hamburger that opens it stayed
+  on screen. Tapping it appeared to do nothing. The suite checks the real
+  `index.html` for the relationship, and `tools/check-app.mjs` checks the
+  geometry on the real page. Note `right: 30px` on `.theme-menu`: the header has
+  a `-15px` margin and is therefore 30px wider than `.container`, and the menu
+  has to be pushed back to keep its right edge on the same pixel.
 - **The hamburger menu carries only drill actions** (download / export /
   import drills, Settings, About). Anything that is not an action you reach
   for mid-session belongs in the Settings screen (`js/settingsUi.js`), which is
@@ -737,7 +748,7 @@ node --test tests/*.test.mjs            # 90 unit tests, no dependencies
 tools/run-checks.sh
 ```
 
-Browser integration (471 checks, needs the HTTP server above):
+Browser integration (476 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
