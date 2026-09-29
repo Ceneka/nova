@@ -629,7 +629,40 @@ Two more headless traps in the same file, both of which hang rather than fail:
 
 The maskable icon is checked for real, by reading its pixels: a launcher may
 crop 10% off every edge, so the artwork has to stay inside the middle 80% of
-the canvas or it gets cut in half on a real home screen.
+the canvas or it gets cut in half on a real home screen. That check finds
+artwork by **brightness**, not by hue, and it has to stay that way. It used to
+skip any pixel whose blue or green was low, which was a way of saying "not the
+orange ball" and only held while the ball was the one warm thing on the icon -
+redraw the mark in the same family with a different accent and its warm half
+counts as background, and the check keeps passing while measuring nothing.
+
+### The icon
+
+`icons/icon.svg` and `icons/icon-maskable.svg` are the **sources**; the PNGs are
+committed and regenerated with `tools/make-icons.sh` (ImageMagick with the
+librsvg delegate, because its own MSVG renderer flattens the gradients). The
+two SVGs carry the same `<defs>` and the same artwork group, and **an edit to
+one is an edit to the other** - only the wrapper differs: `icon.svg` is
+full-bleed and untransformed, the maskable wraps the mark in
+`translate(256 256) scale(0.8) translate(-256 -256)` with the glow inside the
+scale so it stays behind the ball.
+
+The mark is tenisdemesa.ar's *style* - the dark low-chroma ground, one neon
+accent, monoline round caps, one warm counter-colour - and not its picture.
+Ball, table and dotted trail in the app's own mint (`--primary`) and amber
+(`--spin-top`). Things that are load-bearing rather than taste:
+
+- **A double hyphen inside an XML comment is a parse error**, so no CSS token
+  (`--primary`) can be named in a comment. rsvg fails with no useful line.
+- **The seam on the ball is two thin parallel light strokes, not a ring.** A
+  ring wide enough to reach the edge cuts the sphere in two at 32px, and a dark
+  one reads as the shadow the ball is sitting in.
+- **`stroke-dashoffset="8"` on the trail is arithmetic, not decoration.** The
+  path is 225 units long and the dash period is 76, so unphased the last dash
+  stops 43 units short and the trail dies in mid air.
+- **The maskable's scale is bounded by the table bar, not the ball.** The bar's
+  lower-left cap is the furthest point of anything drawn, and it alone decides
+  whether 0.8 of the radius is safe. The suite says so out loud.
 
 
 ## Conventions

@@ -2057,17 +2057,26 @@ ok('the browser tab has an icon', !!(await decode('icons/favicon-32.png')));
 /* --- the maskable icon survives the launcher's crop --- */
 // Android may crop 10% off every edge and some launchers take 20% off the
 // sides, so the artwork has to stay inside the middle 80% - a circle of radius
-// 0.4 * width, which is 0.8 of the half-width. The icon's artwork is the
-// white ball and the bright end of its trail; the orange gradient is not
-// artwork and is deliberately not measured. Red is ~255 throughout, so the
-// blue channel is the cleanest way to tell them apart.
+// 0.4 * width, which is 0.8 of the half-width.
+//
+// Measured by BRIGHTNESS, not by hue. The old test skipped any pixel whose
+// blue or green was low, which was a way of saying "not the orange ball" and
+// only held while the ball was the one warm thing on the icon: redraw the mark
+// in the same family with a different accent and its warm half gets counted as
+// background, and the check goes on passing while measuring almost nothing.
+// The ground here is a dark gradient with a mint lamp behind the mark, and its
+// brightest pixel is ~50; the dimmest stroke, the far table edge at half
+// opacity, is ~130. 110 sits between the two, and the result does not depend on
+// it: 60, 80, 110 and 140 all measure the same extent, because what binds is
+// the opaque table bar either way.
+const GROUND_MAX = 110;
 const artworkExtent = async (src) => {
     const px = pixels(await decode(src));
     let worst = 0, at = '';
     for (let y = 0; y < px.h; y += 2) {
         for (let x = 0; x < px.w; x += 2) {
             const i = (y * px.w + x) * 4;
-            if (px.data[i + 2] < 165 || px.data[i + 1] < 150) continue;   // background
+            if (Math.max(px.data[i], px.data[i + 1], px.data[i + 2]) < GROUND_MAX) continue;
             const dist = Math.hypot(x - px.w / 2, y - px.h / 2) / (px.w / 2);
             if (dist > worst) { worst = dist; at = `${x},${y}`; }
         }

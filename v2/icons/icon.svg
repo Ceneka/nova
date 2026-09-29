@@ -1,41 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Source for the app icon. Regenerate the PNGs with tools/make-icons.sh.
+
+  The style is tenisdemesa.ar's: the dark low-chroma ground, one bright neon
+  accent, monoline geometry, and a single hot counter-colour. The mark is this
+  app's own - a ball leaving the machine on a programmed trajectory - so the two
+  read as one brand without being one image.
+
   Full-bleed square on purpose: the platform supplies its own mask, and a
   rounded rect here would be rounded a second time on Android.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Nova Drill Control">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#ff8a5c"/>
-      <stop offset="0.55" stop-color="#ff6b4a"/>
-      <stop offset="1" stop-color="#ef4b21"/>
+    <!-- The site's own background token, warmed very slightly toward the
+         accent so the neon has something to sit on instead of pure black. -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#111c18"/>
+      <stop offset="1" stop-color="#070b0a"/>
     </linearGradient>
-    <!-- A lit sphere, not a flat disc: the highlight is what sells it at 32px. -->
-    <radialGradient id="ball" cx="0.34" cy="0.3" r="0.85">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#fff6f1"/>
-      <stop offset="1" stop-color="#eec4b1"/>
+    <!-- One soft lamp behind the ball. Without it a dark icon is a black
+         square on a black home screen; with it the mark carries its own glow. -->
+    <radialGradient id="glow" cx="0.65" cy="0.36" r="0.62">
+      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.20"/>
+      <stop offset="0.55" stop-color="#40e2a7" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#40e2a7" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="trail" x1="0" y1="0.35" x2="1" y2="0.65">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.3"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0.85"/>
+    <!-- The ball is the app's amber, the one warm thing in an icon that is
+         otherwise all mint. Lit from the upper left, like every sphere. -->
+    <radialGradient id="ball" cx="0.32" cy="0.26" r="0.95">
+      <stop offset="0" stop-color="#ffe6b8"/>
+      <stop offset="0.35" stop-color="#f5a93f"/>
+      <stop offset="1" stop-color="#b86407"/>
+    </radialGradient>
+    <linearGradient id="trail" gradientUnits="userSpaceOnUse" x1="116" y1="362" x2="288" y2="228">
+      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#40e2a7" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#6df3c1"/>
     </linearGradient>
-    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#7d2409" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#7d2409" stop-opacity="0"/>
-    </radialGradient>
   </defs>
 
   <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
 
-  <!-- The mark is nudged so the ball + trail sit optically centred, not
-       mathematically centred: the trail drags the mass to the lower left. -->
-  <g transform="translate(27 -11)">
-    <path d="M74 420 Q178 404 234 272"
-          fill="none" stroke="url(#trail)" stroke-width="24" stroke-linecap="round"/>
-    <ellipse cx="308" cy="300" rx="104" ry="46" fill="url(#shadow)"/>
-    <circle cx="298" cy="204" r="100" fill="url(#ball)"/>
+  <!-- Measured, not guessed: drawn dead centre the mark sits ~12px high,
+       because the ball is the only mass up there and the table is a hairline.
+       The nudge is in one place so icon-maskable.svg scales the same artwork. -->
+  <g transform="translate(0 12)">
+    <!-- The table in the site's own two-bar perspective: far edge, the net,
+         then the near edge. The far edge stops short of the trail on purpose,
+         so nothing crosses a stroke but the ball. -->
+    <path d="M176 324 H384" fill="none" stroke="#40e2a7" stroke-opacity="0.62"
+          stroke-width="15" stroke-linecap="round"/>
+    <path d="M256 324 V390" fill="none" stroke="#40e2a7" stroke-opacity="0.62"
+          stroke-width="12" stroke-linecap="round"/>
+    <path d="M88 390 H424" fill="none" stroke="#40e2a7" stroke-width="27"
+          stroke-linecap="round"/>
+
+    <!-- Dashes, not a smear. A drill is the same ball over and over, and the
+         rhythm is the whole difference between a trajectory and a machine.
+         The dashoffset is not decoration: the path is 225 units long and the
+         period is 76, so unphased the last dash stops 43 units short and the
+         trail dies in mid air. At 8 the run lands under the ball. -->
+    <path d="M116 362 C 132 318 178 266 288 228" fill="none" stroke="url(#trail)"
+          stroke-width="28" stroke-linecap="round" stroke-dasharray="30 46"
+          stroke-dashoffset="8"/>
+
+    <!-- The ball, and the seam across it. Two thin parallel strokes on the
+         near face, which is how the site's own icon draws its ball: a ring
+         wide enough to reach the edge cuts the sphere in two at 32px, and a
+         single wide arc reads as a highlight rather than a seam. -->
+    <circle cx="334" cy="182" r="78" fill="url(#ball)"/>
+    <g stroke="#fff1d6" stroke-width="10" stroke-linecap="round" stroke-opacity="0.62" fill="none">
+      <path d="M290 232 L322 200"/>
+      <path d="M314 248 L346 216"/>
+    </g>
   </g>
 </svg>
