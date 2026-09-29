@@ -273,10 +273,13 @@ export async function completeSignIn({ code, state } = {}) {
             pending = null;
         }
     }
-    if (pending?.state && state && pending.state !== state) {
+    if (!pending?.verifier) return { ok: false, error: 'no_pending_signin' };
+    // Strict, and after the pending check so a missing sign-in still reports as
+    // one. A callback with NO state is not "no opinion" - it is a callback that
+    // skipped the check, so it is refused like any other mismatch.
+    if (!state || pending.state !== state) {
         return { ok: false, error: 'state_mismatch' };
     }
-    if (!pending?.verifier) return { ok: false, error: 'no_pending_signin' };
 
     const redirectUri = new URL(CALLBACK_PATH, location.href).toString();
     const response = await fetch(apiUrl('/api/nova/auth/token'), {
@@ -287,7 +290,9 @@ export async function completeSignIn({ code, state } = {}) {
             code,
             code_verifier: pending.verifier,
             redirect_uri: redirectUri,
-            state,
+            // No `state`: the server does not and cannot check it. The
+            // comparison above is the check, and PKCE is what protects the
+            // redemption on the server side.
             device: deviceLabel()
         })
     });

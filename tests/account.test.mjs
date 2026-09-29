@@ -218,6 +218,19 @@ test('a callback whose state does not match is refused', async () => {
     assert.equal(result.error, 'state_mismatch');
 });
 
+test('a callback with NO state is refused, not waved through', async () => {
+    // The lenient form of this check - "only compare when both are present" -
+    // reads like a convenience and is a bypass: omitting the parameter skipped
+    // the comparison altogether, and the parameter is attacker-controlled.
+    reset();
+    session.setItem('nova_account_pending', JSON.stringify({
+        verifier: 'v', state: 'the-real-one', returnTo: './'
+    }));
+    const result = await account.completeSignIn({ code: 'abc' });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'state_mismatch');
+});
+
 test('the pending entry is consumed even when the state is wrong', async () => {
     // Otherwise a mismatched callback could be replayed until one landed.
     reset();
