@@ -202,6 +202,70 @@ console.log('  containing block', menuState.inStickyHeader ? 'the sticky header'
 console.log('  header position  ', menuState.headerSticky);
 console.log('  still on screen  ', `${menuState.top}..${menuState.bottom}`);
 
+// Every screen, checked for boxes that reach past the edge of the screen.
+//
+// The honest test is an element's RECT against the viewport, not
+// `documentElement.scrollWidth`. The overflowing boxes here all live inside
+// `position: fixed` overlays, and a fixed overlay does not widen the document -
+// so the document stayed an honest 430px while 32px of every settings row sat
+// off-screen and unreachable. It is also the only formulation that gets the
+// full-bleed main header right: it spans 0..430 by design, with negative
+// margins, and is not a bug.
+const OVERFLOW_AUDIT = `(() => {
+    const bad = [];
+    document.querySelectorAll('body *').forEach(el => {
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0) return;
+        if (r.right > innerWidth + 0.5 || r.left < -0.5) {
+            const name = (el.id ? '#' + el.id : '')
+                + (typeof el.className === 'string' && el.className
+                    ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName);
+            bad.push(name + ' ' + Math.round(r.left) + '..' + Math.round(r.right)
+                + ' (w=' + Math.round(r.width) + ', pad=' + cs.paddingLeft + '/' + cs.paddingRight + ')');
+        }
+    });
+    return [...new Set(bad)];
+})()`;
+
+const SCREENS = [
+    ['the drill list', `null`],
+    ['the IA tab', `window.switchTab('ia')`],
+    ['the editor', `openEditor('push(b)')`],
+    ['the preset sheet', `window.openPresetSheet()`],
+    ['save as', `document.getElementById('save-as-modal').classList.add('open')`],
+    ['download drill', `document.getElementById('download-modal').classList.add('open')`],
+    ['the session summary', `document.getElementById('summary-modal').classList.add('open')`],
+    ['about', `window.openAboutModal()`],
+    ['settings', `window.openSettings()`],
+    ['statistics', `window.openStatsView()`],
+    ['the assistant', `window.openAiView()`]
+];
+
+const overflows = [];
+console.log('--- nothing may reach past the edge of the screen');
+for (const width of [320, 430]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 932, deviceScaleFactor: 1, mobile: true });
+    for (const [name, open] of SCREENS) {
+        if (open !== 'null') await send('Runtime.evaluate', { expression: open, returnByValue: true });
+        await new Promise(r => setTimeout(r, 220));
+        const r = await send('Runtime.evaluate', { expression: OVERFLOW_AUDIT, returnByValue: true });
+        const bad = r.result.value || [];
+        if (bad.length) overflows.push(`${width}px ${name}: ${bad.slice(0, 3).join(' | ')}`);
+        await send('Runtime.evaluate', {
+            expression: `window.closeEditor && closeEditor(); window.closePresetSheet && closePresetSheet();
+                ['save-as-modal','download-modal','summary-modal','about-modal']
+                    .forEach(id => document.getElementById(id)?.classList.remove('open'));
+                window.closeSettings(); window.closeStatsView(); window.closeAiView();`,
+            returnByValue: true
+        });
+    }
+}
+console.log(overflows.length
+    ? overflows.map(o => '  OVERFLOW  ' + o).join('\n')
+    : `  ${SCREENS.length} screens x 2 widths, nothing past the edge`);
+
 // Settings: the screen you land on. It had grown to 2.8 phone screens of 29
 // always-visible rows, the AI section alone being sixteen flat siblings. Each
 // section is a <details> now, so the cost of the long ones is one row.
@@ -323,6 +387,7 @@ const must = [
     [settingsState.groups === 8, 'settings is eight collapsible groups'],
     [settingsState.open === 2, 'only the two common groups are expanded'],
     [settingsState.smallestRow >= 44, 'every settings row is a usable tap target'],
+    [overflows.length === 0, `no screen has a box past the edge (${overflows[0] || 'all clean'})`],
     ...headerWidths.map(h => [
         !h.overlap && h.groupInside && h.scrollW <= h.win + 1 && h.titleCentre === h.viewCentre,
         `the header is clean at ${h.width}px (gap ${h.gap}px)`

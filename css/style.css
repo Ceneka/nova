@@ -2750,3 +2750,50 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 @media (prefers-reduced-motion: reduce) {
     .settings-group-chev { transition: none; }
 }
+
+/* ==========================================================================
+   Boxes that are wider than their parent
+   ==========================================================================
+
+   `box-sizing` is content-box in this file by design (see `.modal-overlay`:
+   it is applied there explicitly for the same reason as here), so any element
+   with a width AND horizontal padding renders `padding` wider than it asked
+   for. That is invisible until the parent is exactly the viewport width, and
+   then the right-hand side is simply off-screen and unreachable - the page
+   does not even scroll, because the overflowing box is inside a
+   `position: fixed` overlay, which is why `documentElement.scrollWidth` stays
+   honest while the content is clipped.
+
+   Measured on a 430px phone, all of these were over:
+     .settings-shell   +32px   Settings, Statistics and the assistant panel
+     .about-site       +30px   the About box, clipped by .modal's overflow
+     .mode-switch       +8px   the reps/time switch, on the drill list
+     input[type=number] +4px   the count and pause fields
+
+   Fixed by applying `border-box` to the offenders themselves rather than
+   globally: a global reset at this point would re-lay-out every element in
+   the app, and the one place it has already been applied is a single line with
+   a comment explaining why. `tools/check-app.mjs` now audits every element on
+   the real page for "border box wider than its parent's content box", so the
+   next one of these is caught by a check instead of by somebody's phone. */
+
+.settings-shell,
+.about-site,
+.mode-switch,
+input[type="number"],
+.control-pill,
+.drill-list > * {
+    box-sizing: border-box;
+}
+
+/* The share-code and drill-name fields had no width rule at all, so they took
+   the UA default of ~20 characters - which at their inline 1.6rem and 1.2rem
+   font sizes is 350px and 262px, inside a modal that has 255px of content on
+   a 320px phone. `.modal` is `overflow: hidden`, so the right-hand end of both
+   fields was cut off with no way to scroll to it. `width: 100%` plus
+   border-box is what every other full-width input in this app already does. */
+#dl-code,
+#save-name {
+    width: 100%;
+    box-sizing: border-box;
+}

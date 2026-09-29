@@ -37,6 +37,7 @@ tools/make-icons.sh regenerates icons/*.png. Not part of the build
 tools/run-checks.sh both deploy gates in one command
 tools/check-app.mjs boots the real index.html over CDP
 tools/screenshots.mjs regenerates images/*.png for the README
+#   check-app.mjs also audits every screen for boxes past the edge
 tools/live-check.mjs one live call against a real endpoint, BYOK
 css/style.css       all styling, one file, CSS custom properties per theme
 fonts/              self-hosted DM Sans + JetBrains Mono woff2, see Design
@@ -648,6 +649,28 @@ the canvas or it gets cut in half on a real home screen.
   breakpoint is arithmetic, not taste: the clear space is `viewport/2 - 210px`,
   so under ~453px the full name and two 40px buttons cannot both fit. They
   overlapped by 7px on a 375px iPhone SE before this.
+- **`box-sizing` is content-box here, and width + padding therefore overflows.**
+  It is not global in this file, deliberately, and `.modal-overlay` already
+  carries an explicit `box-sizing: border-box` with a comment saying why. The
+  trap is any element with a width AND horizontal padding: it renders
+  `padding` wider than it asked for, and the moment its parent is the viewport
+  width the right-hand side is off-screen and unreachable. Found on a 430px
+  phone, all of it invisible to `documentElement.scrollWidth` - the offending
+  boxes are inside `position: fixed` overlays, which do not widen the document,
+  so the document stayed an honest 430px while 32px of every settings row sat
+  off screen:
+  - `.settings-shell` **+32px** - Settings, Statistics and the assistant panel
+  - `.about-site` **+30px** - the About box, clipped by `.modal`'s overflow
+  - `#dl-code` and `#save-name` **up to 100px** - no width rule at all, so they
+    took the UA default of ~20 characters, which at their inline 1.6rem and
+    1.2rem font sizes is 350px and 262px inside a 255px modal
+  - `.mode-switch` and `input[type=number]`, +8 and +4
+
+  **The test that finds this class is an element RECT against the viewport**,
+  per screen, in `tools/check-app.mjs` - not `scrollWidth`, which is blind to
+  fixed overlays, and not a parent-relative comparison, which wrongly flags the
+  full-bleed main header, which spans the viewport on purpose via negative
+  margins. Eleven screens at two widths.
 - **Settings is a list of `<details>` groups, not one column.** It had reached
   2.8 phone screens of 29 always-visible rows, and the AI section alone was
   sixteen flat siblings with nothing to say which four were the text model and
