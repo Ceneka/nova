@@ -648,6 +648,29 @@ the canvas or it gets cut in half on a real home screen.
   breakpoint is arithmetic, not taste: the clear space is `viewport/2 - 210px`,
   so under ~453px the full name and two 40px buttons cannot both fit. They
   overlapped by 7px on a 375px iPhone SE before this.
+- **Settings is a list of `<details>` groups, not one column.** It had reached
+  2.8 phone screens of 29 always-visible rows, and the AI section alone was
+  sixteen flat siblings with nothing to say which four were the text model and
+  which three were behaviour toggles. Each section is a native `<details>`
+  with a 64px summary; two start open, the rest cost one row. Native rather
+  than a div + class because it brings keyboard support, the open state in the
+  a11y tree, and no JavaScript to keep working.
+  Two rules that are load-bearing:
+  - **The open state is read from the live DOM at the START of `renderSettings`,
+    not from a `toggle` listener.** `toggle` is queued as a task, so after a
+    click it has not run yet when the re-render that follows synchronously
+    executes - the state was always one render stale and the group a user had
+    just opened snapped shut. The suite checks this by opening a group that is
+    NOT open by default; testing one of the two defaults proves nothing,
+    because the `open` attribute restores it either way.
+  - **Every closed group carries a live status note** ("8 in your library",
+    "Not set up", "Ready offline"). A collapsed row you cannot read is just a
+    row, and the list still has to be scannable.
+  `.settings-section-title` is deliberately NOT reused for the summary -
+  `statsUi.js` uses it too, and restyling it there would be an unasked-for
+  change. Pixel claims are measured in `tools/check-app.mjs`, not the suite,
+  because the harness page has no `<meta name="viewport">` and its inner height
+  is not a phone's.
 - **The hamburger menu carries only drill actions** (download / export /
   import drills, Settings, About). Anything that is not an action you reach
   for mid-session belongs in the Settings screen (`js/settingsUi.js`), which is
@@ -761,7 +784,7 @@ node --test tests/*.test.mjs            # 90 unit tests, no dependencies
 tools/run-checks.sh
 ```
 
-Browser integration (479 checks, needs the HTTP server above):
+Browser integration (491 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

@@ -2646,3 +2646,107 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     line-height: 1.4;
     text-align: center;
 }
+
+/* ==========================================================================
+   Settings, as a list of groups you open
+   ==========================================================================
+
+   Settings had grown to 2.8 phone-screens of 29 rows, and the AI section alone
+   was SIXTEEN flat siblings with nothing to say which four were the text model
+   and which three were behaviour toggles. A column that long is not a list, it
+   is a wall.
+
+   So each section is a native <details>: a 52px summary you can actually hit
+   with a thumb, and the contents only when you want them. Native rather than a
+   div + class, because it brings keyboard support, the open state in the a11y
+   tree, and no JavaScript to keep working. The chevron is CSS; the open state
+   is persisted in JS ONLY so that a re-render - which happens on every
+   presets-updated / stats-updated / locale-changed - does not snap the screen
+   shut under the user who just opened something.
+
+   `.settings-section-title` is deliberately NOT reused: statsUi.js uses it too,
+   and restyling it there would be a change nobody asked for. */
+
+.settings-group {
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    overflow: hidden;
+}
+.settings-group:first-of-type { margin-top: 0; }
+
+.settings-group-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* min-height is the CONTENT box here - box-sizing is not global in this
+       file - so 44 + 20 of padding is a 64px row. Comfortably above every
+       tap-target minimum in the app, and eight of them fit one phone screen. */
+    min-height: 44px;
+    padding: 10px 14px;
+    cursor: pointer;
+    list-style: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.settings-group-head::-webkit-details-marker { display: none; }
+.settings-group-head::marker { content: ''; }
+.settings-group-head:active { background: var(--accent-fill); }
+
+.settings-group-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    /* A title long enough to wrap must not push the note off the row. */
+    overflow-wrap: anywhere;
+}
+/* The live status, so a CLOSED group still says what is in it. That is the
+   difference between a list you can scan and a list you have to open eight
+   times to find out. */
+.settings-group-note {
+    flex: 0 1 auto;
+    max-width: 45%;
+    font-size: 0.72rem;
+    color: var(--text-light);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.settings-group-chev {
+    flex-shrink: 0;
+    color: var(--text-light);
+    transition: transform var(--trans-speed);
+}
+.settings-group[open] .settings-group-chev { transform: rotate(90deg); }
+.settings-group[open] .settings-group-note { opacity: 0.55; }
+
+.settings-group-body { padding: 0 14px 14px; }
+/* The old section spacing is the group's job now. */
+.settings-group-body > .settings-section:first-child,
+.settings-group-body > .settings-section:first-of-type { margin-top: 0; }
+.settings-group-body .ai-note:first-child { margin-top: 0; }
+
+/* --- sub-groups inside the AI section --------------------------------------
+   The sixteen siblings become three things: what the model is, what the voice
+   is, and when it is allowed to listen. */
+.ai-subgroup { margin: 18px 0 2px; }
+.ai-subgroup:first-child { margin-top: 6px; }
+.ai-subgroup-title {
+    display: block;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+/* The divider between sub-groups, so the eye can chunk sixteen rows into
+   three. The first one does not get a rule above it. */
+.ai-subgroup + .ai-subgroup { border-top: 1px solid var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-group-chev { transition: none; }
+}

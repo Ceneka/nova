@@ -181,6 +181,8 @@ function aiSettingsHtml() {
     return `
         <section class="settings-section" data-section="ai">
             <div class="settings-section-title">${t('settingsAi.section')}</div>
+
+            <span class="ai-subgroup-title">${t('settingsAi.groupModel')}</span>
             <div class="settings-row" data-row="ai-text">
                 <div class="settings-row-main">
                     <div class="settings-row-title">${t('settingsAi.textModel')}</div>
@@ -222,6 +224,7 @@ function aiSettingsHtml() {
                 <div class="ai-test-result" data-ai-test></div>
             </div>
 
+            <div class="ai-subgroup"><span class="ai-subgroup-title">${t('settingsAi.groupVoice')}</span></div>
             <div class="ai-toggle-row" data-row="ai-voice-mode">
                 <div class="settings-row-main">
                     <div class="settings-row-title">${t('settingsAi.voiceModel')}</div>
@@ -268,6 +271,7 @@ function aiSettingsHtml() {
                 </select>
             </div>
 
+            <div class="ai-subgroup"><span class="ai-subgroup-title">${t('settingsAi.groupBehaviour')}</span></div>
             <div class="ai-toggle-row" data-row="ai-screen-lock">
                 <div class="settings-row-main">
                     <div class="settings-row-title">${t('ai.screenLock')}</div>
@@ -330,10 +334,81 @@ function aiSettingsHtml() {
         </section>`;
 }
 
+/**
+ * Which groups the user has opened.
+ *
+ * `renderSettings()` is called on `presets-updated`, `stats-updated`,
+ * `pwa-state-changed` and `locale-changed`, and it rebuilds the whole body from
+ * a template. Without this, tapping a theme would snap every group shut - the
+ * screen would close itself under the user's thumb, which is worse than the
+ * long page it replaced. Two groups start open because they are the two things
+ * people open Settings for, and both are a single tap of content.
+ */
+const openGroups = new Set(['appearance', 'language']);
+
+const CHEVRON = `<svg class="settings-group-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+/**
+ * One collapsible group. `note` is the live status shown on the closed row, so
+ * the screen can be scanned without opening anything.
+ */
+const group = (id, titleKey, bodyHtml, note = '') => `
+    <details class="settings-group" data-group="${id}"${openGroups.has(id) ? ' open' : ''}>
+        <summary class="settings-group-head">
+            <span class="settings-group-title">${t(titleKey)}</span>
+            ${note ? `<span class="settings-group-note">${note}</span>` : ''}
+            ${CHEVRON}
+        </summary>
+        <div class="settings-group-body">${bodyHtml}</div>
+    </details>`;
+
+/**
+ * Remember which groups are open, by reading them BEFORE the body is
+ * overwritten.
+ *
+ * The obvious version - a `toggle` listener per group - is wrong, and the
+ * suite caught it: `toggle` is queued as a task, so it has not run yet when the
+ * `click` that caused it is followed synchronously by a re-render. The state
+ * was therefore always one render stale, and the group a user had just opened
+ * snapped shut. Reading the live DOM here is synchronous and cannot be.
+ *
+ * On the very first render the body is empty, so the defaults in `openGroups`
+ * stand - which is what "two groups start open" means.
+ */
+function captureOpenGroups(root) {
+    const found = root.querySelectorAll('details.settings-group');
+    if (!found.length) return;
+    openGroups.clear();
+    for (const d of found) {
+        if (d.open) openGroups.add(d.dataset.group);
+    }
+}
+
 /** Render the whole screen. Cheap enough to redraw after any change. */
+export /**
+ * What the closed "AI assistant" row says. The point of a collapsed group is
+ * that you can still read it, so this has to be the answer to "is it set up?"
+ * without opening anything.
+ */
+function aiGroupNote(config) {
+    if (!isTextConfigured()) return t('settingsAi.notConfigured');
+    return config.text.model || t('settingsAi.configured');
+}
+
+/** The same idea for the App group: installable, offline-ready, or neither. */
+function appGroupNote() {
+    const state = getInstallState();
+    if (state === 'installed') return t('settings.installed');
+    if (isOfflineReady()) return t('settings.offlineReadyShort');
+    return t('settings.offlinePreparingShort');
+}
+
 export function renderSettings() {
     const body = document.getElementById('settings-body');
     if (!body) return;
+
+    // Read what is open now, before the template replaces it all.
+    captureOpenGroups(body);
 
     const active = currentTheme();
     const presetCount = getPresets().length;
@@ -350,117 +425,102 @@ export function renderSettings() {
         </button>`).join('');
 
     body.innerHTML = `
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.appearance')}</div>
-            <div class="theme-grid">${themeCards}</div>
-        </section>
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.language')}</div>
-            ${languageRowHtml()}
-        </section>
-
-        ${aiSettingsHtml()}
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.presets')}</div>
-            <div class="settings-row" data-row="manage-presets">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.managePresets')}</div>
-                    <div class="settings-row-desc">${t('settings.presetsInLibrary', { n: presetCount })}</div>
-                </div>
-                <button class="settings-btn" onclick="window.openPresetSheet()">${t('action.open')}</button>
-            </div>
-            <div class="settings-row" data-row="export-presets-json">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.exportPresets')}</div>
-                    <div class="settings-row-desc">${t('settings.exportPresetsJsonDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.exportPresetsJSON()">JSON</button>
-            </div>
-            <div class="settings-row" data-row="export-presets-csv">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.exportPresets')}</div>
-                    <div class="settings-row-desc">${t('settings.exportPresetsCsvDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.exportPresetsCSV()">CSV</button>
-            </div>
-            <div class="settings-row" data-row="import-presets">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.importPresets')}</div>
-                    <div class="settings-row-desc">${t('settings.importPresetsDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.handlePresetImportPick()">${t('action.import')}</button>
-            </div>
-            <div class="settings-row" data-row="reset-presets">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.resetPresets')}</div>
-                    <div class="settings-row-desc">${t('settings.resetPresetsDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.handleResetPresets()">${t('action.reset')}</button>
-            </div>
-        </section>
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.drills')}</div>
-            <div class="settings-row" data-row="save-default">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.saveAsDefault')}</div>
-                    <div class="settings-row-desc">${t('settings.saveAsDefaultDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.saveAsDefault()">${t('action.save')}</button>
-            </div>
-            <div class="settings-row" data-row="restore-default">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.restoreDefaults')}</div>
-                    <div class="settings-row-desc">${t('settings.restoreDefaultsDesc')}</div>
-                </div>
-                <button class="settings-btn" onclick="window.resetToDefault()">${t('action.restore')}</button>
-            </div>
-        </section>
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.statistics')}</div>
-            <div class="settings-row" data-row="open-stats">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.trainingHistory')}</div>
-                    <div class="settings-row-desc">${t('settings.trainingHistoryDesc', { n: sessionCount })}</div>
-                </div>
-                <button class="settings-btn" onclick="window.openStatsFromSettings()">${t('action.open')}</button>
-            </div>
-        </section>
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.app')}</div>
-            ${installRowHtml()}
-            <div class="settings-row" data-row="offline-ready">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.offlineUse')}</div>
-                    <div class="settings-row-desc">${isOfflineReady()
-                        ? t('settings.offlineReady')
-                        : t('settings.offlinePreparing')}</div>
-                </div>
-            </div>
-        </section>
-
-        <section class="settings-section">
-            <div class="settings-section-title">${t('settings.data')}</div>
-            <div class="settings-row" data-row="reset-stats">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.resetStats')}</div>
-                    <div class="settings-row-desc danger-text">${t('settings.resetStatsDesc', { balls: appStats.balls, drills: appStats.drills })}</div>
-                </div>
-                <button class="settings-btn" onclick="window.resetStats()">${t('action.reset')}</button>
-            </div>
-            <div class="settings-row" data-row="factory-reset">
-                <div class="settings-row-main">
-                    <div class="settings-row-title">${t('settings.factoryReset')}</div>
-                    <div class="settings-row-desc danger-text">${t('settings.factoryResetDesc')}</div>
-                </div>
-                <button class="settings-btn danger" onclick="window.factoryReset()">${t('action.erase')}</button>
-            </div>
-        </section>
-
+                ${group('appearance', 'settings.appearance', `
+                        <div class="theme-grid">${themeCards}</div>
+        `, t(`theme.${active}`))}
+        ${group('language', 'settings.language', `
+                        ${languageRowHtml()}
+        `, t(`lang.${getLang()}`))}
+        ${group('ai', 'settingsAi.section', `${aiSettingsHtml()}`, aiGroupNote(getAiConfig()))}
+        ${group('presets', 'settings.presets', `
+                        <div class="settings-row" data-row="manage-presets">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.managePresets')}</div>
+                                <div class="settings-row-desc">${t('settings.presetsInLibrary', { n: presetCount })}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.openPresetSheet()">${t('action.open')}</button>
+                        </div>
+                        <div class="settings-row" data-row="export-presets-json">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.exportPresets')}</div>
+                                <div class="settings-row-desc">${t('settings.exportPresetsJsonDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.exportPresetsJSON()">JSON</button>
+                        </div>
+                        <div class="settings-row" data-row="export-presets-csv">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.exportPresets')}</div>
+                                <div class="settings-row-desc">${t('settings.exportPresetsCsvDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.exportPresetsCSV()">CSV</button>
+                        </div>
+                        <div class="settings-row" data-row="import-presets">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.importPresets')}</div>
+                                <div class="settings-row-desc">${t('settings.importPresetsDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.handlePresetImportPick()">${t('action.import')}</button>
+                        </div>
+                        <div class="settings-row" data-row="reset-presets">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.resetPresets')}</div>
+                                <div class="settings-row-desc">${t('settings.resetPresetsDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.handleResetPresets()">${t('action.reset')}</button>
+                        </div>
+        `, t('settings.presetsInLibrary', { n: presetCount }))}
+        ${group('drills', 'settings.drills', `
+                        <div class="settings-row" data-row="save-default">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.saveAsDefault')}</div>
+                                <div class="settings-row-desc">${t('settings.saveAsDefaultDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.saveAsDefault()">${t('action.save')}</button>
+                        </div>
+                        <div class="settings-row" data-row="restore-default">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.restoreDefaults')}</div>
+                                <div class="settings-row-desc">${t('settings.restoreDefaultsDesc')}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.resetToDefault()">${t('action.restore')}</button>
+                        </div>
+        `, )}
+        ${group('statistics', 'settings.statistics', `
+                        <div class="settings-row" data-row="open-stats">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.trainingHistory')}</div>
+                                <div class="settings-row-desc">${t('settings.trainingHistoryDesc', { n: sessionCount })}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.openStatsFromSettings()">${t('action.open')}</button>
+                        </div>
+        `, t('settings.sessionCount', { n: sessionCount }))}
+        ${group('app', 'settings.app', `
+                        ${installRowHtml()}
+                        <div class="settings-row" data-row="offline-ready">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.offlineUse')}</div>
+                                <div class="settings-row-desc">${isOfflineReady()
+                                    ? t('settings.offlineReady')
+                                    : t('settings.offlinePreparing')}</div>
+                            </div>
+                        </div>
+        `, appGroupNote())}
+        ${group('data', 'settings.data', `
+                        <div class="settings-row" data-row="reset-stats">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.resetStats')}</div>
+                                <div class="settings-row-desc danger-text">${t('settings.resetStatsDesc', { balls: appStats.balls, drills: appStats.drills })}</div>
+                            </div>
+                            <button class="settings-btn" onclick="window.resetStats()">${t('action.reset')}</button>
+                        </div>
+                        <div class="settings-row" data-row="factory-reset">
+                            <div class="settings-row-main">
+                                <div class="settings-row-title">${t('settings.factoryReset')}</div>
+                                <div class="settings-row-desc danger-text">${t('settings.factoryResetDesc')}</div>
+                            </div>
+                            <button class="settings-btn danger" onclick="window.factoryReset()">${t('action.erase')}</button>
+                        </div>
+        `, )}
         <div class="settings-foot">${t('settings.foot')}</div>`;
 }
 

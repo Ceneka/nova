@@ -202,6 +202,40 @@ console.log('  containing block', menuState.inStickyHeader ? 'the sticky header'
 console.log('  header position  ', menuState.headerSticky);
 console.log('  still on screen  ', `${menuState.top}..${menuState.bottom}`);
 
+// Settings: the screen you land on. It had grown to 2.8 phone screens of 29
+// always-visible rows, the AI section alone being sixteen flat siblings. Each
+// section is a <details> now, so the cost of the long ones is one row.
+//
+// Measured at a PHONE size on purpose: this tool otherwise runs in whatever
+// window the browser happened to open, and a desktop-shaped viewport would
+// quietly turn "does it fit on a phone" into a question about a different
+// device entirely.
+await send('Emulation.setDeviceMetricsOverride', { width: 430, height: 932, deviceScaleFactor: 1, mobile: true });
+await send('Page.reload', { ignoreCache: true });
+await new Promise(r => setTimeout(r, 900));
+await send('Runtime.evaluate', { expression: `window.openSettings()`, returnByValue: true });
+await new Promise(r => setTimeout(r, 600));
+const settings = await send('Runtime.evaluate', {
+    expression: `JSON.stringify({
+        height: document.getElementById('settings-body').scrollHeight,
+        viewport: window.innerHeight,
+        screens: +(document.getElementById('settings-body').scrollHeight / window.innerHeight).toFixed(2),
+        groups: document.querySelectorAll('#settings-body details.settings-group').length,
+        open: document.querySelectorAll('#settings-body details[open]').length,
+        rows: document.querySelectorAll('#settings-body .settings-row, #settings-body .ai-field, #settings-body .ai-toggle-row').length,
+        smallestRow: Math.min(...[...document.querySelectorAll('#settings-body .settings-group-head')]
+            .map(h => Math.round(h.getBoundingClientRect().height)))
+    })`,
+    returnByValue: true
+});
+await send('Runtime.evaluate', { expression: `window.closeSettings()`, returnByValue: true });
+const settingsState = JSON.parse(settings.result.value);
+
+console.log('--- settings, on arrival');
+console.log(`  ${settingsState.screens} screens (${settingsState.height}px of ${settingsState.viewport})`);
+console.log(`  ${settingsState.groups} groups, ${settingsState.open} open, ${settingsState.rows} rows behind them`);
+console.log(`  smallest summary row: ${settingsState.smallestRow}px`);
+
 // The header: the title is centred and the two 40px controls float over its
 // right margin, so the two must never touch. They did, by 7px, on a 375px
 // iPhone SE - which is why the name has a short form below 460px.
@@ -285,6 +319,10 @@ const must = [
     [menuState.insideViewport, 'the menu is still on screen after scrolling'],
     // The header crowd the assistant's mic introduced: the title and the two
     // floating controls must never touch, and the title must stay centred.
+    [settingsState.screens <= 1.05, `settings lands in one screen (${settingsState.screens})`],
+    [settingsState.groups === 8, 'settings is eight collapsible groups'],
+    [settingsState.open === 2, 'only the two common groups are expanded'],
+    [settingsState.smallestRow >= 44, 'every settings row is a usable tap target'],
     ...headerWidths.map(h => [
         !h.overlap && h.groupInside && h.scrollW <= h.win + 1 && h.titleCentre === h.viewCentre,
         `the header is clean at ${h.width}px (gap ${h.gap}px)`

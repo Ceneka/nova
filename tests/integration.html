@@ -610,17 +610,84 @@ ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden
 ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
 eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
 eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
-eq('eight sections, language and the AI assistant among them',
-   document.querySelectorAll('#settings-body .settings-section').length, 8);
-ok('the AI assistant has its own section',
-   !!document.querySelector('#settings-body [data-section="ai"]'));
-ok('and it sits above Presets, which is where the plan puts it',
-   (() => {
-       const ai = document.querySelector('#settings-body [data-section="ai"]');
-       const presets = [...document.querySelectorAll('#settings-body .settings-section')]
-           .find(s => s.textContent.includes('Manage presets'));
-       return !!(ai && presets) && (ai.compareDocumentPosition(presets) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-   })());
+// Settings is a list of collapsible groups, not one long column. It had grown
+// to 2.8 phone screens of 29 rows, with the AI section alone being sixteen flat
+// siblings. These assert the shape, because the shape is the fix.
+const settingsGroups = [...document.querySelectorAll('#settings-body details.settings-group')];
+eq('eight collapsible settingsGroups', settingsGroups.length, 8);
+eq('in a deliberate order',
+   settingsGroups.map(g => g.dataset.group).join(','),
+   'appearance,language,ai,presets,drills,statistics,app,data');
+ok('each is a real <details>, so it works with the keyboard and no JS',
+   settingsGroups.every(g => g.tagName === 'DETAILS' && !!g.querySelector('summary.settings-group-head')));
+ok('every row is a comfortable tap target',
+   settingsGroups.every(g => g.querySelector('.settings-group-head').getBoundingClientRect().height >= 44),
+   settingsGroups.map(g => Math.round(g.querySelector('.settings-group-head').getBoundingClientRect().height)).join('/'));
+
+// A closed group still has to say what is in it, or the list cannot be scanned.
+// Matched against the LIVE counts rather than literals: several checks above
+// add and remove presets, so a hard-coded "8" would fail for the right reason
+// at the wrong time.
+const groupNotes = settingsGroups.map(g => g.querySelector('.settings-group-note')?.textContent.trim() || '');
+ok('a closed group shows what is inside it',
+   new RegExp(`^${P.getPresets().length} in your library$`).test(groupNotes[3])
+   && groupNotes[2] === 'Not set up'
+   && /sessions?$/.test(groupNotes[5]),
+   JSON.stringify(groupNotes));
+ok('and the ones with nothing to say simply have no note',
+   groupNotes[4] === '' && groupNotes[7] === '', JSON.stringify(groupNotes));
+
+ok('the AI assistant is its own group',
+   !!document.querySelector('#settings-body [data-group="ai"] [data-section="ai"]'));
+eq('and its sixteen rows are chunked into three named things',
+   [...document.querySelectorAll('#settings-body [data-section="ai"] .ai-subgroup-title')]
+       .map(e => e.textContent.trim()).join('|'),
+   'Model|Voice|When it listens');
+
+/**
+ * The one behaviour that had to be built deliberately: `renderSettings()` runs
+ * on presets-updated / stats-updated / locale-changed and rebuilds the body from
+ * a template, so without remembering the open state the screen snaps itself
+ * shut under the finger that just tapped something in it.
+ *
+ * The check opens a group that is NOT open by default. Testing one of the two
+ * defaults proves nothing, because the `open` attribute puts it back on every
+ * render regardless - which is exactly how the first version of this check
+ * passed with the whole mechanism commented out.
+ */
+ok('only the two common groups start open',
+   settingsGroups.filter(g => g.open).map(g => g.dataset.group).join(',') === 'appearance,language');
+
+document.querySelector('[data-group="ai"] .settings-group-head').click();
+ok('a closed group can be opened', document.querySelector('[data-group="ai"]').open === true);
+window.handleAiToggle('remember');       // a full re-render
+ok('and a group the user opened STAYS open across one',
+   document.querySelector('[data-group="ai"]').open === true,
+   'a screen that snaps shut under your thumb is worse than the long page it replaced');
+window.handleAiToggle('remember');       // and back
+document.querySelector('[data-group="ai"] .settings-group-head').click();
+
+// The PIXEL claim is checked in tools/check-app.mjs, against the real
+// index.html: this harness page has no <meta name="viewport">, so its inner
+// height is not the height a phone would give and a pixel assertion here would
+// be measuring the harness, not the app. What is checked here is the thing
+// that actually made the screen long: how much is expanded.
+// Queried fresh, not the `settingsGroups` array: those node references were
+// captured at the first render and the checks above re-rendered the body
+// several times, so they are detached and their `.open` is stale.
+const liveGroups = [...document.querySelectorAll('#settings-body details.settings-group')];
+ok('only the common groups are expanded on arrival',
+   liveGroups.filter(g => g.open).map(g => g.dataset.group).join(',') === 'appearance,language',
+   liveGroups.filter(g => g.open).map(g => g.dataset.group).join(',') || 'nothing open');
+ok('so the long sections cost one summary row each, not twelve',
+   liveGroups.length === 8 && liveGroups.filter(g => g.open).length < liveGroups.length);
+
+document.querySelector('[data-group="presets"] .settings-group-head').click();
+ok('tapping a group opens it',
+   document.querySelector('[data-group="presets"]').open === true);
+ok('and opening one does not open the others',
+   document.querySelector('[data-group="drills"]').open === false);
+document.querySelector('[data-group="presets"] .settings-group-head').click();
 
 const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
 for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',

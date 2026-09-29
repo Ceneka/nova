@@ -259,6 +259,11 @@ export const en = {
     },
 
     // --- settingsUi.js: the Settings screen ---
+    lang: {
+        en: 'English',
+        es: 'Español'
+    },
+
     settings: {
         appearance: 'Appearance',
         language: 'Language',
@@ -294,6 +299,12 @@ export const en = {
         installedDesc: 'Open Nova from your home screen. It runs without a browser or a signal.',
         installableDesc: 'Puts Nova on your home screen so it opens like a normal app.',
         installDeclined: 'Not now. Your drills and settings are safe either way.',
+        sessionCount: {
+            one: '{n} session',
+            other: '{n} sessions'
+        },
+        offlineReadyShort: 'Ready offline',
+        offlinePreparingShort: 'Preparing…',
         installUnsupported: 'This browser is not offering it. In Chrome, use the ⋮ menu → Add to Home screen.',
         resetStats: 'Reset statistics',
         resetStatsDesc: '{balls} balls · {drills} drills · clears the history too.',
@@ -316,6 +327,13 @@ export const en = {
     // --- aiConfig.js + settingsUi.js: the AI assistant settings section ---
     settingsAi: {
         section: 'AI assistant',
+        // The three things inside it. Sixteen flat rows could not be
+        // scanned; three named groups can.
+        groupModel: 'Model',
+        groupVoice: 'Voice',
+        groupBehaviour: 'When it listens',
+        notConfigured: 'Not set up',
+        configured: 'Configured',
         textModel: 'Text model',
         textModelDesc: 'Optional. Without it the assistant still reads short commands on this device, with no key and no signal.',
         voiceModel: 'Voice model',

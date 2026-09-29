@@ -267,6 +267,11 @@ export const es = {
     },
 
     // --- settingsUi.js: the Settings screen ---
+    lang: {
+        en: 'English',
+        es: 'Español'
+    },
+
     settings: {
         appearance: 'Apariencia',
         language: 'Idioma',
@@ -302,6 +307,12 @@ export const es = {
         installedDesc: 'Abre Nova desde tu pantalla de inicio. Funciona sin navegador y sin señal.',
         installableDesc: 'Coloca Nova en tu pantalla de inicio para que se abra como una app normal.',
         installDeclined: 'Ahora no. Tus ejercicios y ajustes están a salvo de todos modos.',
+        sessionCount: {
+            one: '{n} sesión',
+            other: '{n} sesiones'
+        },
+        offlineReadyShort: 'Lista sin conexión',
+        offlinePreparingShort: 'Preparando…',
         installUnsupported: 'Este navegador no lo ofrece. En Chrome, usa el menú ⋮ → Añadir a pantalla de inicio.',
         resetStats: 'Restablecer estadísticas',
         resetStatsDesc: '{balls} bolas · {drills} ejercicios · también borra el historial.',
@@ -324,6 +335,11 @@ export const es = {
     // --- aiConfig.js + settingsUi.js: la sección del asistente IA ---
     settingsAi: {
         section: 'Asistente IA',
+        groupModel: 'Modelo',
+        groupVoice: 'Voz',
+        groupBehaviour: 'Cuándo escucha',
+        notConfigured: 'Sin configurar',
+        configured: 'Configurado',
         textModel: 'Modelo de texto',
         textModelDesc: 'Opcional. Sin él, el asistente igual lee los comandos cortos en este dispositivo, sin clave y sin señal.',
         voiceModel: 'Modelo de voz',
