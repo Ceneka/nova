@@ -14,6 +14,7 @@ import { makeBall } from './ball.js';
 import { showToast, formatDuration, drillKeyName } from './utils.js'; 
 import { openEditor } from './editor.js';
 import { t, drillDisplayName } from './i18n.js';
+import { getAiDrills, deleteAiDrill, clearAiDrills, moveToCustom } from './aiStore.js';
 
 // --- NEW: Handle Create New Drill ---
 window.handleCreateNewDrill = (category) => {
@@ -164,7 +165,161 @@ export function renderDrillButtons() {
         container.appendChild(addWrapper);
     });
 
+    renderIaList();
+
     updateLastPlayedHighlight();
+}
+
+/**
+ * The IA tab.
+ *
+ * Not a custom set, and that is the whole reason it exists separately:
+ * `importCustomDrills()` rebuilds `custom_data` from scratch, so AI drills
+ * living inside a custom set would be silently deleted by importing any CSV -
+ * including one the user exported themselves. They are in `nova_ai_drills`
+ * instead, and they are not in the shared drill CSV until one is moved into
+ * Custom A/B/C, at which point it is an ordinary drill.
+ *
+ * Rows carry an IA chip and a source glyph, and three one-tap move buttons. A
+ * drill that is not in the shared CSV is exactly the thing a user needs to be
+ * able to notice, so the row says so rather than looking like any other.
+ */
+function renderIaList() {
+    const container = document.getElementById('view-ia');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const drills = getAiDrills();
+    if (!drills.length) {
+        const empty = document.createElement('div');
+        empty.className = 'ia-empty';
+        empty.textContent = t('ia.emptyList');
+        container.appendChild(empty);
+        return;
+    }
+
+    for (const drill of drills) container.appendChild(iaRow(drill));
+
+    const clear = document.createElement('button');
+    clear.className = 'btn-swap btn-drill-add ia-clear';
+    clear.textContent = t('ai.clearCategory');
+    clear.onclick = () => window.clearIaCategory();
+    container.appendChild(clear);
+}
+
+/** A glyph for where the drill came from. Decorative: the chip carries the meaning. */
+const SOURCE_GLYPH = { voice: '\u{1F399}', text: '\u{2328}', model: '\u2726' };
+
+function iaRow(drill) {
+    const wrap = document.createElement('div');
+    wrap.className = 'ia-row';
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-drill';
+    // The key is minted from the clock, so interpolating it into this
+    // attribute is safe - see aiStore.newAiDrillKey().
+    btn.dataset.key = drill.key;
+
+    const icon = document.createElement('div');
+    icon.className = 'drill-icon';
+    for (let i = 0; i < 4; i++) icon.appendChild(document.createElement('div')).className = 'd-dot';
+    btn.appendChild(icon);
+
+    const label = document.createElement('span');
+    // A model-authored name: textContent, never innerHTML.
+    label.textContent = drill.name;
+    btn.appendChild(label);
+
+    const chip = document.createElement('div');
+    chip.className = 'mark-ai';
+    chip.textContent = 'IA';
+    btn.appendChild(chip);
+
+    const glyph = document.createElement('div');
+    glyph.className = 'mark-source';
+    glyph.textContent = SOURCE_GLYPH[drill.source] || SOURCE_GLYPH.text;
+    glyph.title = t(`ia.source.${drill.source}`);
+    btn.appendChild(glyph);
+
+    btn.onclick = () => {
+        if (!bleState.isConnected) {
+            showToast(t('toast.notConnected'));
+            return;
+        }
+        window.playAiDrill(drill.key);
+    };
+
+    // Long-press opens the normal editor, exactly as every other drill does.
+    let pressTimer = null;
+    btn.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openEditor(drill.key), 600); });
+    for (const ev of ['mouseup', 'mouseleave']) {
+        btn.addEventListener(ev, () => { clearTimeout(pressTimer); pressTimer = null; });
+    }
+    btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => openEditor(drill.key), 600); }, { passive: true });
+    for (const ev of ['touchend', 'touchcancel']) {
+        btn.addEventListener(ev, () => { clearTimeout(pressTimer); pressTimer = null; });
+    }
+
+    wrap.appendChild(btn);
+
+    const actions = document.createElement('div');
+    actions.className = 'ia-row-actions';
+    for (const bank of ['A', 'B', 'C']) {
+        const move = document.createElement('button');
+        move.className = 'ia-move';
+        move.textContent = bank;
+        move.title = t('ia.moveTo', { bank });
+        move.setAttribute('aria-label', t('ia.moveTo', { bank }));
+        move.onclick = () => window.moveAiDrill(drill.key, `custom-${bank.toLowerCase()}`);
+        actions.appendChild(move);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'ia-move danger';
+    del.textContent = '\u2715';
+    del.title = t('action.delete');
+    del.setAttribute('aria-label', t('action.delete'));
+    del.onclick = () => window.deleteAiDrillRow(drill.key);
+    actions.appendChild(del);
+
+    wrap.appendChild(actions);
+    return wrap;
+}
+
+/**
+ * Move an AI drill into one of the user's own sets. This is how it becomes
+ * permanently theirs: an ordinary custom drill, in `custom_drills`, and
+ * therefore in the CSV export.
+ */
+export function moveAiDrillTo(key, category) {
+    const deps = {
+        currentDrills,
+        userCustomDrills,
+        setCustomData: () => localStorage.setItem('custom_data', JSON.stringify(userCustomDrills)),
+        saveDrillsToStorage
+    };
+    const newKey = moveToCustom(key, category, deps);
+    if (!newKey) {
+        showToast(t('toast.bankFull', { bank: category.split('-')[1].toUpperCase() }));
+        return null;
+    }
+    showToast(t('toast.aiMoved', { bank: category.split('-')[1].toUpperCase() }));
+    renderDrillButtons();
+    document.dispatchEvent(new CustomEvent('drills-updated'));
+    return newKey;
+}
+
+export function deleteAiDrillRow(key) {
+    if (deleteAiDrill(key)) renderIaList();
+}
+
+export function clearIaCategory() {
+    if (!getAiDrills().length) return false;
+    if (!confirm(t('ai.confirmClearCategory'))) return false;
+    clearAiDrills();
+    showToast(t('toast.aiCleared'));
+    renderIaList();
+    return true;
 }
 
 export function updateLastPlayedHighlight() {
@@ -388,7 +543,7 @@ export function setTheme(themeName, { closeMenu = true } = {}) {
 }
 
 export function switchTab(catName, btn) {
-    const tabs = ['basic','combined','complex','custom-a','custom-b','custom-c'];
+    const tabs = ['basic','combined','complex','custom-a','custom-b','custom-c','ia'];
     tabs.forEach(c => {
         const el = document.getElementById('view-'+c);
         if(el) el.classList.add('hidden');
@@ -401,7 +556,9 @@ export function switchTab(catName, btn) {
 
     const diffGroup = document.getElementById('grp-difficulty');
     if(diffGroup) {
-        diffGroup.style.display = ['custom-a', 'custom-b', 'custom-c'].includes(catName) ? 'none' : 'flex';
+        // A level applies to the factory drills; a custom set or the IA
+        // category has its own content, so the control would mean nothing.
+        diffGroup.style.display = ['custom-a', 'custom-b', 'custom-c', 'ia'].includes(catName) ? 'none' : 'flex';
     }
 }
 
@@ -435,6 +592,10 @@ export function showSessionSummary() {
     const modal = document.getElementById('summary-modal');
     if(modal) modal.classList.add('open');
 }
+
+window.moveAiDrill = moveAiDrillTo;
+window.deleteAiDrillRow = deleteAiDrillRow;
+window.clearIaCategory = clearIaCategory;
 
 window.closeSummaryModal = () => {
     const modal = document.getElementById('summary-modal');

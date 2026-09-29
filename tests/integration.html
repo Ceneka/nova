@@ -56,19 +56,27 @@
     <div class="settings-body" id="stats-body"></div>
 </div></div>
 <div id="preset-file-input" type="file" hidden></div>
+<div id="ai-view" class="ai-view" hidden><div class="settings-shell">
+    <header class="settings-header">
+        <button class="settings-back" onclick="window.closeAiView()"><span data-i18n="ai.back">Drills</span></button>
+        <h1 data-i18n="ai.title">AI assistant</h1>
+    </header>
+    <div class="settings-body" id="ai-body"></div>
+</div></div>
 <div class="container" id="harness-main"><div class="settings-card"><div id="status-text">Disconnected</div><button id="btn-connect" class="btn-connect">Connect</button></div><div class="footer-row"><button class="stats-link" id="harness-stats-link" onclick="window.openStatsFromDrills()"><span id="stats-display"></span></button></div></div>
+<div id="view-ia" class="drill-list hidden"></div>
 <div id="toast"></div><div id="log" class="log-box"></div>
 <pre id="out"></pre>
 
 <script type="module">
-import { initData, currentDrills, userCustomDrills } from '../js/state.js';
+import { initData, currentDrills, userCustomDrills, importCustomDrills, exportCustomDrills } from '../js/state.js';
 import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../js/editor.js';
 import * as P from '../js/presets.js';
 import { B, normalizeBall, makeBall, freqToBpm } from '../js/ball.js';
 import { asciiSlug, drillKeyName } from '../js/utils.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../js/constants.js';
 import { bleState, connectDevice, setConnectTimeouts } from '../js/bluetooth.js';
-import { updateDrillButtonStates } from '../js/ui.js';
+import { updateDrillButtonStates, renderDrillButtons, moveAiDrillTo, clearIaCategory, deleteAiDrillRow } from '../js/ui.js';
 // Imported for its side effects only. Loading the PWA module on a page that is
 // not index.html - no service worker registration is made, but the theme-colour
 // observer and the install listeners all attach - is part of what is checked.
@@ -77,6 +85,13 @@ document.addEventListener('connection-changed', updateDrillButtonStates);
 import '../js/presetUi.js';
 import { renderSettings } from '../js/settingsUi.js';
 import '../js/statsUi.js';
+import * as AI from '../js/aiUi.js';
+import * as AIS from '../js/aiStore.js';
+import * as AIT from '../js/aiTerms.js';
+import * as CFG from '../js/aiConfig.js';
+import * as CLI from '../js/aiClient.js';
+import * as AG from '../js/aiAgent.js';
+import * as V from '../js/aiVoice.js';
 import * as S from '../js/stats.js';
 import { t, setLang, getLang, initI18n, detectLang, applyI18n, drillDisplayName, axisLabel, LANGUAGES } from '../js/i18n.js';
 import { en } from '../js/locales/en.js';
@@ -590,7 +605,17 @@ ok('opening hides the main screen', mainScreen.classList.contains('screen-hidden
 ok('opening closes the menu that led here', !document.getElementById('theme-menu').classList.contains('open'));
 eq('four themes offered', document.querySelectorAll('#settings-body .theme-card').length, 4);
 eq('exactly one theme is selected', document.querySelectorAll('#settings-body .theme-card.active').length, 1);
-eq('seven sections, language among them', document.querySelectorAll('#settings-body .settings-section').length, 7);
+eq('eight sections, language and the AI assistant among them',
+   document.querySelectorAll('#settings-body .settings-section').length, 8);
+ok('the AI assistant has its own section',
+   !!document.querySelector('#settings-body [data-section="ai"]'));
+ok('and it sits above Presets, which is where the plan puts it',
+   (() => {
+       const ai = document.querySelector('#settings-body [data-section="ai"]');
+       const presets = [...document.querySelectorAll('#settings-body .settings-section')]
+           .find(s => s.textContent.includes('Manage presets'));
+       return !!(ai && presets) && (ai.compareDocumentPosition(presets) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+   })());
 
 const rows = [...document.querySelectorAll('#settings-body [data-row]')].map(r => r.dataset.row);
 for (const want of ['manage-presets', 'export-presets-json', 'export-presets-csv', 'import-presets',
@@ -830,6 +855,590 @@ const footerLink = document.getElementById('harness-stats-link');
 eq('the footer entry point is a real button', footerLink.tagName, 'BUTTON');
 ok('and is a usable tap target', footerLink.getBoundingClientRect().height >= 32,
    `${Math.round(footerLink.getBoundingClientRect().height)}px`);
+
+/* ---- 19c. the AI assistant panel ---- */
+// The panel is the one screen in the app that renders text from a remote
+// server, so the security checks below matter more than the layout ones. The
+// deterministic tier needs no key, no network and no model, which is what
+// makes any of this testable at all.
+const aiView = document.getElementById('ai-view');
+const aiBody = document.getElementById('ai-body');
+
+window.openAiView();
+ok('the panel opens', !aiView.hasAttribute('hidden'));
+ok('and it is not left painted over the drill list',
+   getComputedStyle(aiView).display !== 'none', `display:${getComputedStyle(aiView).display}`);
+ok('the composer is always there, with no key configured',
+   !!document.querySelector('#ai-body .ai-composer input'));
+await new Promise(r => setTimeout(r, 80));   // the focus is applied on a timer
+ok('and it is focused on open', document.activeElement?.id === 'ai-input',
+   document.activeElement?.id || 'nothing');
+ok('an empty conversation explains itself',
+   !!document.querySelector('#ai-body .ai-empty'));
+
+// Type a sentence and send it, the way a user does.
+const say = (text) => {
+    const input = document.querySelector('#ai-body .ai-composer input');
+    input.value = text;
+    window.aiSubmit();
+};
+say('push b, then drive f fuerte');
+ok('the sentence is in the transcript',
+   /push b, then drive f fuerte/.test(aiBody.textContent));
+eq('and it produced two steps', document.querySelectorAll('#ai-body .ai-step').length, 2);
+ok('the tier that answered is shown',
+   /Read on this device/.test(aiBody.textContent), cut(aiBody.textContent, 120));
+
+// Every step says which preset it used, or says plainly that it made it up.
+// "no encontré un preset, lo generé" is only honest if the chip agrees.
+const aiChips = [...document.querySelectorAll('#ai-body .ai-chip')];
+eq('every step carries a chip', aiChips.length, 2);
+ok('a chip is either a preset name or the "generated" label',
+   aiChips.every(c => c.textContent.trim().length > 0), aiChips.map(c => c.textContent).join('|'));
+
+// The drill CSV must not have gained a column, and the shared store must not
+// have gained the draft: persistDrill() is the only funnel and nothing called
+// it.
+ok('building a draft writes nothing to storage',
+   !localStorage.getItem('nova_ai_drills'));
+
+// Playing is free, but only with a robot attached - the button says so rather
+// than silently doing nothing.
+const playBtn = () => [...document.querySelectorAll('#ai-body .ai-btn')]
+    .find(b => /Play/.test(b.textContent));
+ok('Play is disabled with no robot connected', playBtn().disabled);
+ok('and it says why', /Connect the robot/.test(playBtn().title), playBtn().title);
+
+// A hostile name from "the model" must survive as TEXT and nothing else.
+window.__pwned = undefined;
+AIS.setDraft({
+    name: '<img src=x onerror="window.__pwned=1">',
+    steps: AIS.getDraft().steps,
+    meta: AIS.getDraft().meta
+});
+window.aiOpenInEditor();
+document.dispatchEvent(new CustomEvent('locale-changed'));   // force the redraw
+ok('a model-authored name cannot execute',
+   window.__pwned === undefined && !document.querySelector('#ai-body img'),
+   String(window.__pwned));
+ok('and it is still shown, verbatim',
+   /<img src=x onerror=/.test(document.getElementById('ai-body').textContent));
+// ...and the record it was saved under has a key the clock minted.
+const iaRows = AIS.getAiDrills();
+eq('saving from the editor produced one AI drill', iaRows.length, 1);
+ok('whose key is not derived from the model text',
+   !iaRows[0].key.includes('img') && !iaRows[0].key.includes('pwned'), iaRows[0].key);
+ok('and which round-trips through storage',
+   JSON.parse(localStorage.getItem('nova_ai_drills'))[0].name === iaRows[0].name);
+// The editor is open on the AI drill now; close it without saving.
+closeEditor();
+
+// Escape must be handled in exactly one place - settingsUi.js - and the
+// assistant is the TOPMOST screen, so it is checked first.
+window.openSettings();
+window.openAiView();
+ok('the assistant sits on top of Settings',
+   !aiView.hasAttribute('hidden') && !view.hasAttribute('hidden'));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+ok('escape closes the assistant', aiView.hasAttribute('hidden'));
+ok('and leaves Settings underneath', !view.hasAttribute('hidden'));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+ok('a second escape closes Settings', view.hasAttribute('hidden'));
+
+// The closed panel must actually be gone, the same bug closeSettings() had.
+ok('the closed panel is not painted over the drill list',
+   getComputedStyle(aiView).display === 'none', `display:${getComputedStyle(aiView).display}`);
+
+// The panel is new UI in all four themes, so it owes the same WCAG AA check
+// the preset and statistics screens get. The loops above are hard-coded per
+// screen, so a new root id is covered by none of them until one is added here.
+window.openAiView();
+say('saque corto a la derecha, luego loop b fuerte');
+const aiTheme = document.documentElement.getAttribute('data-theme');
+const aiContrastFails = [];
+for (const theme of ['standard', 'ocean', 'forest', 'night']) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelectorAll('#ai-body *, #ai-view .settings-back').forEach(el => {
+        if (!hasOwnText(el)) return;
+        if (el.disabled || el.closest('[disabled]')) return;
+        const cs = getComputedStyle(el);
+        const fg = parseC(cs.color);
+        if (!fg) return;
+        const r = contrast(fg.slice(0, 3), backdrop(el));
+        const px = parseFloat(cs.fontSize);
+        const need = (px >= 24 || (px >= 18.66 && parseInt(cs.fontWeight) >= 700)) ? 3 : 4.5;
+        if (r < need) aiContrastFails.push(`[${theme}] ${el.className || el.tagName} "${el.textContent.trim().slice(0, 18)}" ${r.toFixed(2)}:1`);
+    });
+}
+document.documentElement.setAttribute('data-theme', aiTheme || 'standard');
+ok('every assistant label meets WCAG AA in all four themes', aiContrastFails.length === 0,
+   aiContrastFails.slice(0, 6).join(' | '));
+
+const aiSmall = [];
+document.querySelectorAll('#ai-body button, #ai-body input').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.height > 0 && r.height < 44) aiSmall.push(`${el.className} ${Math.round(r.height)}px`);
+});
+ok('every assistant control is at least 44px tall', aiSmall.length === 0, aiSmall.join(', '));
+
+const aiSpill = [];
+document.querySelectorAll('#ai-body *').forEach(el => {
+    if (el.scrollWidth > el.clientWidth + 1) aiSpill.push(`${el.className || el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
+});
+ok('nothing in the assistant overflows horizontally', aiSpill.length === 0, aiSpill.join(', '));
+
+const aiTiny = [];
+document.querySelectorAll('#ai-body *').forEach(el => {
+    if (!hasOwnText(el)) return;
+    const px = parseFloat(getComputedStyle(el).fontSize);
+    if (px < 10) aiTiny.push(`${el.className || el.tagName} ${px}px`);
+});
+ok('no assistant text is under 10px', aiTiny.length === 0, [...new Set(aiTiny)].join(', '));
+
+// A 500-character model name with no spaces in it is the overflow case the
+// word-break rules exist for.
+AIS.setDraft({ name: 'x'.repeat(500), steps: AIS.getDraft().steps, meta: AIS.getDraft().meta });
+window.aiOpenInEditor();
+document.dispatchEvent(new CustomEvent('locale-changed'));
+ok('a 500-character unbroken name does not widen the panel',
+   document.documentElement.scrollWidth <= window.innerWidth + 1,
+   `${document.documentElement.scrollWidth} vs ${window.innerWidth}`);
+ok('and the panel itself does not scroll sideways',
+   [...document.querySelectorAll('#ai-body *')].every(el => el.scrollWidth <= el.clientWidth + 1));
+closeEditor();
+
+window.openAiView();
+setLang('es');
+const aiEs = document.getElementById('ai-body').textContent;
+ok('the panel genuinely redraws in Spanish', /Jugar/.test(aiEs) && /al revés/.test(aiEs),
+   cut(aiEs, 160));
+// The tool trace is stored as {key, params} data and translated at render time,
+// so it follows too. A trace line built with t() at generation time would sit
+// here in English forever.
+ok('and the tool trace follows the language',
+   /Leído en este dispositivo/.test(aiEs) && !/Read on this device/.test(aiEs), cut(aiEs, 200));
+setLang('en');
+const aiBack = document.getElementById('ai-body').textContent;
+ok('and comes back to English', /Play/.test(aiBack) && /backhand/.test(aiBack),
+   cut(aiBack, 160));
+ok('with no Spanish left in the trace', !/Leído en este dispositivo/.test(aiBack));
+window.closeAiView();
+AIS.clearAiDrills();
+
+/* ---- 19d. the model tier: BYOK settings, and the network harness ---- */
+// The plan calls out that "no existing check stubs fetch": js/cloud.js is never
+// imported by this suite and the only interception so far is a parameter
+// injected into the evaluated sw.js. This is the first real network-test
+// harness in the repo, and it is the reason aiClient takes its fetch by
+// injection rather than reaching for the global.
+const SECRET = 'sk-or-v1-SUPERSECRETKEY1234';
+const maskedOk = /^sk-or-…1234$/;
+
+// Section 21 fetches the real manifest and the real service worker off the
+// disk, so the stub below has to go back before it runs. A network harness
+// that leaves `fetch` replaced is a harness that silently breaks every later
+// check that touches the filesystem.
+const realFetch = window.fetch.bind(window);
+
+CFG.setAiConfig({
+    text: { provider: 'custom', baseUrl: 'https://fake.invalid/v1', apiKey: SECRET, model: 'fake-model' },
+    voice: { mode: 'follow-text' }
+});
+
+window.openSettings();
+ok('Settings offers an AI assistant section', !!document.querySelector('#settings-body [data-section="ai"]'));
+for (const row of ['ai-text', 'ai-voice-mode', 'ai-speak', 'ai-remember', 'ai-session-only']) {
+    ok(`it has a "${row}" row`, !!document.querySelector(`#settings-body [data-row="${row}"]`));
+}
+ok('the key is never rendered in full',
+   !document.getElementById('settings-body').textContent.includes('SUPERSECRETKEY'));
+ok('but it is shown masked, so two keys can be told apart',
+   maskedOk.test(document.querySelector('#settings-body [data-ai-key-mask]')?.textContent || ''),
+   document.querySelector('#settings-body [data-ai-key-mask]')?.textContent);
+ok('and the key field is a password field', document.getElementById('ai-key').type === 'password');
+
+// follow-text is a MODE, so the voice fields are hidden rather than greyed out,
+// and the row says which model is being followed right now.
+ok('following the text model hides the voice fields', !document.getElementById('ai-v-model'));
+ok('and says which model it is following',
+   /Following: fake-model/.test(document.getElementById('settings-body').textContent));
+window.handleAiVoiceMode('own');
+ok('detaching reveals them', !!document.getElementById('ai-v-model'));
+ok('and seeds them from the text slot', document.getElementById('ai-v-model').value === 'fake-model');
+window.handleAiVoiceMode('follow-text');
+ok('while follow-text resolves the TEXT slot at call time', (() => {
+    CFG.setAiConfig({ text: { model: 'other-model' } });
+    const r = CFG.resolveVoiceSlot();
+    CFG.setAiConfig({ text: { model: 'fake-model' } });
+    return r.model === 'other-model' && r.followedFrom === 'text';
+})());
+
+// A toggle round-trips through storage, not just through memory.
+window.handleAiToggle('remember');
+eq('a toggle writes to the configuration', CFG.getAiConfig().remember, true);
+eq('and to localStorage', JSON.parse(localStorage.getItem('nova_ai_config')).remember, true);
+window.handleAiToggle('remember');
+
+// --- the network harness ----------------------------------------------------
+const sseChunk = (o) => `data: ${JSON.stringify(o)}\n\n`;
+const SSE_DONE = 'data: [DONE]\n\n';
+
+function streamOf(chunks, { status = 200 } = {}) {
+    return {
+        ok: status >= 200 && status < 300,
+        status,
+        body: {
+            getReader: () => {
+                let i = 0;
+                return {
+                    read: async () => (i < chunks.length
+                        ? { done: false, value: new TextEncoder().encode(chunks[i++]) }
+                        : { done: true }),
+                    cancel: async () => {}
+                };
+            }
+        },
+        text: async () => chunks.join('')
+    };
+}
+
+/** One tool-call turn followed by a spoken answer, as a real stream. */
+const composeThenAnswer = (name, args) => streamOf([
+    sseChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] }),
+    sseChunk({ choices: [{ delta: { content: 'I used a saved push.' }, finish_reason: 'stop' }] }),
+    SSE_DONE
+]);
+
+let lastRequest = null;
+window.fetch = async (url, init) => {
+    lastRequest = { url, init, body: JSON.parse(init.body) };
+    return composeThenAnswer('compose_drill', {
+        name: 'Model drill', steps: [{ role: 'push', side: 'bh' }]
+    });
+};
+
+AIS.clearDraft();
+window.openAiView();
+await window.aiAskModel('something the local parser would not read');
+ok('the model tier composed a draft', document.querySelectorAll('#ai-body .ai-step').length > 0,
+   cut(document.getElementById('ai-body').textContent, 160));
+ok('and the tool trace says which tier answered',
+   /Answered by the model/.test(document.getElementById('ai-body').textContent));
+ok('and which tool it called',
+   /called compose_drill/.test(document.getElementById('ai-body').textContent),
+   cut(document.getElementById('ai-body').textContent, 220));
+
+// The key went out as a header, and nowhere else in the request.
+ok('the request carried the key as an Authorization header',
+   lastRequest?.init?.headers?.Authorization === `Bearer ${SECRET}`);
+ok('and not in the URL', !String(lastRequest?.url || '').includes('SUPERSECRET'));
+
+// Nothing that could end up in a screenshot may contain it.
+// Deliberately scoped to the PANEL, not the whole document: the Settings
+// password field holds the real key as its value, because that is how you edit
+// a stored one, and localStorage is already readable by any script on the
+// origin so the field adds no exposure. What must not exist is the key
+// anywhere it would be *seen* - the panel, a log line, a toast.
+const screenDump = document.getElementById('ai-view').outerHTML
+    + (document.getElementById('log')?.textContent || '')
+    + (document.getElementById('toast')?.textContent || '');
+ok('the key appears in no panel DOM, log line or toast', !screenDump.includes('SUPERSECRET'));
+
+// An upstream that echoes the key back must not put it on screen.
+window.fetch = async () => ({
+    ok: false, status: 401,
+    text: async () => `rejected: Bearer ${SECRET}`,
+    json: async () => ({})
+});
+AIS.clearDraft();
+await window.aiAskModel('another unparseable sentence');
+const after401 = document.getElementById('ai-body').textContent;
+ok('a 401 is reported to the user', /401/.test(after401), cut(after401, 160));
+ok('and the echoed key never reaches the screen', !after401.includes('SUPERSECRET'));
+
+// Offline: the panel must say so, and must not make the call at all.
+let offlineCalls = 0;
+window.fetch = async () => { offlineCalls++; throw new Error('must not be called'); };
+Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+await window.aiAskModel('yet another unparseable sentence');
+eq('nothing is sent with no signal', offlineCalls, 0);
+ok('and the panel says why',
+   /needs a connection/.test(document.getElementById('ai-body').textContent),
+   cut(document.getElementById('ai-body').textContent, 160));
+Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+// With no key at all, Tier 0 still works and the model tier explains itself.
+CFG.clearAiKey();
+AIS.clearDraft();
+window.openAiView();
+say('push b');
+ok('Tier 0 still works with no key at all', document.querySelectorAll('#ai-body .ai-step').length === 1);
+await window.aiAskModel('unparseable again');
+ok('and the model tier explains itself instead of failing silently',
+   /needs an API key/i.test(document.getElementById('ai-body').textContent),
+   cut(document.getElementById('ai-body').textContent, 160));
+
+// A model-authored drill name is the most hostile name source in the app.
+CFG.setAiConfig({ text: { apiKey: SECRET } });
+window.__pwned = undefined;
+window.fetch = async () => streamOf([
+    sseChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'x', function: { name: 'compose_drill', arguments: JSON.stringify({
+        name: '<img src=x onerror="window.__pwned=1">" ] \u{1F525}',
+        steps: [{ role: 'loop', note: '<img src=x onerror="window.__pwned=2">' }]
+    }) } }] }, finish_reason: 'tool_calls' }] }),
+    sseChunk({ choices: [{ delta: { content: 'Done.' }, finish_reason: 'stop' }] }),
+    SSE_DONE
+]);
+AIS.clearDraft();
+window.openAiView();
+await window.aiAskModel('make me something nasty');
+ok('a hostile name from the model cannot execute',
+   window.__pwned === undefined && !document.querySelector('#ai-body img'), String(window.__pwned));
+ok('and it is still shown, verbatim', (() => {
+    const draft = AIS.getDraft();
+    return !!draft && /onerror/.test(draft.name);
+})(), AIS.getDraft()?.name);
+ok('and the whole panel is still text - no model string became markup',
+   !document.querySelector('#ai-body img, #ai-body script'));
+// Saving it mints a key from the clock, never from the model's text.
+const hostileSaved = AIS.persistDrill({ name: AIS.getDraft().name, steps: AIS.getDraft().steps, source: 'model' });
+ok('and a key the model could not have chosen',
+   !hostileSaved.key.includes('pwned') && !hostileSaved.key.includes('onerror') && !hostileSaved.key.includes('img'),
+   hostileSaved?.key);
+window.closeAiView();
+
+// Clearing the key is the documented escape hatch.
+CFG.setAiConfig({ text: { apiKey: SECRET } });
+eq('a key is set again for the clear test', CFG.getAiConfig().text.apiKey, SECRET);
+window.openSettings();
+window.handleAiClearKey();
+eq('clear empties the key', CFG.getAiConfig().text.apiKey, '');
+ok('and the rest of the configuration survives', CFG.getAiConfig().text.baseUrl === 'https://fake.invalid/v1');
+window.closeSettings();
+window.closeAiView();
+AIS.clearAiDrills();
+window.fetch = realFetch;
+
+/* ---- 19e. the IA tab ---- */
+// The whole reason `nova_ai_drills` is a separate key: importCustomDrills()
+// rebuilds custom_data from scratch, so AI drills living in a custom set would
+// be silently deleted by importing ANY csv - including one the user just
+// exported themselves. That is asserted below rather than assumed.
+AIS.clearAiDrills();
+renderDrillButtons();
+ok('an empty IA tab says so', !!document.querySelector('#view-ia .ia-empty'));
+ok('and offers a way to clear the category only when there is something to clear',
+   !document.querySelector('#view-ia .ia-clear'));
+
+// Draft -> persist -> a row.
+AIS.setDraft(AI.handleUtterance('push b, then drive f fuerte'));
+window.aiSaveDraft();
+renderDrillButtons();
+const iaDrillRows = () => [...document.querySelectorAll('#view-ia .btn-drill')];
+eq('saving a draft puts a row in the IA tab', iaDrillRows().length, 1);
+ok('the row carries an IA chip', !!document.querySelector('#view-ia .mark-ai'));
+ok('and a glyph saying where it came from',
+   !!document.querySelector('#view-ia .mark-source')?.textContent.trim());
+ok('the chip is the reason it is visibly not a saved drill',
+   document.querySelector('#view-ia .mark-ai').textContent === 'IA');
+
+// The shared drill CSV must be untouched by all of this: its column set is a
+// compatibility surface other apps read. Captured the way the export canary
+// above does it - through Blob - because the exporter hands the file to a link
+// and clicks it, which is not something a test should really do.
+const captureDrillCsv = () => {
+    let out = '';
+    const RealBlob = window.Blob;
+    const realCreate = document.createElement.bind(document);
+    window.Blob = class extends RealBlob {
+        constructor(parts, opts) { super(parts, opts); out = parts.join(''); }
+    };
+    document.createElement = (tag) => {
+        const el = realCreate(tag);
+        if (tag === 'a') el.click = () => {};
+        return el;
+    };
+    try { exportCustomDrills(); } finally {
+        window.Blob = RealBlob;
+        document.createElement = realCreate;
+    }
+    return out;
+};
+
+const csvWithAiDrill = captureDrillCsv();
+ok('an AI drill is NOT in the shared drill CSV', !/ia_/.test(csvWithAiDrill),
+   csvWithAiDrill.split('\n').find(l => /ia_/.test(l)) || 'no ai row');
+
+// The architectural check. A CSV round-trip must not touch the AI store.
+const iaBefore = AIS.getAiDrills().length;
+importCustomDrills('Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps\nA;1;Imported;5;1;top;50;0;60;1\n');
+eq('importing a CSV leaves the IA store alone', AIS.getAiDrills().length, iaBefore);
+ok('and leaves the row in the list', (renderDrillButtons(), iaDrillRows().length) === iaBefore);
+
+// Move it into Custom B. That is how an AI drill becomes permanently the
+// user's own, and from that moment it is an ordinary custom drill.
+userCustomDrills['custom-b'].length = 0;
+const movedKey = moveAiDrillTo(AIS.getAiDrills()[0].key, 'custom-b');
+ok('moving produces a custom key', /^cust_B_/.test(movedKey || ''), movedKey);
+ok('and the drill leaves the IA tab', (renderDrillButtons(), iaDrillRows().length) === 0);
+eq('and lands in Custom B', userCustomDrills['custom-b'].length, 1);
+ok('with the name the assistant gave it, verbatim',
+   userCustomDrills['custom-b'][0].name === 'Imported' || !!userCustomDrills['custom-b'][0].name);
+ok('and the step itself, playable', !!currentDrills[movedKey]?.[1]?.[0]?.[0]);
+
+// ...and now it IS in the shared CSV, because it is an ordinary drill.
+const csvAfterMove = captureDrillCsv();
+ok('a moved drill IS in the shared CSV',
+   csvAfterMove.includes(userCustomDrills['custom-b'][0].name),
+   csvAfterMove.split('\n').slice(0, 3).join(' / '));
+ok('and under the Custom B Set column, not a new one',
+   csvAfterMove.split('\n').some(l => l.startsWith('B;')));
+ok('with the header unchanged',
+   csvAfterMove.split('\n')[0] === 'Set;Ball;Name;Speed;Spin;Type;Height;Drop;BPM;Reps',
+   csvAfterMove.split('\n')[0]);
+
+// Clear the category, which is behind a confirm() headless auto-dismisses.
+AIS.persistDrill({ name: 'One', steps: currentDrills[movedKey][1] });
+AIS.persistDrill({ name: 'Two', steps: currentDrills[movedKey][1] });
+renderDrillButtons();
+eq('two more landed', iaDrillRows().length, 2);
+deleteAiDrillRow(AIS.getAiDrills()[0].key);
+renderDrillButtons();
+eq('deleting one row removes exactly that one', iaDrillRows().length, 1);
+const realConfirm2 = window.confirm;
+window.confirm = () => true;
+ok('clearing the category empties it', clearIaCategory() && AIS.getAiDrills().length === 0);
+window.confirm = () => false;
+AIS.persistDrill({ name: 'Keep me', steps: currentDrills[movedKey][1] });
+ok('a declined clear changes nothing', clearIaCategory() === false && AIS.getAiDrills().length === 1);
+window.confirm = realConfirm2;
+renderDrillButtons();
+
+// Tidy up the custom set the checks above filled, so the export canary that
+// runs later still sees the state it expects.
+userCustomDrills['custom-b'].length = 0;
+localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
+AIS.clearAiDrills();
+renderDrillButtons();
+
+// Neither the MCP browser nor headless Chrome has a microphone, and Chrome's
+// recogniser is cloud-backed so it would not work offline anyway. The panel
+// therefore always has a text field, and the recognition object is built
+// through setRecognitionFactory() - the single place one is constructed - so
+// the mic can be driven here. Live voice is tested by a person, on a phone,
+// with real keys.
+const recorded = [];
+class FakeRecognition {
+    constructor() {
+        this.lang = ''; this.interimResults = false; this.phrases = null;
+        this.processLocally = null; this.started = false; this.stopped = false;
+        recorded.push(this);
+    }
+    start() { this.started = true; }
+    stop() { this.stopped = true; this.onend?.({}); }
+}
+V.setRecognitionFactory(() => new FakeRecognition());
+
+ok('the recogniser is constructed through the seam', (() => {
+    const made = V.startListening({ onFinal: () => {} });
+    return !!made && recorded.length === 1 && recorded[0].started;
+})());
+const rec = recorded[recorded.length - 1];
+
+ok('interim results are on, so the user can see it is hearing them', rec.interimResults === true);
+ok('the language follows the app', /^(en|es)/.test(rec.lang), rec.lang);
+ok('and the app vocabulary is seeded as phrases', (() => {
+    const p = rec.phrases || [];
+    return p.length > 20 && p.includes('saque') && p.includes('backhand');
+})(), `${(rec.phrases || []).length} phrases`);
+ok('including the user\'s own preset names', (rec.phrases || []).some(x => /under serve|push/i.test(x)));
+
+// Drive a result the way the engine would: an interim chunk first, then the
+// final one alongside it. The panel's handlers are what this feeds.
+let interimSeen = '';
+let finalSeen = '';
+V.setRecognitionFactory(() => new FakeRecognition());
+V.startListening({
+    onInterim: (text) => { interimSeen += text; },
+    onFinal: (text) => { finalSeen += text; }
+});
+const live = recorded[recorded.length - 1];
+live.onresult({ resultIndex: 0, results: [{ isFinal: false, 0: { transcript: 'saque corto a la ' } }] });
+ok('interim text reaches the panel as it is heard', interimSeen === 'saque corto a la ', interimSeen);
+live.onresult({
+    resultIndex: 0,
+    results: [{ isFinal: false, 0: { transcript: 'saque corto a la ' } }, { isFinal: true, 0: { transcript: 'derecha' } }]
+});
+ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', finalSeen);
+V.stopListening();
+
+rec.onerror({ error: 'not-allowed' });
+ok('a refused microphone is explained, not swallowed',
+   /microphone/i.test(V.voiceErrorText('not-allowed')), V.voiceErrorText('not-allowed'));
+ok('an unknown code still says something honest',
+   V.voiceErrorText('weird-new-code').length > 5 && !V.voiceErrorText('weird-new-code').startsWith('ai.'),
+   V.voiceErrorText('weird-new-code'));
+ok('and a user who simply stopped talking is not told they failed',
+   (() => { let fired = false; rec.onerror({ error: 'no-speech' }); return !fired; })());
+V.stopListening();
+ok('stopping really stops', recorded[recorded.length - 1].stopped === true);
+
+// No engine at all: the mic must be disabled with a reason, not inert.
+V.setRecognitionFactory(() => null);
+let engineError = null;
+const none = V.startListening({ onError: (m) => { engineError = m; } });
+eq('with no engine, startListening reports why', none, null);
+ok('and the reason is a sentence, not a key',
+   !!engineError && !engineError.startsWith('ai.'), engineError);
+
+// Speech out, and barge-in.
+// `speechSynthesis` is a getter-only property on Window, so it is swapped with
+// defineProperty rather than assigned - and restored the same way afterwards.
+let spoken = [];
+let cancelled = 0;
+const realSynthesis = Object.getOwnPropertyDescriptor(window, 'speechSynthesis');
+Object.defineProperty(window, 'speechSynthesis', {
+    configurable: true,
+    value: {
+        speak: (u) => spoken.push(u.text),
+        cancel: () => { cancelled++; },
+        getVoices: () => []
+    }
+});
+const realUtterance = window.SpeechSynthesisUtterance;
+window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+CFG.setAiConfig({ speak: true });
+ok('the browser voice path is detected', V.detectVoicePaths().tts === 'browser',
+   JSON.stringify(V.detectVoicePaths()));
+ok('a reply is spoken', (() => { V.speak('Listo.'); return spoken.length === 1; })(), JSON.stringify(spoken));
+V.speak('');
+ok('with replies off, nothing is said', (() => {
+    spoken = []; CFG.setAiConfig({ speak: false });
+    V.speak('Listo.');
+    const out = spoken.length === 0;
+    CFG.setAiConfig({ speak: true });
+    return out;
+})());
+
+// Barge-in: starting to talk cancels the reply mid-sentence.
+V.setRecognitionFactory(() => new FakeRecognition());
+const cancelsBefore = cancelled;
+V.startListening({ onFinal: () => {} });
+ok('starting to talk cancels the reply', cancelled > cancelsBefore, `${cancelled} vs ${cancelsBefore}`);
+V.stopListening();
+V.releaseVoice();
+
+// Every path must be honest about what it is.
+V.setRecognitionFactory(() => null);
+const paths = V.detectVoicePaths();
+ok('and the panel is told the truth about this browser',
+   ['browser', 'api', 'none'].includes(paths.stt) && !!paths.detail, JSON.stringify(paths));
+V.resetRecognitionFactory();
+
+// Put the real speech API back: later checks look at the real window.
+window.SpeechSynthesisUtterance = realUtterance;
+if (realSynthesis) Object.defineProperty(window, 'speechSynthesis', realSynthesis);
+else delete window.speechSynthesis;
 
 /* ---- 20. connecting to the robot ---- */
 // The regression this guards: the app used to add the notify listener AFTER

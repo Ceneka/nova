@@ -8,6 +8,7 @@ import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { showToast, clamp, toggleBodyScroll, drillKeyName } from './utils.js';
 import { t, drillDisplayName } from './i18n.js';
 import { uploadDrill } from './cloud.js';
+import { updateAiDrillSteps } from './aiStore.js';
 
 // --- Local State ---
 let tempDrillData = null;
@@ -43,6 +44,14 @@ export function openEditor(key) {
 
 export function closeEditor() {
     document.getElementById('editor-modal').classList.remove('open');
+    // An AI drill is owned by the IA store. While it was open the editor
+    // borrowed a scratch copy under an `ai_` key so openEditor() - which is
+    // driven entirely by currentDrills - could find it at all. That copy never
+    // outlives the editor: leaving it would put a key in custom_drills that no
+    // list points at, which no import or reset would ever clean up.
+    if (editingDrillKey && editingDrillKey.startsWith('ai_')) {
+        delete currentDrills[editingDrillKey];
+    }
     editingDrillKey = null;
     tempDrillData = null;
     syncDrillContext();
@@ -59,8 +68,14 @@ export function saveDrillChanges() {
         step.forEach(ball => normalizeBall(ball));
     });
 
-    currentDrills[editingDrillKey][selectedLevel] = tempDrillData;
-    saveDrillsToStorage();
+    if (editingDrillKey.startsWith('ai_')) {
+        // Write back to the record that owns it, not to custom_drills.
+        updateAiDrillSteps(editingDrillKey, tempDrillData);
+        document.dispatchEvent(new CustomEvent('ai-drills-updated'));
+    } else {
+        currentDrills[editingDrillKey][selectedLevel] = tempDrillData;
+        saveDrillsToStorage();
+    }
 
     closeEditor();
     showToast(t('toast.configSaved'));

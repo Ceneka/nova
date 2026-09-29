@@ -38,8 +38,19 @@
     
     <header>
         <h1 data-i18n="app.title">Nova Drill | Tenisdemesa.ar</h1>
-        <div class="menu-btn" onclick="toggleMenu()">
-            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        <div class="ai-open-wrap">
+            <button class="ai-open-btn" onclick="window.openAiView()" data-i18n-attr="aria-label:a11y.openAi;title:menu.ai">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+                    <line x1="5" y1="11" x2="5" y2="12"></line>
+                    <line x1="19" y1="11" x2="19" y2="12"></line>
+                    <path d="M5.5 12a6.5 6.5 0 0 0 13 0"></path>
+                    <line x1="12" y1="18.5" x2="12" y2="22"></line>
+                </svg>
+            </button>
+            <div class="menu-btn" onclick="toggleMenu()">
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </div>
         </div>
     </header>
 
@@ -132,6 +143,12 @@
              ondragover="window.allowTabDrop(event)">
             <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-c">Custom C</span>
         </div>
+        <!-- The assistant's own category. It is NOT a custom set: AI drills
+             live in nova_ai_drills, so importing a CSV cannot reach them and
+             they are not in the shared drill file until one is moved. -->
+        <div class="tab-btn" onclick="switchTab('ia', this)">
+            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.ia">IA</span>
+        </div>
     </div>
 
     <div id="view-basic" class="drill-list"></div>
@@ -140,6 +157,7 @@
     <div id="view-custom-a" class="drill-list hidden"></div>
     <div id="view-custom-b" class="drill-list hidden"></div>
     <div id="view-custom-c" class="drill-list hidden"></div>
+    <div id="view-ia" class="drill-list hidden"></div>
 
     <div class="footer-row">
         <!-- The running totals are also the way into the statistics screen.
@@ -201,8 +219,26 @@
     </div>
 </div>
 
-<div id="toast" data-i18n="toast.default">Notification</div>
+<!-- The AI assistant: a full screen above Statistics, reusing the same
+     settings chrome. It comes after #stats-view so its z-index band (170)
+     stacks over it, and before the modals, which it does not. Same
+     open/close/hidden discipline as #settings-view and #stats-view. -->
+<div id="ai-view" class="ai-view" hidden>
+    <div class="settings-shell">
+        <header class="settings-header">
+            <button class="settings-back" onclick="window.closeAiView()" data-i18n-attr="aria-label:a11y.backToDrills">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span data-i18n="ai.back">Drills</span>
+            </button>
+            <h1 data-i18n="ai.title">AI assistant</h1>
+        </header>
+        <div class="settings-body" id="ai-body"></div>
+    </div>
+</div>
 
+<div id="toast" data-i18n="toast.default">Notification</div>
 <div id="editor-modal" class="modal-overlay">
     <div class="modal">
         <div class="modal-header">

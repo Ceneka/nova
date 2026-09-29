@@ -27,7 +27,8 @@ export const en = {
         importDrills: 'Import Drills',
         settings: 'Settings',
         about: 'About',
-        statistics: 'Statistics'
+        statistics: 'Statistics',
+        ai: 'AI assistant'
     },
 
     // --- index.html: the tabs above the drill list ---
@@ -37,7 +38,8 @@ export const en = {
         complex: 'Complex',
         'custom-a': 'Custom A',
         'custom-b': 'Custom B',
-        'custom-c': 'Custom C'
+        'custom-c': 'Custom C',
+        ia: 'IA'
     },
 
     // --- ui.js: the connection card, and index.html controls on it ---
@@ -88,7 +90,9 @@ export const en = {
         erase: 'Erase',
         install: 'Install',
         newPreset: '+ New Preset',
-        savePreset: 'Save Preset'
+        savePreset: 'Save Preset',
+        on: 'On',
+        off: 'Off'
     },
 
     // --- index.html: modal titles ---
@@ -295,6 +299,62 @@ export const en = {
         foot: 'Nova Drill | Tenisdemesa.ar · Version 2.4a'
     },
 
+    // --- ui.js: the IA tab ---
+    ia: {
+        emptyList: 'Nothing here yet. Build a drill in the AI assistant and save it, and it shows up here.',
+        moveTo: 'Move to Custom {bank}',
+        source: {
+            voice: 'Spoken',
+            text: 'Typed',
+            model: 'From the model'
+        }
+    },
+
+    // --- aiConfig.js + settingsUi.js: the AI assistant settings section ---
+    settingsAi: {
+        section: 'AI assistant',
+        textModel: 'Text model',
+        textModelDesc: 'Optional. Without it the assistant still reads short commands on this device, with no key and no signal.',
+        voiceModel: 'Voice model',
+        voiceModelDesc: 'For transcribing speech and, optionally, speaking replies.',
+        followText: 'Use the text model for voice too',
+        followTextDesc: 'Follows whatever the text model is set to, right now.',
+        detach: 'Detach',
+        following: 'Following: {model}',
+        provider: 'Provider',
+        baseUrl: 'Base URL',
+        apiKey: 'API key',
+        model: 'Model',
+        fetchModels: 'Fetch models',
+        testConnection: 'Test connection',
+        speakReplies: 'Speak replies',
+        speakRepliesDesc: 'Reads the answer out loud using your browser\u2019s own voice.',
+        remember: 'Remember this conversation',
+        rememberDesc: 'Off: the history is per session and gone when you close the tab.',
+        clearKey: 'Clear API key',
+        clearKeyDesc: 'Forgets the key on this device. Everything else stays.',
+        keyStored: 'Saved on this device and sent only to the base URL above.',
+        keySessionOnly: 'Session only: the key is kept in memory and gone when this tab closes.',
+        keyWarning: 'The key is stored in this browser\u2019s local storage, which any script on the site can read. That is fine on your own phone and not fine on a shared machine \u2014 use the session-only option there.',
+        sessionOnly: 'Keep the key in memory only',
+        language: 'Reply language',
+        languageInherit: 'Same as the app',
+        never: 'never tested',
+        testing: 'Testing\u2026',
+        ok: 'Connected. The model replied.',
+        failed: 'Could not reach that endpoint',
+        noModels: 'The endpoint returned no models.',
+        modelsLoaded: '{n} models loaded',
+        cleared: 'API key cleared',
+        savedMsg: 'AI settings saved'
+    },
+
+    provider: {
+        openrouter: 'OpenRouter',
+        openai: 'OpenAI',
+        custom: 'Custom'
+    },
+
     // --- settingsUi.js: the theme cards. Themes are named, not styled. ---
     // All four are dark now - they are four accent hues over one shared set of
     // surfaces - so the names are the accents, not the light/dark split.
@@ -320,6 +380,86 @@ export const en = {
         },
         deleteAll: 'Delete all history',
         keepingLast: 'Keeping the last {n} sessions.'
+    },
+
+    // --- aiUi.js: the assistant panel ---
+    // Code keys use dots and word characters only. The call-site scanner in
+    // tests/integration.html matches t\(\s*['"]([\w.]+)['"], so a hyphen here
+    // would not be seen as this key at all and the placeholder check would go
+    // quiet. (Markup keys in index.html may use hyphens; these may not.)
+    ai: {
+        title: 'AI assistant',
+        back: 'Drills',
+        // The first thing a new user reads, so it says the two things that
+        // matter: you can type as well as talk, and it works with no key.
+        empty: 'Say or type a drill. This reads your sentence on this device — no API key, no signal needed.',
+        placeholder: 'e.g. push b, then a long backspin serve to the forehand',
+        ask: 'Ask the AI',
+        listening: 'Listening…',
+        thinking: 'Thinking…',
+        tierLocal: 'Read on this device',
+        tierModel: 'Answered by the model',
+        step: 'Step {n}',
+        generated: 'generated',
+        notUnderstood: 'I could not read “{text}”. Try “push b, then drive f fuerte”, or ask the model.',
+        chipFrom: 'using “{name}”',
+        traceTool: 'called {name}',
+        presetsFound: {
+            one: '{n} preset looked at',
+            other: '{n} presets looked at'
+        },
+        chipGenerated: {
+            one: '{n} ball generated',
+            other: '{n} balls generated'
+        },
+        play: 'Play',
+        openEditor: 'Open in editor',
+        save: 'Save',
+        discard: 'Discard',
+        rename: 'Rename',
+        needConnection: 'Connect the robot to play a drill.',
+        needKey: 'The model needs an API key. Add one in Settings → AI assistant.',
+        offline: 'The model needs a connection. Everything else still works.',
+        voiceCloud: 'Speech recognition needs a connection in this browser.',
+        voiceUnsupported: 'This browser cannot listen. Type the drill instead - everything else works the same.',
+        voiceNothingHeard: 'Nothing was heard on the recording.',
+        voiceErrorGeneric: 'Voice input did not work. Type the drill instead.',
+        voiceErrorNotAllowed: 'Microphone access was refused. Allow it, or type the drill.',
+        voiceErrorNoMic: 'No microphone was found.',
+        voiceErrorNetwork: 'Speech recognition needs a connection.',
+        voiceErrorLanguage: 'This browser does not speak that language.',
+        confirmDiscard: 'Throw this draft away?',
+        clearCategory: 'Clear the IA category',
+        confirmClearCategory: 'Delete every drill the assistant built? This cannot be undone.',
+        promptRename: 'Name for this drill:',
+        // The spoken readout, one sentence per step. Built from the same
+        // vocabulary the parser matched on, so the words the user said are the
+        // words they hear back.
+        readout: 'Step {n} — {label}.',
+        readoutFrom: 'Step {n} — {label}, from the preset “{name}”.',
+        readoutTail: '{reps} reps, {bpm} bpm.',
+        role: {
+            serve: 'serve',
+            push: 'push',
+            drive: 'drive',
+            loop: 'loop',
+            block: 'block'
+        },
+        rot: {
+            top: 'topspin',
+            back: 'backspin',
+            side: 'sidespin',
+            flat: 'flat'
+        },
+        side: {
+            bh: 'backhand',
+            center: 'the middle',
+            fh: 'forehand'
+        },
+        strength: {
+            low: 'soft',
+            high: 'strong'
+        }
     },
 
     // --- showToast() calls, everywhere ---
@@ -364,6 +504,9 @@ export const en = {
         nothingNewToImport: 'Nothing new to import',
         noPresetsInFile: 'No presets found in file',
         importFailed: 'Import failed',
+        aiSaved: 'Saved to the IA tab',
+        aiCleared: 'IA drills cleared',
+        aiMoved: 'Moved to Custom {bank}',
         presetsReset: 'Presets reset to defaults',
         maxPerAxis: 'Max 6 per axis',
         sessionDeleted: 'Session deleted',
@@ -416,7 +559,10 @@ export const en = {
         deleteSessionTitle: 'Delete this session',
         createNewDrill: 'Create New Drill',
         dragToReorder: 'Drag to reorder',
-        installApp: 'Install Nova'
+        installApp: 'Install Nova',
+        openAi: 'Open the AI assistant',
+        talk: 'Talk to the assistant',
+        send: 'Send what you typed'
     },
 
     placeholder: {

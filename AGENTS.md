@@ -53,6 +53,15 @@ js/
   bluetooth.js      Web Bluetooth + the wire packet format
   cloud.js          share-code upload/download
   i18n.js           translation runtime: t(), applyI18n(), language state
+  aiTerms.js        the assistant's vocabulary + parseUtterance()  <- read this
+  aiMatch.js        deterministic preset matching
+  aiCompile.js      intent + preset -> real steps, via makeBall()
+  aiStore.js        nova_ai_drills, the IA category, and the draft
+  aiConfig.js       BYOK storage, endpoint building, key redaction
+  aiClient.js       OpenAI-compatible transport + the bounded agent loop
+  aiAgent.js        the tools the model may call
+  aiVoice.js        speech in and speech out
+  aiUi.js           the assistant panel
   locales/
     en.js           English dictionary, and the source of truth for the keys
     es.js           Español
@@ -71,7 +80,7 @@ speaks the same flat array. Defined in `js/ball.js` as `B`:
 | 0 | top motor RPM | derived from speed/spin |
 | 1 | bottom motor RPM | derived from speed/spin |
 | 2 | height | -50 (down) .. 100 (up) |
-| 3 | drop | -10 (right) .. 10 (left); **lateral placement** |
+| 3 | drop | -10 (backhand) .. 10 (forehand); **lateral placement** |
 | 4 | frequency | 0 (30 bpm) .. 100 (90 bpm) — *not* bpm |
 | 5 | reps | 1 .. 200 |
 | 6 | active | 1 = played, 0 = skipped. **undefined means 1** |
@@ -190,11 +199,174 @@ Two traps here, both of which cost a debugging round:
 - **Escape is handled in exactly one place, `settingsUi.js`.** It cannot live
   in `statsUi.js`: Settings *imports* that module, so a listener there is
   registered first, closes Statistics, and then Settings sees a closed
-  Statistics and closes itself too — one keypress, both screens.
+  Statistics and closes itself too — one keypress, both screens. The same goes
+  for `aiUi.js`. The order in that one handler **is** the z-order: assistant
+  170, Statistics 160, Settings 150.
 
 `--danger` is a *fill* colour and text on it is `--on-accent`, not white —
 white is 3.9:1 on the danger red. Destructive **labels** use `--danger-ink`,
 which is a lighter red that does clear AA as text. See Design.
+
+## The AI assistant ("Coach")
+
+A voice-first assistant that turns a spoken sentence into a playable drill. It
+is BYOK - no key ships, and **none is needed**: Tier 0 answers `push b, drive f`
+on the device with no network at all. That is the whole reason it belongs in
+this app rather than being a step backwards from it.
+
+### The one architectural decision
+
+**The model never writes ball numbers.** It writes an *intent* in the user's own
+vocabulary, and the same two pure functions turn that into a real array whether
+the intent came from the deterministic tier or from the model:
+
+```
+utterance ─▶ parseUtterance() ─▶ intent[] ─▶ matchPreset() ─▶ compile() ─▶ steps
+              (deterministic)    (vocabulary)  (deterministic)   (deterministic)
+                   │
+                   └─ not understood ─▶ the model ─▶ intent[]  (same shape)
+```
+
+`compile()` never builds an array by hand - everything goes through
+`makeBall()`, so `SPIN_LIMITS`, `maxScatterFor()` and the `active === 1` default
+cannot be violated. Rules that have bitten people before:
+
+- **Two tiers, and the cheap one is the floor.** Tier 0 needs no key, no
+  network and no model. Tier 1 is only entered for what Tier 0 could not read,
+  and a Tier 0 result is never a dead end - there is always a one-tap "ask the
+  AI". The panel says which tier answered.
+- **They cannot drift.** `aiTerms.js` holds the vocabulary once; the parser
+  matches on it and `systemPrompt()` renders it into the model tier's prompt.
+- **`aiTerms`, `aiMatch`, `aiCompile` and `aiClient` import cleanly under bare
+  Node** - no `document`, no `window`, no `localStorage` at module scope, and
+  `aiClient` takes its `fetch` **by injection**. That is what makes
+  `tests/ai-client.test.mjs` possible with no browser and no network. Do not
+  reach for a global in those four files.
+- **"saque" and "push" are the same word here.** The factory key `push(b)` is
+  labelled "Saque(Rev.)" in Spanish, but a serve and a rally push are opposite
+  ends of the table. One vocabulary entry, two readings, and a fixed rule: a
+  **depth word means serve**, no depth word means rally push. The speed
+  difference (4.5 vs 1.5) is the point of telling them apart.
+- **Intensity is a speed, never a scatter.** "fuerte" moves `speed` by at most
+  +/-2. Scatter stays the explicit "con dispersion", so a drill can never
+  surprise you mid-rally.
+- **A connector only breaks where the next part names a shot.** "push b, drive
+  f" is two steps; "a la derecha y fuerte" is one step with two modifiers. That
+  rule is what makes the example sentence come out as three shots, not five.
+
+### The rule that matters most in this feature
+
+**Model output is untrusted input and is rendered with `textContent`, never
+`innerHTML`.** This is the one place where the app's re-render-from-the-model
+pattern becomes dangerous: everywhere else the model is the user's own drills
+and presets, and here part of it is text from a remote server. No `innerHTML`,
+no `insertAdjacentHTML`, no `data-i18n-html` on any node that can hold model
+text, and no model string inside a template literal in a `render()`. `t()` does
+not escape its parameters, so a dictionary value is trusted chrome and a model
+value never goes through it.
+
+**AI-generated names are the most hostile name source in the app.** The key is
+`ai_` + the clock + a random suffix, *never* derived from the model's text - see
+"Drill names are free text" below for why that is not a style preference. The
+name itself is stored as typed and rendered with `textContent`.
+
+### `nova_ai_drills` is its own key on purpose
+
+It is not a `custom-ia` set inside `userCustomDrills`, because
+`importCustomDrills()` rebuilds `custom_data` from scratch: AI drills there
+would be **silently deleted by importing any CSV**, including one the user just
+exported. It is also not in the shared drill CSV, whose column set is a
+compatibility surface. The IA tab (`#view-ia`, `ui.js`) exists to keep "my
+drills" and "the machine's drills" separable, with a one-tap **Move to Custom
+A/B/C** - which is how an AI drill becomes permanently yours *and* CSV-
+exportable, because from that moment it is an ordinary custom drill.
+
+### The BYOK surface
+
+Settings has an **AI assistant** section above Presets. Two slots, and
+"same model for text and voice" is a **mode**, not a copy and not a shared
+pointer - both of those have a failure mode. `voice.mode: 'follow-text'` resolves
+the text slot at *call time* and the row shows what you are following with a
+Detach button, so it can never silently change under you. No model id is
+hardcoded; "Fetch model list" asks the endpoint and fills a `<datalist>`, while
+the field stays free text for self-hosted proxies.
+
+The key lives in `localStorage` under `nova_ai_config` and is sent **only** as
+an `Authorization` header to the one base URL you typed. `redact()` exists
+because that is a promise kept in more than one place, and a key in a console is
+a key in a screenshot: **every** error path in `aiClient.js` scrubs the key it
+*actually sent*, not only the stored one. There is a session-only option, and
+the settings copy says out loud - in both languages - that `localStorage` is
+readable by any script on the origin, which is fine on your own phone and not
+fine on a shared machine.
+
+### The tools, and what they deliberately cannot do
+
+**No tool writes a ball array and no tool writes `currentDrills`.**
+`persist_draft` is the single funnel into storage and it is the user's decision,
+not the model's. A model that names a tool which does not exist has it reported
+back rather than executed. `CONFIRM` in `aiAgent.js` is the one list of which
+tools need a yes, so a tool cannot quietly become destructive by omission.
+`delete_preset`, `update_preset` on a non-AI preset and clearing the IA category
+all ask every time; playing a draft is deliberately free.
+
+The loop is capped at **8 tool rounds and 45 seconds**, both abortable - a model
+that calls a tool forever would otherwise hold a spinner forever. Streaming is
+the default: a voice assistant that waits for the whole answer before it says
+anything feels broken, so `readSse()` parses the stream by hand (~30 lines, no
+SDK) and buffers across chunk boundaries, because a split in the middle of a
+tool call's JSON otherwise loses the call silently.
+
+### Two things only a live call finds
+
+Both of these were found against a real endpoint and are now unit-tested, but
+they are worth knowing before you "simplify" either one away:
+
+- **`max_tokens` is a THINKING budget, not a reply budget.** Since ~2025 a lot
+  of models behind an OpenAI-compatible endpoint are reasoning models, and they
+  emit `reasoning` deltas *alongside* `content` deltas that are present but
+  **empty**. The first live turn against `deepseek/deepseek-v4.1-flash`
+  reported `completion_tokens: 700, reasoning_tokens: 700,
+  finish_reason: "length"` and returned **no content and no tool call at all** -
+  so the user got a silent empty bubble that looked exactly like a model with
+  nothing to say. Hence `DEFAULT_MAX_TOKENS = 2048`, and a hard check: a turn
+  cut off with nothing to show is retried once at double the budget and then
+  **fails loudly** rather than returning an empty string.
+- **The API speech-in path has TWO wire formats, and picking the wrong one is
+  a 404, not an error.** OpenAI's `/audio/transcriptions` takes
+  `multipart/form-data` with a `file` part and must NOT set `Content-Type`
+  (the browser adds the boundary). OpenRouter's takes `application/json` with
+  base64 in `input_audio: {data, format}`. The shape is chosen by provider.
+  Two corollaries: the JSON body **must be `JSON.stringify`'d** (a plain
+  object handed to `fetch` gets coerced, and the endpoint answers "expected
+  object, received array", which looks like a bad model id and is not one), and
+  **OpenRouter does not list transcription models in `GET /models`** - that
+  endpoint covers chat models only, so "it is not in the list" is not evidence
+  a transcription model does not work.
+
+### Voice
+
+Browser `SpeechRecognition` by default (Chrome and Safari only, **not
+Baseline, not Firefox** - and Chrome's engine is cloud-backed, so it does not
+work offline, which is the opposite of everything else here). `phrases` is
+seeded with the app's own vocabulary, which is the single biggest accuracy win
+for exactly the words that trip it up. `speechSynthesis` for replies, with
+barge-in: starting to talk cancels the answer mid-sentence.
+
+**Neither the MCP browser nor headless Chrome has a microphone**, so the panel
+*always* has a text field - not a send button that expands - and the recognition
+object is built through one seam, `setRecognitionFactory()`. A microphone you
+can miss is a microphone that gets abandoned. Live voice gets tested by a person,
+on a phone, with real keys.
+
+### AI drills count toward the training history
+
+Yes, deliberately. A session is one robot connection and every drill folds into
+it; a draft played from the panel goes through the same `noteSessionDrill()` a
+saved drill does. Excluding it would make the history a lie about what you
+actually did. `startSequence()` is what made this possible - it is the
+in-memory entry point the assistant calls, and `startDrillSequence()` is now a
+thin wrapper over it.
 
 ## Translations
 
@@ -372,7 +544,7 @@ A **real registration cannot be tested in the headless suite**: under
 `--virtual-time-budget` a *successful* registration never settles and the page
 hangs, while a failed one rejects immediately. (It is the virtual clock, not
 headless - over CDP against a real browser the same worker activates,
-precaches 33 files, and the app boots with the network switched off.) So
+precaches the whole shell, and the app boots with the network switched off.) So
 `tests/integration.html` evaluates the real `sw.js` through `new Function` with
 a fake `self`/`caches`/`Request`/`fetch` and drives its own `install`,
 `activate` and `fetch` handlers. That covers the logic; the browser half is
@@ -403,7 +575,8 @@ the canvas or it gets cut in half on a real home screen.
   an import cycle.
 - **Storage keys**: `custom_drills`, `custom_data`, `drill_order`,
   `user_defaults`, `nova_stats`, `nova_theme_pref`, `nova_last_played`,
-  `nova_ball_presets`, `nova_sessions`, `nova_active_session`, `nova_lang`.
+  `nova_ball_presets`, `nova_sessions`, `nova_active_session`, `nova_lang`,
+  `nova_ai_drills`, `nova_ai_config`.
   `factoryReset()` wipes all of them (it calls `localStorage.clear()`; the key
   list here is documentation, not a second implementation).
 - **Styling**: CSS custom properties (`--primary`, `--surface`, `--danger`,
@@ -495,10 +668,12 @@ the whole repo":
 | `tools/` | the icon regeneration script; the PNGs it writes are committed |
 | `AGENTS.md` | instructions for coding agents, not for users |
 
-Two gates run before anything is deployed: `node --test tests/presets.test.mjs`
-and the browser checks in `tests/integration.html`, driven through
-headless Chrome in the same way as documented below. A failure blocks the
-deploy.
+Two gates run before anything is deployed: `node --test tests/*.test.mjs`
+(three suites - the preset engine, the assistant's core, and the model tier
+against a fake endpoint; the live counterpart is `tools/live-check.mjs`) and
+the browser checks in `tests/integration.html`, driven through headless Chrome
+in the same way as documented below. A failure
+blocks the deploy. `tools/run-checks.sh` runs both in one command.
 
 The workflow also verifies that every local `src=`/`href=` in `index.html`
 resolves to a file that was actually copied. That is the check that catches
@@ -517,21 +692,26 @@ that third-party server. If you want your own, self-host PocketBase and change
 ## Tests
 
 ```bash
-node --test tests/presets.test.mjs      # 24 unit tests, no dependencies
+node --test tests/*.test.mjs            # 85 unit tests, no dependencies
+# or, both gates plus the browser suite, in one command:
+tools/run-checks.sh
 ```
 
-Browser integration (329 checks, needs the HTTP server above):
+Browser integration (438 checks, needs the HTTP server above):
 
 ```bash
-google-chrome --headless --disable-gpu --window-size=430,932 \
-  --virtual-time-budget=12000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
-  | grep -o '<title>[^<]*'        # -> <title>PASS(329) or FAIL(n)
+google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+  --window-size=430,932 --user-data-dir=$(mktemp -d) \
+  --virtual-time-budget=20000 --dump-dom http://127.0.0.1:8123/tests/integration.html \
+  | grep -o '<title>[^<]*'        # -> <title>PASS(n) or FAIL(n)
 ```
 
-Give it a throwaway `--user-data-dir`. The page drives the real importer and
-the real editor, both of which write to `localStorage`, so a second run
-against a warm profile starts from the previous run's drills and fails checks
-that have nothing to do with the change.
+`--user-data-dir` must be throwaway. The page drives the real importer and the
+real editor, both of which write to `localStorage`, so a second run against a
+warm profile starts from the previous run's drills and fails checks that have
+nothing to do with the change. `tools/run-checks.sh` gets this right for you:
+it runs both gates, starts the server if it is not already up, and always uses
+a fresh profile.
 
 Open it in a normal browser to see each check. It drives the real editor, the
 real importer, the real exporter, the real settings screen and the real

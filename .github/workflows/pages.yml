@@ -30,8 +30,11 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Unit tests (preset engine)
-        run: node --test tests/presets.test.mjs
+      # Every *.test.mjs, not a named list: a new suite that nobody added to
+      # this line would sit in the repo passing on its own machine and never
+      # run here. The browser checks below are the other half of the gate.
+      - name: Unit tests
+        run: node --test tests/*.test.mjs
 
       # The browser suite drives the real editor, importer, exporter and
       # settings screen in headless Chrome, which the runner already has.
@@ -43,7 +46,6 @@ jobs:
 
           python3 -m http.server 8123 --bind 127.0.0.1 >/dev/null 2>&1 &
           SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           for _ in $(seq 1 30); do
             curl -sf -o /dev/null http://127.0.0.1:8123/ && break
@@ -51,8 +53,16 @@ jobs:
           done
           curl -sf -o /dev/null http://127.0.0.1:8123/ || { echo "::error::server never came up"; exit 1; }
 
+          # A throwaway profile every run: the page writes to localStorage, so
+          # a warm one starts from the previous run's drills and fails checks
+          # that have nothing to do with the change under test.
+          PROFILE=$(mktemp -d)
+          trap 'rm -rf "$PROFILE"; kill $SERVER_PID 2>/dev/null || true' EXIT
+
           RESULT=$(google-chrome --headless --no-sandbox --disable-gpu \
-                    --disable-dev-shm-usage --window-size=430,932 \
+                    --disable-dev-shm-usage --disable-crash-reporter \
+                    --no-first-run --window-size=430,932 \
+                    --user-data-dir="$PROFILE" \
                     --virtual-time-budget=20000 \
                     --dump-dom http://127.0.0.1:8123/tests/integration.html \
                     | grep -o '<title>[^<]*' || true)

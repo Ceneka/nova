@@ -52,6 +52,14 @@ import './settingsUi.js';
 // Registers the window.* statistics-screen handlers
 import './statsUi.js';
 
+// The assistant panel. Imported for its side effects (the window.* handlers and
+// the 'locale-changed' listener) like every other screen module, and with a
+// relative specifier on purpose: the integration suite's import-graph walker
+// only follows specifiers matching ["'](\.[^'"]+)['"], so a bare 'aiUi.js'
+// would escape the precache check and then 404 the first time the phone loses
+// signal. See AGENTS.md, Installing.
+import './aiUi.js';
+
 import { 
     startDrillSequence, 
     stopRun, 

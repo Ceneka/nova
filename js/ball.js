@@ -10,7 +10,7 @@ import { clamp } from './utils.js';
  *   [0]  top motor RPM
  *   [1]  bottom motor RPM
  *   [2]  height     -50 (down) .. 100 (up)
- *   [3]  drop       -10 (right) .. 10 (left)   <- lateral placement
+ *   [3]  drop       -10 (backhand) .. 10 (forehand)  <- lateral placement
  *   [4]  frequency  0 (30 bpm) .. 100 (90 bpm)
  *   [5]  repetitions
  *   [6]  active     1 = played, 0 = skipped by the runner
@@ -21,6 +21,22 @@ import { clamp } from './utils.js';
  *
  * Indexes 7-9 are only present on balls created or edited in this version; the
  * factory drills still store raw RPMs and get reverse-calculated on first read.
+ *
+ * ## The `drop` sign
+ *
+ * `drop` is the lateral target, named from the RECEIVER's point of view for a
+ * right-handed receiver - the same convention the factory drills, the built-in
+ * preset axis labels and both user-facing hints already use:
+ *
+ *     drop  0      = centre
+ *     drop -5      = backhand    (push(b), "Push(B)" / "Saque(Rev.)")
+ *     drop +5      = forehand    (push(f), "Push(F)" / "Saque(Der.)")
+ *
+ * This is stated here because it was documented backwards in three places at
+ * once - this file, presets.js and the AGENTS.md table - all saying
+ * "-10 (right) .. 10 (left)" while the data and the UI said the opposite. A
+ * comment that contradicts the code is how the next person gets it backwards.
+ * constants.js is the tie-breaker if this ever drifts again.
  */
 export const B = {
     TOP: 0, BOT: 1, HEIGHT: 2, DROP: 3, FREQ: 4, REPS: 5, ACTIVE: 6,

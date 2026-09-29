@@ -41,7 +41,8 @@ export const es = {
         importDrills: 'Importar ejercicios',
         settings: 'Ajustes',
         about: 'Acerca de',
-        statistics: 'Estadísticas'
+        statistics: 'Estadísticas',
+        ai: 'Asistente IA'
     },
 
     // --- index.html: the tabs above the drill list ---
@@ -51,7 +52,9 @@ export const es = {
         complex: 'Complejos',
         'custom-a': 'Personal A',
         'custom-b': 'Personal B',
-        'custom-c': 'Personal C'
+        'custom-c': 'Personal C',
+        // "IA" is a brand mark, not a word: it is the same in both languages.
+        ia: 'IA'
     },
 
     // --- ui.js: the connection card, and index.html controls on it ---
@@ -101,7 +104,9 @@ export const es = {
         erase: 'Borrar',
         install: 'Instalar',
         newPreset: '+ Nuevo preset',
-        savePreset: 'Guardar preset'
+        savePreset: 'Guardar preset',
+        on: 'On',
+        off: 'Off'
     },
 
     // --- index.html: modal titles ---
@@ -302,6 +307,62 @@ export const es = {
         foot: 'Nova Drill | Tenisdemesa.ar · Versión 2.4a'
     },
 
+    // --- ui.js: la pestaña IA ---
+    ia: {
+        emptyList: 'Todavía no hay nada. Armá un ejercicio en el asistente IA y guardalo, y aparece acá.',
+        moveTo: 'Mover a {bank}',
+        source: {
+            voice: 'Hablado',
+            text: 'Escrito',
+            model: 'Del modelo'
+        }
+    },
+
+    // --- aiConfig.js + settingsUi.js: la sección del asistente IA ---
+    settingsAi: {
+        section: 'Asistente IA',
+        textModel: 'Modelo de texto',
+        textModelDesc: 'Opcional. Sin él, el asistente igual lee los comandos cortos en este dispositivo, sin clave y sin señal.',
+        voiceModel: 'Modelo de voz',
+        voiceModelDesc: 'Para transcribir la voz y, si querés, leer las respuestas.',
+        followText: 'Usar el modelo de texto también para la voz',
+        followTextDesc: 'Sigue lo que tenga el modelo de texto ahora mismo.',
+        detach: 'Separar',
+        following: 'Siguiendo: {model}',
+        provider: 'Proveedor',
+        baseUrl: 'URL base',
+        apiKey: 'Clave de API',
+        model: 'Modelo',
+        fetchModels: 'Ver modelos',
+        testConnection: 'Probar conexión',
+        speakReplies: 'Leer las respuestas',
+        speakRepliesDesc: 'Dice la respuesta en voz alta con la voz del propio navegador.',
+        remember: 'Recordar esta conversación',
+        rememberDesc: 'Apagado: el historial es de esta sesión y se va al cerrar la pestaña.',
+        clearKey: 'Borrar la clave de API',
+        clearKeyDesc: 'Olvida la clave en este dispositivo. Todo lo demás queda.',
+        keyStored: 'Guardada en este dispositivo y enviada solo a la URL de arriba.',
+        keySessionOnly: 'Solo de sesión: la clave queda en memoria y se va al cerrar esta pestaña.',
+        keyWarning: 'La clave se guarda en el almacenamiento local de este navegador, que puede leer cualquier script del sitio. Está bien en tu propio teléfono y no está bien en una máquina compartida: ahí usá la opción de solo sesión.',
+        sessionOnly: 'Guardar la clave solo en memoria',
+        language: 'Idioma de la respuesta',
+        languageInherit: 'Igual que la app',
+        never: 'sin probar',
+        testing: 'Probando\u2026',
+        ok: 'Conectado. El modelo respondió.',
+        failed: 'No se pudo llegar a ese endpoint',
+        noModels: 'El endpoint no devolvió modelos.',
+        modelsLoaded: '{n} modelos cargados',
+        cleared: 'Clave de API borrada',
+        savedMsg: 'Ajustes de IA guardados'
+    },
+
+    provider: {
+        openrouter: 'OpenRouter',
+        openai: 'OpenAI',
+        custom: 'Personalizado'
+    },
+
     // --- settingsUi.js: the theme cards ---
     theme: {
         standard: 'Mesa',
@@ -325,6 +386,77 @@ export const es = {
         },
         deleteAll: 'Eliminar todo el historial',
         keepingLast: 'Se conservan las últimas {n} sesiones.'
+    },
+
+    // --- aiUi.js: el panel del asistente ---
+    ai: {
+        title: 'Asistente IA',
+        back: 'Ejercicios',
+        empty: 'Decí o escribí un ejercicio. Esto lee tu frase en este dispositivo: sin clave de API y sin señal.',
+        placeholder: 'ej. push b, y luego saque largo cortado a la derecha',
+        ask: 'Preguntarle a la IA',
+        listening: 'Escuchando…',
+        thinking: 'Pensando…',
+        tierLocal: 'Leído en este dispositivo',
+        tierModel: 'Respondido por el modelo',
+        step: 'Paso {n}',
+        generated: 'generado',
+        notUnderstood: 'No pude leer «{text}». Probá «push b, y luego drive f fuerte», o preguntale al modelo.',
+        chipFrom: 'usando «{name}»',
+        traceTool: 'called {name}',
+        presetsFound: {
+            one: '{n} preset looked at',
+            other: '{n} presets looked at'
+        },
+        chipGenerated: {
+            one: '{n} bola generada',
+            other: '{n} bolas generadas'
+        },
+        play: 'Jugar',
+        openEditor: 'Abrir en el editor',
+        save: 'Guardar',
+        discard: 'Descartar',
+        rename: 'Renombrar',
+        needConnection: 'Conectá el robot para jugar un ejercicio.',
+        needKey: 'El modelo necesita una clave de API. Agregala en Ajustes → Asistente IA.',
+        offline: 'El modelo necesita conexión. Todo lo demás sigue funcionando.',
+        voiceCloud: 'En este navegador, el reconocimiento de voz necesita conexión.',
+        voiceUnsupported: 'Este navegador no puede escuchar. Escribí el ejercicio: todo lo demás funciona igual.',
+        voiceNothingHeard: 'No se oyó nada en la grabación.',
+        voiceErrorGeneric: 'La entrada por voz no funcionó. Escribí el ejercicio.',
+        voiceErrorNotAllowed: 'Se denegó el acceso al micrófono. Permitilo, o escribí el ejercicio.',
+        voiceErrorNoMic: 'No se encontró ningún micrófono.',
+        voiceErrorNetwork: 'El reconocimiento de voz necesita conexión.',
+        voiceErrorLanguage: 'Este navegador no habla ese idioma.',
+        confirmDiscard: '¿Descartar este borrador?',
+        clearCategory: 'Vaciar la categoría IA',
+        confirmClearCategory: '¿Eliminar todos los ejercicios que armó el asistente? Esto no se puede deshacer.',
+        promptRename: 'Nombre para este ejercicio:',
+        readout: 'Paso {n} — {label}.',
+        readoutFrom: 'Paso {n} — {label}, del preset «{name}».',
+        readoutTail: '{reps} repeticiones, {bpm} bpm.',
+        role: {
+            serve: 'saque',
+            push: 'push',
+            drive: 'drive',
+            loop: 'loop',
+            block: 'bloqueo'
+        },
+        rot: {
+            top: 'top',
+            back: 'cortado',
+            side: 'lateral',
+            flat: 'plano'
+        },
+        side: {
+            bh: 'al revés',
+            center: 'al medio',
+            fh: 'a la derecha'
+        },
+        strength: {
+            low: 'suave',
+            high: 'fuerte'
+        }
     },
 
     // --- showToast() calls, everywhere ---
@@ -369,6 +501,9 @@ export const es = {
         nothingNewToImport: 'No hay nada nuevo que importar',
         noPresetsInFile: 'No se encontraron presets en el archivo',
         importFailed: 'La importación falló',
+        aiSaved: 'Guardado en la pestaña IA',
+        aiCleared: 'Ejercicios de IA eliminados',
+        aiMoved: 'Movido a {bank}',
         presetsReset: 'Presets restablecidos a los originales',
         maxPerAxis: 'Máx. 6 por eje',
         sessionDeleted: 'Sesión eliminada',
@@ -421,7 +556,10 @@ export const es = {
         deleteSessionTitle: 'Eliminar esta sesión',
         createNewDrill: 'Crear un ejercicio nuevo',
         dragToReorder: 'Arrastra para reordenar',
-        installApp: 'Instalar Nova'
+        installApp: 'Instalar Nova',
+        openAi: 'Abrir el asistente IA',
+        talk: 'Hablarle al asistente',
+        send: 'Enviar lo que escribiste'
     },
 
     placeholder: {

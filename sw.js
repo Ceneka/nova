@@ -21,7 +21,7 @@
  *     install at all, rather than an app that half-works offline.
  */
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `nova-shell-${VERSION}`;
 
 /** The precached address of the app itself. Serve as the navigation fallback. */
@@ -51,6 +51,15 @@ const PRECACHE = [
     'fonts/jbm-latin.woff2',
     'fonts/jbm-latin-ext.woff2',
 
+    'js/aiAgent.js',
+    'js/aiClient.js',
+    'js/aiCompile.js',
+    'js/aiConfig.js',
+    'js/aiMatch.js',
+    'js/aiStore.js',
+    'js/aiTerms.js',
+    'js/aiVoice.js',
+    'js/aiUi.js',
     'js/ball.js',
     'js/bluetooth.js',
     'js/cloud.js',

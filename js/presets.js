@@ -10,7 +10,7 @@ export const MAX_STEPS_PER_DRILL = 20;
 /**
  * A preset is a named ball recipe plus up to two variation axes:
  *
- *   placements -> lateral position, writes the drop  (-10 right .. 10 left)
+ *   placements -> lateral position, writes the drop  (-10 backhand .. 10 forehand)
  *   depths     -> how deep it lands, writes the height (-50 .. 100)
  *
  * Both axes are optional. With an axis empty the preset's own drop/height is

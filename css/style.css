@@ -239,7 +239,13 @@ h1 {
 
 .menu-btn {
     position: absolute;
-    right: 0;
+    /* `right: 8px` with `margin: -8px`, not `right: 0`. The negative margin
+       hangs the 8px of padding outside the button so the icon lines up with
+       the edge, which is the point of it - but paired with `right: 0` it also
+       hung the button itself 8px past the viewport, and the whole page
+       scrolled sideways by 8px. This keeps the padding hang and the box
+       inside. Found by loading the real index.html, which no check did. */
+    right: 8px;
     color: var(--text-light);
     cursor: pointer;
     padding: 8px;
@@ -2123,3 +2129,426 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 /* The toast is pinned near the bottom, which on a gesture-navigation phone is
    exactly where the home indicator is drawn. */
 #toast.show { bottom: calc(50px + env(safe-area-inset-bottom)); }
+
+/* ==========================================================================
+   The AI assistant panel
+   ==========================================================================
+
+   A full screen in the free z-index band between Statistics (160) and the
+   modals (200), so the preset sheet and the drill editor still open over it.
+   It reuses .settings-shell / .settings-header / .settings-back verbatim, the
+   way #stats-view reuses them, rather than growing a parallel set of chrome.
+
+   The `hidden` / `.active` pair is load-bearing and is the same trap
+   #stats-view and #settings-view both fell into once: .ai-view declares no
+   `display` of its own, so openAiView() has to remove `hidden` and
+   closeAiView() has to put it back, or the panel keeps covering the drill
+   list underneath it. See open/close in js/aiUi.js. */
+
+.ai-view {
+    position: fixed;
+    inset: 0;
+    z-index: 170;                 /* above Statistics (160), below modals (200) */
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.ai-view[hidden] { display: none; }
+.ai-view.active { display: block; }
+
+/* --- the transcript ------------------------------------------------------ */
+
+/* Interim speech and the model's in-flight prose are dimmed but present: the
+   user has to be able to see it is working, not broken. */
+.ai-transcript {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.ai-empty {
+    padding: 18px 14px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    text-align: center;
+}
+.ai-msg {
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    max-width: 88%;
+    /* Model prose is arbitrary text: it can be a 500-character run with no
+       spaces. overflow-wrap is what stops one long token taking the panel
+       sideways, which the integration suite checks for. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.ai-msg.user {
+    align-self: flex-end;
+    background: var(--accent-fill);
+    color: var(--primary);
+    border: 1px solid var(--accent-line);
+}
+.ai-msg.model {
+    align-self: flex-start;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+.ai-msg.interim { opacity: 0.6; font-style: italic; }
+.ai-msg.error {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger-ink);
+}
+
+/* Which tier answered, shown on the message that did it. */
+.ai-tier {
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+/* --- the tool trace ------------------------------------------------------ */
+
+.ai-trace {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.ai-trace-line {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-size: 0.72rem;
+    color: var(--text-light);
+    line-height: 1.4;
+}
+.ai-trace-line::before {
+    content: '\203A';           /* › */
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+/* --- the draft preview --------------------------------------------------- */
+
+.ai-draft {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 12px;
+    margin-bottom: 14px;
+}
+.ai-draft-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    /* A model-generated name is arbitrary text and can be very long. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.ai-step {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+}
+.ai-step:first-of-type { border-top: none; padding-top: 6px; }
+.ai-step-label {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.ai-step-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-top: 3px;
+}
+/* "from the preset X" or "generated" - the honest label either way. */
+.ai-chip {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border: 1px solid var(--accent-line);
+    background: var(--accent-fill);
+    color: var(--primary);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ai-chip.generated {
+    background: transparent;
+    color: var(--text-light);
+    border-color: var(--border);
+}
+
+/* --- the action bar ------------------------------------------------------ */
+
+.ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.ai-btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    /* Colours come from here, never from an inline style in JS, so they keep
+       following the theme - see AGENTS.md, Design. */
+}
+.ai-btn.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-accent);
+}
+.ai-btn.danger {
+    background: transparent;
+    border-color: var(--danger);
+    /* Destructive LABELS use --danger-ink, which clears AA as text. White on
+       --danger is 3.9:1. */
+    color: var(--danger-ink);
+}
+.ai-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* --- the composer -------------------------------------------------------- */
+
+.ai-composer {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-top: 6px;
+}
+.ai-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 44px;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.86rem;
+}
+.ai-input:focus {
+    outline: none;
+    border-color: var(--accent-line);
+}
+.ai-icon-btn {
+    flex: 0 0 auto;
+    width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    cursor: pointer;
+}
+.ai-icon-btn svg { flex-shrink: 0; }
+.ai-icon-btn.listening {
+    border-color: var(--danger);
+    color: var(--danger-ink);
+}
+.ai-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The header button that opens the panel, next to the hamburger. The wrapper
+   is what keeps the two controls a pair; the header centres its children, so
+   without it the mic would sit against the title and the menu would drift. */
+.ai-open-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.ai-open-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-right: 2px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--input-bg);
+    color: var(--text);
+    cursor: pointer;
+}
+.ai-open-btn:hover { border-color: var(--accent-line); color: var(--primary); }
+
+/* --- the AI settings form -----------------------------------------------
+   The first place in the app with a real form in it, so it brings its own
+   row type rather than being bent into `.settings-row`. Everything is a
+   custom property, so it follows all four themes for free. */
+
+.ai-field {
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+}
+.ai-field:first-of-type { border-top: none; padding-top: 4px; }
+.ai-field-label {
+    display: block;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.ai-input-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ai-input, .ai-select {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.ai-input:focus, .ai-select:focus { outline: none; border-color: var(--accent-line); }
+.ai-input.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+/* A key is a secret: the field is a password type, and this is the only place
+   its length is ever shown. */
+.ai-key-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.72rem;
+    color: var(--text-light);
+}
+.ai-btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ai-note {
+    font-size: 0.72rem;
+    color: var(--text-light);
+    line-height: 1.45;
+    margin-top: 8px;
+}
+.ai-note.warn {
+    color: var(--danger-ink);
+    border-left: 2px solid var(--danger);
+    padding-left: 9px;
+}
+/* A test result line: green when it worked, danger-ink when it did not. Both
+   are text colours, not fills. */
+.ai-test-result { font-size: 0.75rem; margin-top: 8px; line-height: 1.4; }
+.ai-test-result.ok { color: var(--primary); }
+.ai-test-result.bad { color: var(--danger-ink); }
+.ai-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+}
+
+/* A question the model needs answered before it can go on. It is part of the
+   conversation, not a modal: interrupting a tool call with a dialog is worse
+   than a row of buttons under the message that asked. */
+.ai-ask {
+    border: 1px solid var(--accent-line);
+    background: var(--accent-fill);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+.ai-ask-question {
+    font-size: 0.86rem;
+    color: var(--text);
+    line-height: 1.45;
+    margin-bottom: 10px;
+    /* Model-authored text: arbitrary, and potentially a 500-character run. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* --- the IA tab ----------------------------------------------------------
+   A drill the assistant built is not a saved drill: it is in nova_ai_drills,
+   not in custom_drills, and it is not in the shared CSV until it is moved. So
+   the row says so with a chip, and carries its own one-tap move buttons
+   rather than borrowing the drag-and-drop the custom sets use - these are not
+   in `drillOrder` and there is nothing to reorder against. */
+
+.ia-row { margin-bottom: 8px; }
+
+.mark-ai {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--accent-fill);
+    color: var(--primary);
+    border: 1px solid var(--accent-line);
+    flex-shrink: 0;
+}
+.mark-source { font-size: 0.8rem; flex-shrink: 0; opacity: 0.8; }
+
+.ia-row-actions {
+    display: flex;
+    gap: 6px;
+    padding: 0 2px 2px 2px;
+}
+.ia-move {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.ia-move:hover { border-color: var(--accent-line); color: var(--primary); }
+/* A destructive LABEL, so --danger-ink and not white on --danger. */
+.ia-move.danger { color: var(--danger-ink); border-color: var(--border); }
+.ia-move.danger:hover { border-color: var(--danger); }
+
+.ia-clear { margin: 15px auto 10px; }
+.ia-empty {
+    padding: 18px 14px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    text-align: center;
+}

@@ -55,6 +55,7 @@ shows whether the offline copy is ready yet.
   * **Languages:** English and Spanish, switchable in Settings. The first visit follows your browser's language; after that the app remembers your choice.
   * **Settings screen:** themes, language, the preset library, training history, drill defaults and data resets live in one place, behind the menu.
   * **Statistics:** a stored history of every session you have trained, with totals, a 14-day chart, your most-played drills, and per-session delete.
+  * **AI assistant:** say or type a drill in plain words and it builds one. Works with no key and no signal for the common commands; add your own model in Settings for everything else.
   * **Installable:** add it to the home screen and it opens like a normal app — no browser, and no signal needed.
 
 
@@ -108,6 +109,69 @@ other apps.
 Presets are stored per browser in `localStorage`, and are not affected by
 "Factory Reset" of drills alone.
 
+## The AI assistant
+
+Tap the microphone in the header, or just type. Either way you describe the
+drill and the app builds it:
+
+```
+Saque corto a la derecha, cortado, luego cortado largo al revés
+y luego un top al medio fuerte
+```
+
+  * "push b, drive f" → two steps
+  * "3Push b" → one step, three repetitions
+  * "loop f fuerte, push b suave" → two steps, one strong and one soft
+  * "preset Safe push a la derecha" → that preset, by name
+
+It reuses **your own presets** wherever one fits and tells you which, and says
+plainly when it did not find one and made the ball up. You see the whole
+drill before anything is saved, can play it straight away, and can open it in
+the normal editor to tweak a ball by hand.
+
+### It works without a key
+
+That is the point. The commands above are parsed on your device by a
+deterministic parser — no network, no account, no key, and nothing leaves the
+phone. An API key is **optional** and only widens what it understands: add one
+in **Settings → AI assistant** and anything the local parser cannot read goes
+to your own model instead.
+
+### Your key, your endpoint
+
+Settings has two slots, a text model and a voice model, either pointing at any
+OpenAI-compatible endpoint (OpenRouter, OpenAI, or your own). "Use the text
+model for voice too" is a switch with a visible state — the row shows exactly
+which model you are following, with a button to break the link.
+
+  * The key is stored in this browser only and is sent **only** as an
+    `Authorization` header to the one base URL you type. It never appears in a
+    log, a toast, an export, an error message or a share code.
+  * There is a **session-only** option that keeps it in memory and forgets it
+    when the tab closes.
+  * `localStorage` is readable by any script on the site, which is fine on your
+    own phone and not fine on a shared machine. Use the session-only option
+    there.
+
+### The IA tab
+
+Drills the assistant builds live in their own **IA** tab, separate from Custom
+A/B/C. That is deliberate: importing a CSV cannot touch them, and they are not
+in the exported drill file until you want them to be. Each row has a one-tap
+**Move to A / B / C**, and from that moment it is an ordinary custom drill of
+yours — editable, shareable and included in every export.
+
+### Voice
+
+Speaking and being spoken to are on by default, and the text field is always
+there, because a microphone you can miss is a microphone that gets abandoned.
+Browser speech recognition is Chrome and Safari only and is **cloud-backed, so
+it does not work offline** — which is the opposite of everything else in this
+app, and is exactly why the no-key parser above exists. Point the voice slot at
+your own endpoint for a better model, or for Firefox.
+
+Talking over the assistant cancels its reply, so you can interrupt it.
+
 ## Custom Drills (CSV)
 
 Drills can be imported via CSV. Each category (A, B, C) holds 100 drills; each drill holds 20 balls. Variant balls (pseudo-randomness) share the same ball number.
@@ -147,6 +211,7 @@ upstream app could not do or did not get right:
   * **Translations** — English and Spanish, with a hand-rolled i18n layer rather than a dependency, so the app still installs from a plain file download with no build step. Your drills, presets and shared CSV stay in the language you typed them in; only the interface around them is translated.
   * **Training history** — sessions logged per robot connection, with totals, a 14-day chart, a most-played ranking, and the ability to delete a single session or all of them.
   * **Fixes** — connecting silently doing nothing, the 20-drill category cap, the Settings back button, preset field overflow, and three identical-looking preset entry points in the editor.
+  * **An AI assistant** — a spoken or typed sentence becomes a drill, in English or Spanish. The common commands are parsed on the device with no key, no account and no network; your own model is optional and only widens what it understands. Drills it builds live in their own tab until you move one into Custom A/B/C.
   * **Installable PWA** — a web manifest, a service worker and a real icon set, so the app installs to the home screen and opens offline.
   * **Continuous deployment** — pushing to `main` runs the test suites and publishes to GitHub Pages. There is still no build step.
 
@@ -223,7 +288,8 @@ python3 -m http.server 8123
 ```
 
 ```bash
-node --test tests/presets.test.mjs        # unit tests
+node --test tests/*.test.mjs              # unit tests, no dependencies
+tools/run-checks.sh                       # both gates, one command
 ```
 
 The PWA icons are committed like every other asset. `icons/*.svg` are the
@@ -235,6 +301,11 @@ suite fails if you forget.
 Pushing to `main` runs both suites and, if they pass, publishes to GitHub
 Pages (`.github/workflows/pages.yml`). Nothing to build — the app is served
 as-is.
+
+The assistant's core (`aiTerms`, `aiMatch`, `aiCompile`, `aiClient`) imports
+cleanly under bare Node and `aiClient` takes its `fetch` **by injection**, so
+the whole model tier is tested against a fake endpoint with no browser, no
+network and no key.
 
 Browser integration checks: open `tests/integration.html` (the page title
 turns into `PASS(n)` / `FAIL(n)`). See [AGENTS.md](AGENTS.md) for the

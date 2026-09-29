@@ -4,6 +4,11 @@ import { getTotals } from './stats.js';
 import { setTheme } from './ui.js';
 import { toggleBodyScroll, showToast } from './utils.js';
 import { isStatsOpen, closeStatsView } from './statsUi.js';
+import { isAiOpen, closeAiView } from './aiUi.js';
+import {
+    getAiConfig, setAiConfig, clearAiKey, maskKey, isTextConfigured,
+    normalizeBaseUrl, redact as redactAi, PROVIDER_IDS, PROVIDERS, modelsUrl, buildHeaders
+} from './aiConfig.js';
 import { getInstallState, promptInstall, isOfflineReady } from './pwa.js';
 import { t, getLang, setLang, LANGUAGES } from './i18n.js';
 
@@ -139,6 +144,156 @@ export async function handleInstallApp() {
     if (accepted) showToast(t('toast.installing'));
 }
 
+/**
+ * The AI assistant's settings, in whichever state the configuration is in.
+ *
+ * Everything here is a mirror of `nova_ai_config`. The key itself is only ever
+ * shown masked, and only ever written back through a handler - there is no path
+ * from this template to localStorage that does not go through
+ * `aiConfig.setConfig()`.
+ *
+ * Note what is NOT here: a hardcoded model id. §16 Q6 - model ids change, are
+ * region- and account-dependent, and a stale default is a confusing first run.
+ * "Fetch model list" asks the endpoint; the field stays free text so a
+ * self-hosted proxy works.
+ *
+ * In `follow-text` mode the voice fields are hidden rather than disabled: a
+ * greyed-out field full of values that are not being used is worse than no
+ * field at all, and the "Following: <model>" line already says what is in use.
+ */
+function aiSettingsHtml() {
+    const c = getAiConfig();
+    const options = (slot) => PROVIDER_IDS.map(id => {
+        const selected = c[slot].provider === id ? ' selected' : '';
+        return `<option value="${id}"${selected}>${t(`provider.${id}`)}</option>`;
+    }).join('');
+
+    const own = c.voice.mode === 'own';
+    const following = c.voice.mode === 'follow-text';
+
+    return `
+        <section class="settings-section" data-section="ai">
+            <div class="settings-section-title">${t('settingsAi.section')}</div>
+            <div class="settings-row" data-row="ai-text">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('settingsAi.textModel')}</div>
+                    <div class="settings-row-desc">${t('settingsAi.textModelDesc')}</div>
+                </div>
+            </div>
+
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-provider">${t('settingsAi.provider')}</label>
+                <select class="ai-select" id="ai-provider"
+                        onchange="window.handleAiField('text','provider',this.value)">${options('text')}</select>
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-base">${t('settingsAi.baseUrl')}</label>
+                <input class="ai-input mono" id="ai-base" type="url" inputmode="url"
+                       value="${esc(c.text.baseUrl)}" placeholder="https://openrouter.ai/api/v1"
+                       onchange="window.handleAiField('text','baseUrl',this.value)">
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-key">${t('settingsAi.apiKey')}</label>
+                <input class="ai-input mono" id="ai-key" type="password" autocomplete="off"
+                       spellcheck="false" value="${esc(c.text.apiKey)}"
+                       onchange="window.handleAiField('text','apiKey',this.value)">
+                <div class="ai-key-state">
+                    <span data-ai-key-mask>${c.text.apiKey ? maskKey(c.text.apiKey) : t('settingsAi.never')}</span>
+                    <span>${c.sessionOnly ? t('settingsAi.keySessionOnly') : t('settingsAi.keyStored')}</span>
+                </div>
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-model">${t('settingsAi.model')}</label>
+                <input class="ai-input mono" id="ai-model" type="text" list="ai-model-list"
+                       value="${esc(c.text.model)}"
+                       onchange="window.handleAiField('text','model',this.value)">
+                <datalist id="ai-model-list"></datalist>
+                <div class="ai-btn-row">
+                    <button class="settings-btn" onclick="window.aiFetchModels()">${t('settingsAi.fetchModels')}</button>
+                    <button class="settings-btn" onclick="window.aiTestConnection()">${t('settingsAi.testConnection')}</button>
+                </div>
+                <div class="ai-test-result" data-ai-test></div>
+            </div>
+
+            <div class="ai-toggle-row" data-row="ai-voice-mode">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('settingsAi.voiceModel')}</div>
+                    <div class="settings-row-desc">${following
+                        ? t('settingsAi.following', { model: c.text.model || t('settingsAi.never') })
+                        : t('settingsAi.followTextDesc')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiVoiceMode('${own ? 'follow-text' : 'own'}')">
+                    ${own ? t('settingsAi.followText') : t('settingsAi.detach')}
+                </button>
+            </div>
+
+            ${own ? `
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-v-provider">${t('settingsAi.provider')}</label>
+                <select class="ai-select" id="ai-v-provider"
+                        onchange="window.handleAiField('voice','provider',this.value)">${options('voice')}</select>
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-v-base">${t('settingsAi.baseUrl')}</label>
+                <input class="ai-input mono" id="ai-v-base" type="url" inputmode="url"
+                       value="${esc(c.voice.baseUrl)}"
+                       onchange="window.handleAiField('voice','baseUrl',this.value)">
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-v-key">${t('settingsAi.apiKey')}</label>
+                <input class="ai-input mono" id="ai-v-key" type="password" autocomplete="off"
+                       spellcheck="false" value="${esc(c.voice.apiKey)}"
+                       onchange="window.handleAiField('voice','apiKey',this.value)">
+            </div>
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-v-model">${t('settingsAi.model')}</label>
+                <input class="ai-input mono" id="ai-v-model" type="text"
+                       value="${esc(c.voice.model)}"
+                       onchange="window.handleAiField('voice','model',this.value)">
+            </div>` : ''}
+
+            <div class="ai-field">
+                <label class="ai-field-label" for="ai-lang">${t('settingsAi.language')}</label>
+                <select class="ai-select" id="ai-lang" onchange="window.handleAiLanguage(this.value)">
+                    <option value=""${c.voice.language ? '' : ' selected'}>${t('settingsAi.languageInherit')}</option>
+                    <option value="en"${c.voice.language === 'en' ? ' selected' : ''}>English</option>
+                    <option value="es"${c.voice.language === 'es' ? ' selected' : ''}>Español</option>
+                </select>
+            </div>
+
+            <div class="ai-toggle-row" data-row="ai-speak">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('settingsAi.speakReplies')}</div>
+                    <div class="settings-row-desc">${t('settingsAi.speakRepliesDesc')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiToggle('speak')">${c.speak ? t('action.on') : t('action.off')}</button>
+            </div>
+
+            <div class="ai-toggle-row" data-row="ai-remember">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('settingsAi.remember')}</div>
+                    <div class="settings-row-desc">${t('settingsAi.rememberDesc')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiToggle('remember')">${c.remember ? t('action.on') : t('action.off')}</button>
+            </div>
+
+            <div class="ai-toggle-row" data-row="ai-session-only">
+                <div class="settings-row-main">
+                    <div class="settings-row-title">${t('settingsAi.sessionOnly')}</div>
+                    <div class="settings-row-desc">${t('settingsAi.keySessionOnly')}</div>
+                </div>
+                <button class="settings-btn" onclick="window.handleAiToggle('sessionOnly')">${c.sessionOnly ? t('action.on') : t('action.off')}</button>
+            </div>
+
+            <div class="ai-note warn">${t('settingsAi.keyWarning')}</div>
+
+            <div class="ai-btn-row">
+                <button class="settings-btn danger" onclick="window.handleAiClearKey()">${t('settingsAi.clearKey')}</button>
+            </div>
+            <div class="ai-note">${t('settingsAi.clearKeyDesc')}</div>
+        </section>`;
+}
+
 /** Render the whole screen. Cheap enough to redraw after any change. */
 export function renderSettings() {
     const body = document.getElementById('settings-body');
@@ -168,6 +323,8 @@ export function renderSettings() {
             <div class="settings-section-title">${t('settings.language')}</div>
             ${languageRowHtml()}
         </section>
+
+        ${aiSettingsHtml()}
 
         <section class="settings-section">
             <div class="settings-section-title">${t('settings.presets')}</div>
@@ -276,6 +433,144 @@ export function renderSettings() {
  * of moving themes here is to compare all four side by side. Same for the
  * language: switch it and stay on the screen to see the result.
  */
+// --- the AI assistant's settings handlers -----------------------------------
+//
+// Every one of these writes through `setAiConfig()`, which normalizes on the
+// way in and persists through the same try/catch the rest of the app uses. The
+// screen is redrawn afterwards rather than patched in place, so what is on
+// screen is always what is stored.
+
+export function handleAiField(slot, field, value) {
+    if (slot !== 'text' && slot !== 'voice') return;
+    // Picking a provider fills in its base URL - but only when the field is
+    // still empty or still on a provider default, so it never overwrites a
+    // self-hosted URL somebody typed by hand.
+    if (field === 'provider') {
+        const c = getAiConfig();
+        const current = normalizeBaseUrl(c[slot].baseUrl);
+        const known = Object.values(PROVIDERS).map(p => p.baseUrl).filter(Boolean);
+        if (!current || known.includes(current)) {
+            setAiConfig({ [slot]: { provider: value, baseUrl: PROVIDERS[value]?.baseUrl || '' } });
+            renderSettings();
+            return;
+        }
+    }
+    setAiConfig({ [slot]: { [field]: value } });
+    showToast(t('settingsAi.savedMsg'));
+    renderSettings();
+}
+
+/**
+ * "Use the text model for voice too" is a MODE, not a copy and not a shared
+ * pointer - see the header of aiConfig.js. Switching to `own` seeds the voice
+ * slot from what the text slot currently says, so detaching does not leave you
+ * staring at four empty fields wondering what it used to be.
+ */
+export function handleAiVoiceMode(mode) {
+    const c = getAiConfig();
+    if (mode === 'own' && c.voice.mode !== 'own') {
+        setAiConfig({ voice: { mode: 'own', provider: c.text.provider, baseUrl: c.text.baseUrl, model: c.text.model, apiKey: c.text.apiKey } });
+    } else {
+        setAiConfig({ voice: { mode: 'follow-text' } });
+    }
+    renderSettings();
+}
+
+/** '' means "same as the app", which is the app's one rule everywhere else. */
+export function handleAiLanguage(code) {
+    setAiConfig({ voice: { language: code === 'en' || code === 'es' ? code : '' } });
+    renderSettings();
+}
+
+export function handleAiToggle(field) {
+    const c = getAiConfig();
+    if (field === 'speak' || field === 'remember' || field === 'sessionOnly') {
+        setAiConfig({ [field]: !c[field] });
+    }
+    renderSettings();
+}
+
+/** Forget the key. Everything else about the configuration stays. */
+export function handleAiClearKey() {
+    clearAiKey();
+    showToast(t('settingsAi.cleared'));
+    renderSettings();
+}
+
+/**
+ * Ask the endpoint what models it has. The result fills a <datalist> rather
+ * than a <select>: §16 Q6 - a self-hosted proxy may have ids the picker never
+ * heard of, so the field has to stay free text and the list is only a hint.
+ */
+export async function aiFetchModels({ fetchImpl = fetch } = {}) {
+    const slot = getAiConfig().text;
+    if (!slot.baseUrl || !slot.apiKey) {
+        setAiTestResult(t('settingsAi.failed'), 'bad');
+        return [];
+    }
+    setAiTestResult(t('settingsAi.testing'), '');
+
+    try {
+        const res = await fetchImpl(modelsUrl(slot), { headers: buildHeaders(slot, { json: false }) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const ids = (Array.isArray(data?.data) ? data.data : [])
+            .map(m => m?.id).filter(id => typeof id === 'string').slice(0, 200);
+
+        const list = document.getElementById('ai-model-list');
+        if (list) {
+            list.innerHTML = '';
+            for (const id of ids) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                list.appendChild(opt);
+            }
+        }
+        setAiTestResult(ids.length
+            ? t('settingsAi.modelsLoaded', { n: ids.length })
+            : t('settingsAi.noModels'), ids.length ? 'ok' : 'bad');
+        return ids;
+    } catch (err) {
+        // The message is redacted on the way out: a provider that echoes the
+        // Authorization header into its own error body is a real thing, and
+        // that text ends up in the DOM and in a screenshot.
+        setAiTestResult(`${t('settingsAi.failed')}: ${redactAi(err?.message || String(err))}`, 'bad');
+        return [];
+    }
+}
+
+/** One real request, and a real answer, rather than a "looks configured" tick. */
+export async function aiTestConnection({ fetchImpl = fetch } = {}) {
+    const slot = getAiConfig().text;
+    if (!isTextConfigured()) {
+        setAiTestResult(t('settingsAi.failed'), 'bad');
+        return false;
+    }
+    setAiTestResult(t('settingsAi.testing'), '');
+
+    try {
+        const res = await chat({
+            messages: [{ role: 'user', content: 'ping' }],
+            maxTokens: 8,
+            fetchImpl,
+            slot
+        });
+        setAiTestResult(res?.text ? t('settingsAi.ok') : t('settingsAi.failed'), res?.text ? 'ok' : 'bad');
+        return !!res?.text;
+    } catch (err) {
+        setAiTestResult(`${t('settingsAi.failed')}: ${redactAi(err?.message || String(err))}`, 'bad');
+        return false;
+    }
+}
+
+/** The result line, as text. Never as markup. */
+function setAiTestResult(text, kind) {
+    const node = document.querySelector('#settings-body [data-ai-test]');
+    if (!node) return;
+    node.className = `ai-test-result${kind ? ' ' + kind : ''}`;
+    node.textContent = text;
+}
+
 export function handleSettingsTheme(id) {
     setTheme(id, { closeMenu: false });
     renderSettings();
@@ -294,13 +589,18 @@ export function handlePresetImportPick() {
 }
 
 // Escape closes the topmost full screen, matching every other overlay in the
-// app. This is the only Escape handler in the stack: Statistics sits above
-// Settings, and two listeners would both fire on one keypress. It cannot live
-// in statsUi.js either, because Settings imports that module - its dependency
-// is evaluated first, so a listener there would close Statistics before this
-// one got to look, and one Escape would close both.
+// app. This is the only Escape handler in the stack: Statistics and the
+// assistant sit above Settings, and two listeners would both fire on one
+// keypress. It cannot live in statsUi.js either, because Settings imports that
+// module - its dependency is evaluated first, so a listener there would close
+// Statistics before this one got to look, and one Escape would close both.
+//
+// The order below IS the z-order: assistant 170, Statistics 160, Settings 150.
+// Checking them out of order closes the wrong screen and leaves the topmost
+// one up, which is worse than closing nothing.
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (isAiOpen()) { closeAiView(); return; }
     if (isStatsOpen()) { closeStatsView(); return; }
     if (open) closeSettings();
 });
@@ -327,3 +627,10 @@ window.handleSettingsTheme = handleSettingsTheme;
 window.handleSettingsLang = handleSettingsLang;
 window.handlePresetImportPick = handlePresetImportPick;
 window.handleInstallApp = handleInstallApp;
+window.handleAiField = handleAiField;
+window.handleAiVoiceMode = handleAiVoiceMode;
+window.handleAiToggle = handleAiToggle;
+window.handleAiLanguage = handleAiLanguage;
+window.handleAiClearKey = handleAiClearKey;
+window.aiFetchModels = aiFetchModels;
+window.aiTestConnection = aiTestConnection;
