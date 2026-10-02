@@ -469,8 +469,11 @@ export const es = {
         // How much of what was said the vocabulary actually read. A tier that
         // understood two words of a sentence and answered from the rest looks
         // identical, without this, to one that understood all of it.
-        traceCoverage: 'read {pct}% of what you said',
-        traceDropped: 'never heard: {words}',
+        traceCoverage: 'entendió el {pct}% de lo que dijiste',
+        traceDropped: 'nunca oyó: {words}',
+        // Shown when the local tier read part of a sentence and the model is
+        // being asked for the rest. The reason the answer is slower now.
+        partialAsk: 'Entendí el {pct}% de eso, así que se lo pregunto al modelo.',
         chipGenerated: {
             one: '{n} bola generada',
             other: '{n} bolas generadas'

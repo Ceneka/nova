@@ -477,6 +477,11 @@ export const en = {
         // identical, without this, to one that understood all of it.
         traceCoverage: 'read {pct}% of what you said',
         traceDropped: 'never heard: {words}',
+        // Shown when the local tier read part of a sentence and the model is
+        // being asked for the rest. The reason the answer is slower now.
+        // Shown when the local tier read part of a sentence and the model is
+        // being asked for the rest. The reason the answer is slower now.
+        partialAsk: 'I understood {pct}% of that, so I\u2019m asking the model.',
         chipGenerated: {
             one: '{n} ball generated',
             other: '{n} balls generated'

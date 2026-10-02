@@ -1637,6 +1637,64 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
        !JSON.stringify(window.novaAiTrace()).includes('SUPERSECRET'),
        'log scanned');
 }
+// Below full coverage the local tier's answer goes to the model. It used to
+// ship it: a draft built from the part of the sentence that WAS understood,
+// confident and wrong, with nothing on screen saying so.
+{
+    const said = 'genera un drill cortado a la izquierda despues cortado largo a la derecha y despues dos torpedos largos a la izquierda';
+    const turns = AI.novaAiTrace();
+
+    // No key configured at this point in the file, and there is no model tier to
+    // escalate to. The app's promise is that a key is never required, so this
+    // MUST stay local - and must say why it stayed.
+    AI.handleUtterance(said, { tier: 'local' });
+    const noKey = AI.novaAiTrace();
+    const blocked = noKey[noKey.length - 1];
+    ok('with no key configured, a partial sentence still answers locally',
+       blocked?.escalated !== true && blocked?.escalateBlocked === 'no model configured',
+       JSON.stringify({ e: blocked?.escalated, b: blocked?.escalateBlocked }));
+    ok('and the local draft is still there to use',
+       !!AIS.getDraft() && AIS.getDraft().steps.length > 0,
+       `${AIS.getDraft()?.steps?.length} steps`);
+
+    // Now give it a key and the same sentence must go to the model.
+    CFG.setAiConfig({ text: { apiKey: SECRET, model: 'fake/model', baseUrl: 'https://example.invalid/v1' } });
+    const savedFetch = window.fetch;
+    let asked = 0;
+    window.fetch = async () => { asked++; return { ok: false, status: 401, text: async () => 'unauthorized', json: async () => ({}) }; };
+    AI.handleUtterance(said, { tier: 'local' });
+    await new Promise(r => setTimeout(r, 60));
+    window.fetch = savedFetch;
+
+    const withKey = AI.novaAiTrace();
+    // Two entries, and both matter: the local turn that handed over, and the
+    // model turn that actually used the network.
+    ok('with a model configured, the same sentence IS escalated',
+       withKey[withKey.length - 2]?.escalated === true
+       && withKey[withKey.length - 1]?.tier === 'model'
+       && withKey[withKey.length - 1]?.network === true,
+       JSON.stringify(withKey.slice(-2).map(e => ({ tier: e.tier, esc: e.escalated, net: e.network }))));
+    ok('and the model was actually called', asked > 0, `${asked} request(s)`);
+
+    // A full-coverage sentence must NOT escalate: that is the whole app working
+    // offline for free, and a change here would spend money on every command.
+    const before = AI.novaAiTrace().length;
+    AI.handleUtterance('saque corto al reves, luego drive fuerte a la derecha', { tier: 'local' });
+    const cleanTurn = AI.novaAiTrace()[AI.novaAiTrace().length - 1];
+    ok('a sentence read in full never escalates',
+       cleanTurn?.coverage === 100 && !cleanTurn?.escalated,
+       `${cleanTurn?.coverage}% escalated ${cleanTurn?.escalated}`);
+
+    // The tier itself must not escalate, or a model answer would loop.
+    AI.handleUtterance(said, { tier: 'model' });
+    const fromModel = AI.novaAiTrace()[AI.novaAiTrace().length - 1];
+    ok('and the model tier never escalates to itself',
+       fromModel?.escalateBlocked === 'already the model tier',
+       JSON.stringify(fromModel?.escalateBlocked));
+
+    CFG.setAiConfig({ text: { apiKey: SECRET } });
+}
+
 
 // The mic failed for a real user with "This browser does not speak that
 // language" on a perfectly normal setup. The recogniser was being opted into

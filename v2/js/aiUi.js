@@ -256,7 +256,50 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
 
     setDraft(plan);
     tracePlan(plan, parsed, tier, turn);
+
+    // Below full coverage, Tier 0 did not read the whole request. It produced an
+    // answer anyway, from part of the sentence, and that is the failure this
+    // exists for: the draft looked confident and was wrong in a way nothing on
+    // screen admitted to. So a partial read goes to the model.
+    //
+    // The local plan is set first and deliberately kept. It costs nothing, it is
+    // there in the frame the tap happened, and if the model call fails the user
+    // still has their drill instead of an error. The model's draft replaces it
+    // when it arrives.
+    const partial = parsed.coverage < 100;
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const canEscalate = partial
+        && tier !== 'model'
+        && isTextConfigured()
+        && !offline;
+
+    if (partial) {
+        debugFinish(turn, {
+            escalated: canEscalate,
+            escalateBlocked: partial && !canEscalate
+                ? (!isTextConfigured() ? 'no model configured' : offline ? 'offline' : 'already the model tier')
+                : null
+        });
+    }
+    if (!canEscalate) return plan;
+
+    // Not awaited: the caller is a tap handler, and the draft is already on
+    // screen. Failures are the model's own to report.
+    pushMessage('model', t('ai.partialAsk', { pct: parsed.coverage }));
+    void askAiModel(text, { seed: lastTraceLines() });
     return plan;
+}
+
+/**
+ * The trace lines just rendered, so the model tier can keep the coverage on
+ * screen while it works.
+ *
+ * Without this the escalation would erase the evidence for why it happened: the
+ * user asks why the answer was slow, and the panel says "answered by the model"
+ * with nothing about the 60% that caused it.
+ */
+function lastTraceLines() {
+    return trace.filter(l => l && (l.kind === 'coverage' || l.kind === 'dropped'));
 }
 
 /**
@@ -875,7 +918,7 @@ function speakReply(text) {
  * The reply is rendered with `textContent` like everything else here. This is
  * the one function in the file whose input is a remote server.
  */
-export async function askAiModel(text = '') {
+export async function askAiModel(text = '', { seed = null } = {}) {
     const said = String(text || lastUserUtterance() || '').trim();
     if (!said) return null;
 
@@ -897,7 +940,9 @@ export async function askAiModel(text = '') {
     setAiBusy(true);
     streaming = '';
     inFlight = new AbortController();
-    trace = [{ kind: 'tierModel' }];
+    // The caller's coverage lines ride along, so the reason for the escalation
+    // is still on screen while the model is thinking.
+    trace = [{ kind: 'tierModel' }, ...(Array.isArray(seed) ? seed.filter(l => TRACE_TEXT[l?.kind]) : [])];
 
     // The call, recorded BEFORE it goes out: a turn that hangs, or never sends,
     // is exactly the turn you cannot debug afterwards.
