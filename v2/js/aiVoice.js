@@ -97,14 +97,51 @@ export function voicePhrases() {
 }
 
 /** What this browser can do, recomputed rather than cached - it can change. */
+/**
+ * Whether the microphone should record and send rather than listen locally.
+ *
+ * **The voice slot has to be pointed at a model on purpose.** `voice.mode`
+ * defaults to `'follow-text'`, and `resolveVoiceSlot()` then hands back the
+ * TEXT slot - so "is a voice model configured" is true for anybody who has ever
+ * configured a chat model, and routing on that posts recordings to a model that
+ * answers in text. That is a baffling failure for somebody who only ever set up
+ * a key for talking to the assistant, and it is worse than useless: it silently
+ * replaces a working free microphone with a bill.
+ *
+ * So the API microphone needs a DETACHED voice slot with its own model. That is
+ * also the only configuration where the user can have chosen a transcription
+ * model, which is a different thing from a chat model and not something this
+ * app should guess at.
+ */
+export function apiSttReady() {
+    const c = getAiConfig();
+    if (c?.voice?.mode !== 'own') return false;
+    return isVoiceConfigured() && canRecordAudio();
+}
+
 export function detectVoicePaths() {
     const hasRecognition = typeof window !== 'undefined'
         && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     const hasSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
     const api = isVoiceConfigured();
 
-    VOICE_PATHS.stt = hasRecognition ? 'browser' : (api ? 'api' : 'none');
-    VOICE_PATHS.tts = hasSynthesis ? 'browser' : (api ? 'api' : 'none');
+    // Speech IN prefers the configured voice model, and this order is the
+    // opposite of what it was. It used to prefer the browser whenever the
+    // browser had recognition, which made the voice slot a setting that stored
+    // a key and then never called anything - the 'api' branch was computed,
+    // displayed, and had no implementation behind it.
+    //
+    // The fallback is still the browser, and it is reached when there is no
+    // voice model OR when this browser cannot record: a model configured on a
+    // browser with no microphone must not leave the user with a dead button.
+    VOICE_PATHS.stt = apiSttReady() ? 'api' : (hasRecognition ? 'browser' : 'none');
+
+    // Speech OUT is the reverse, deliberately and for good reason: there is no
+    // API TTS in this app, `speechSynthesis` is free, offline, and needs no key,
+    // and OpenRouter is not a speech service. The 'api' value here is a promise
+    // with nothing behind it, so it is reported as none rather than as a path
+    // that does not exist.
+    VOICE_PATHS.tts = hasSynthesis ? 'browser' : 'none';
 
     // Report honestly about recognition being on-device or not. Chrome's
     // engine is cloud-backed today and the local variant is opt-in per
@@ -166,6 +203,153 @@ export function voiceErrorText(code) {
 
 let screenLock = null;
 let screenLockWanted = false;
+
+// --- the API microphone -----------------------------------------------------
+//
+// MediaRecorder -> a Blob -> transcribeAudio(). This is the path that makes the
+// VOICE slot mean anything: until it existed, a configured voice model was
+// stored, shown as "Configured" in Settings, and never called by a line of code
+// in the app - `detectVoicePaths()` computed an 'api' branch that nothing
+// implemented, in either direction.
+//
+// **The wake word cannot coexist with this, and that is the price.** Browser
+// recognition runs continuously and raises an event on a phrase; a clip is
+// recorded when the user asks and exists until it is sent. There is no event to
+// hang a wake word on and nothing to transcribe until the user has stopped
+// talking. So with a voice model configured the mic is press-and-hold, the
+// wake word and continuous listening are off, and the panel says so rather than
+// offering a toggle that cannot work.
+//
+// Two seams, for the same reason `setRecognitionFactory()` exists: neither a
+// microphone nor a MediaRecorder exists in the harness, and the suite has to
+// drive this end to end.
+
+let streamFactory = null;
+let recorderFactory = null;
+let recording = null;
+
+/** Injected so the suite can supply a recorder that is not Chrome's. */
+export function setStreamFactory(fn) { streamFactory = fn; }
+export function setRecorderFactory(fn) { recorderFactory = fn; }
+
+/**
+ * Whether this browser can record at all.
+ *
+ * Separate from whether a voice model is configured, because the two can
+ * disagree in the direction that matters: a model set on a browser with no
+ * microphone support still has to fall back to recognition rather than leave
+ * the user with a dead button.
+ */
+export function canRecordAudio() {
+    if (typeof navigator === 'undefined') return false;
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') return false;
+    if (typeof MediaRecorder === 'undefined') return false;
+    return true;
+}
+
+export function isRecording() { return !!recording; }
+
+function getStream() {
+    const fn = streamFactory || ((c) => navigator.mediaDevices.getUserMedia(c));
+    return fn({ audio: true });
+}
+
+function makeRecorder(stream) {
+    // The seam is CALLED, not constructed - the same shape as
+    // `setRecognitionFactory()`. An arrow function returning an instance is not
+    // a constructor, and `new`-ing one throws in a way that reads as "this
+    // browser cannot record" rather than "the seam is wrong".
+    if (recorderFactory) {
+        try { return recorderFactory(stream) || null; } catch { return null; }
+    }
+    const Ctor = typeof MediaRecorder !== 'undefined' ? MediaRecorder : null;
+    if (!Ctor) return null;
+    // Prefer a format the transcription endpoints accept as-is. Not every
+    // browser offers webm, so this is a preference and not a requirement.
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+    for (const type of types) {
+        if (typeof Ctor.isTypeSupported === 'function' && Ctor.isTypeSupported(type)) {
+            try { return new Ctor(stream, { mimeType: type }); } catch { /* try the next one */ }
+        }
+    }
+    try { return new Ctor(stream); } catch { return null; }
+}
+
+/**
+ * Start recording. Resolves true once audio is actually arriving.
+ *
+ * The permission prompt is why this is async and why the caller shows a state
+ * before it settles: a user who has never granted the microphone gets a browser
+ * dialog, and a button that does nothing while that is open reads as broken.
+ */
+export async function startRecording() {
+    if (recording) return false;
+    if (!canRecordAudio()) return false;
+
+    let stream;
+    try {
+        stream = await getStream();
+    } catch {
+        return false;
+    }
+    if (!stream) return false;
+
+    const rec = makeRecorder(stream);
+    if (!rec) {
+        for (const track of stream.getTracks?.() || []) track.stop();
+        return false;
+    }
+
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e?.data && e.data.size) chunks.push(e.data); };
+    const state = { rec, stream, chunks, stopped: false };
+    recording = state;
+
+    try {
+        rec.start();
+    } catch {
+        releaseRecording();
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Stop and hand back the clip. Resolves to a Blob, or null if nothing usable
+ * was captured - a tap that is too short should say so rather than POST an
+ * empty body and surface a 400.
+ */
+export function stopRecording({ mimeType = 'audio/webm' } = {}) {
+    const state = recording;
+    if (!state) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        let done = false;
+        const finish = (blob) => {
+            if (done) return;
+            done = true;
+            recording = null;
+            for (const track of state.stream.getTracks?.() || []) track.stop();
+            resolve(blob);
+        };
+        state.rec.onstop = () => {
+            const blob = state.chunks.length ? new Blob(state.chunks, { type: mimeType }) : null;
+            finish(blob && blob.size ? blob : null);
+        };
+        state.stopped = true;
+        try { state.rec.stop(); } catch { finish(null); }
+        // A recorder that never fires onstop must not wedge the button.
+        setTimeout(() => finish(null), 2000);
+    });
+}
+
+/** Drop whatever is in flight without producing a clip. */
+export function releaseRecording() {
+    const state = recording;
+    recording = null;
+    if (!state) return;
+    try { state.rec.onstop = null; state.rec.stop(); } catch { /* not started */ }
+    for (const track of state.stream.getTracks?.() || []) track.stop();
+}
 
 /** Whether this browser offers the API at all. */
 export function isScreenLockSupported() {

@@ -65,6 +65,7 @@ import { isTextConfigured, getAiConfig, chatUrl } from './aiConfig.js';
 import {
     startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths,
     arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
+    startRecording, stopRecording, isRecording, transcribeAudio, voicePhrases,
     holdScreenLock, isScreenLockHeld, isScreenLockSupported
 } from './aiVoice.js';
 import { startSequence, isDrillRunning } from './runner.js';
@@ -617,12 +618,34 @@ function renderComposer() {
         const live = armedNow || isListening();
         mic.classList.toggle('listening', live);
         mic.classList.toggle('armed', armedNow);
-        const label = armedNow
-            ? t('ai.wakeArmed', { phrase: wakePhrasesForUi()[0] || '' })
-            : live ? t('ai.listening') : t('a11y.talk');
-        mic.title = label;
-        mic.setAttribute('aria-label', label);
-        mic.onclick = () => window.aiToggleMic();
+        if (voice.stt === 'api') {
+            // Press-and-hold, not a toggle. This is the cost of using the user's
+            // own model, and the button has to behave like what it is: a clip
+            // exists only while the button is down, so a toggle would have to
+            // invent an end the user never chose. The wake word is gone for the
+            // same reason and the row says so, rather than offering a toggle
+            // that cannot work.
+            mic.classList.toggle('recording', isRecording());
+            const label = isRecording() ? t('ai.listening') : t('ai.holdToTalk');
+            mic.title = label;
+            mic.setAttribute('aria-label', label);
+            const down = (e) => { e.preventDefault(); void window.aiHoldMicStart(); };
+            const up = () => { void window.aiHoldMicEnd(); };
+            mic.onpointerdown = down;
+            mic.onpointerup = up;
+            mic.onpointerleave = up;
+            mic.onpointercancel = up;
+            // Keyboard and assistive tech, which have no pointer.
+            mic.onkeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); void window.aiHoldMicStart(); } };
+            mic.onkeyup = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); void window.aiHoldMicEnd(); } };
+        } else {
+            const label = armedNow
+                ? t('ai.wakeArmed', { phrase: wakePhrasesForUi()[0] || '' })
+                : live ? t('ai.listening') : t('a11y.talk');
+            mic.title = label;
+            mic.setAttribute('aria-label', label);
+            mic.onclick = () => window.aiToggleMic();
+        }
     }
     row.appendChild(mic);
 
@@ -832,6 +855,61 @@ export function openAiInEditor() {
  * the point: text is an equal citizen, not a fallback that shows up looking
  * different.
  */
+/**
+ * Press-and-hold, for the API microphone. See the recording layer in aiVoice.js
+ * for why this exists and what it costs.
+ *
+ * The draft is not built here: the clip comes back as TEXT and goes through
+ * handleUtterance exactly like a typed sentence or a browser transcript, so
+ * there is one path from words to a drill and not three.
+ */
+export async function holdMicStart() {
+    if (detectVoicePaths().stt !== 'api') return false;
+    if (isRecording()) return false;
+    const ok = await startRecording();
+    if (!ok) {
+        aiModelSay(t('ai.voiceNoRecord'), { error: true });
+        return false;
+    }
+    renderAi();
+    return true;
+}
+
+export async function holdMicEnd() {
+    if (!isRecording()) return false;
+    const blob = await stopRecording();
+    renderAi();
+    if (!blob) {
+        aiModelSay(t('ai.voiceNothingHeard'), { error: true });
+        return false;
+    }
+    aiModelSay(t('ai.voiceTranscribing'), {});
+
+    const slot = getAiConfig().voice;
+    try {
+        const text = await transcribeAudio(blob, {
+            slot,
+            language: slot?.language || getLang(),
+            // The app's own vocabulary as a biasing hint. This is the same
+            // seeding the browser recogniser gets via `phrases`, and it is the
+            // single biggest accuracy win for exactly the words that trip a
+            // general-purpose transcriber up: "saque", "torpedo", "block".
+            prompt: voicePhrases().join(', ')
+        });
+        const said = String(text || '').trim();
+        if (!said) {
+            aiModelSay(t('ai.voiceNothingHeard'), { error: true });
+            return false;
+        }
+        handleUtterance(said, { tier: 'local' });
+        return true;
+    } catch (err) {
+        // Already redacted by the client, and shown as text.
+        aiModelSay(err?.message || String(err), { error: true });
+        return false;
+    }
+}
+
 export function toggleMic() {
     // Armed first: one tap means "the mic is open from now on", and tapping
     // again closes it. Anything else makes the wake word a thing you have to
@@ -1011,6 +1089,18 @@ export async function askAiModel(text = '', { seed = null } = {}) {
     }
 }
 
+/**
+ * The conversation so far, as data.
+ *
+ * Exists because `renderAi()` returns early when the panel is closed, so the
+ * DOM cannot be used to ask "what did the assistant just say?" - and an error
+ * that arrives while the panel is closed is invisible until the user opens it.
+ * Same model-first rule as everywhere else: text, not markup.
+ */
+export function aiTranscript() {
+    return transcript.map(m => ({ role: m.role, text: String(m.text || ''), tier: m.tier || null, error: !!m.error }));
+}
+
 /** Ask the model about whatever the user last said. */
 function lastUserUtterance() {
     for (let i = transcript.length - 1; i >= 0; i--) {
@@ -1100,6 +1190,8 @@ if (typeof window !== 'undefined') {
     window.aiDiscardDraft = discardAiDraft;
     window.aiAskModel = askAiModel;
     window.aiToggleMic = toggleMic;
+    window.aiHoldMicStart = holdMicStart;
+    window.aiHoldMicEnd = holdMicEnd;
     window.aiOpenInEditor = openAiInEditor;
     window.aiOpenModelSetup = aiOpenModelSetup;
     window.playAiDrill = playAiDrill;

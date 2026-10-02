@@ -367,7 +367,7 @@ export const en = {
         textModel: 'Text model',
         textModelDesc: 'Optional. Without it the assistant still reads short commands on this device, with no key and no signal.',
         voiceModel: 'Voice model',
-        voiceModelDesc: 'For transcribing speech and, optionally, speaking replies.',
+        voiceModelDesc: 'Transcribes what you say. Spoken replies stay on the browser\u2019s own voice, which is free and works offline.',
         followText: 'Use the text model for voice too',
         followTextDesc: 'Follows whatever the text model is set to, right now.',
         detach: 'Detach',
@@ -482,6 +482,11 @@ export const en = {
         // Shown when the local tier read part of a sentence and the model is
         // being asked for the rest. The reason the answer is slower now.
         partialAsk: 'I understood {pct}% of that, so I\u2019m asking the model.',
+        // Press-and-hold microphone, for the API path.
+        holdToTalk: 'Hold to talk',
+        voiceTranscribing: 'Listening\u2026',
+        voiceNoRecord: 'This browser cannot record audio, so the microphone is off. Type the drill instead \u2014 everything else works the same.',
+        wakeNeedsBrowser: 'The wake word needs the browser\u2019s microphone. With a voice model set, the mic records and sends the clip instead, so there is nothing listening for a phrase. Detach the voice model in Settings to get the wake word back.',
         chipGenerated: {
             one: '{n} ball generated',
             other: '{n} balls generated'

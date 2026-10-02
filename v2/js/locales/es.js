@@ -373,7 +373,7 @@ export const es = {
         textModel: 'Modelo de texto',
         textModelDesc: 'Opcional. Sin él, el asistente igual lee los comandos cortos en este dispositivo, sin clave y sin señal.',
         voiceModel: 'Modelo de voz',
-        voiceModelDesc: 'Para transcribir la voz y, si querés, leer las respuestas.',
+        voiceModelDesc: 'Transcribe lo que decís. Las respuestas habladas siguen usando la voz del navegador, que es gratis y funciona sin señal.',
         followText: 'Usar el modelo de texto también para la voz',
         followTextDesc: 'Sigue lo que tenga el modelo de texto ahora mismo.',
         detach: 'Separar',
@@ -474,6 +474,11 @@ export const es = {
         // Shown when the local tier read part of a sentence and the model is
         // being asked for the rest. The reason the answer is slower now.
         partialAsk: 'Entendí el {pct}% de eso, así que se lo pregunto al modelo.',
+        // Micrófono de presionar-y-mantener, para la ruta por API.
+        holdToTalk: 'Mantené presionado para hablar',
+        voiceTranscribing: 'Escuchando…',
+        voiceNoRecord: 'Este navegador no puede grabar audio, así que el micrófono está apagado. Escribí el ejercicio en su lugar — todo lo demás funciona igual.',
+        wakeNeedsBrowser: 'La palabra de activación necesita el micrófono del navegador. Con un modelo de voz configurado, el micrófono graba y envía el clip, así que no queda nada escuchando una frase. Desasociá el modelo de voz en Ajustes para recuperar la palabra de activación.',
         chipGenerated: {
             one: '{n} bola generada',
             other: '{n} bolas generadas'

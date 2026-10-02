@@ -7,7 +7,8 @@ import { isStatsOpen, closeStatsView } from './statsUi.js';
 import { isAiOpen, closeAiView, refreshAiPanel } from './aiUi.js';
 import {
     getAiConfig, setAiConfig, clearAiKey, maskKey, isTextConfigured,
-    normalizeBaseUrl, redact as redactAi, PROVIDER_IDS, PROVIDERS, modelsUrl, buildHeaders
+    normalizeBaseUrl, redact as redactAi, PROVIDER_IDS, PROVIDERS, modelsUrl, buildHeaders,
+    isVoiceConfigured
 } from './aiConfig.js';
 // These two were missing until the screen-lock row forced a second look at
 // this import block, and nothing had ever pressed either button, so
@@ -15,7 +16,7 @@ import {
 // first time a real user touched them. The checks in tests/integration.html
 // now press both.
 import { chat } from './aiClient.js';
-import { isScreenLockSupported } from './aiVoice.js';
+import { isScreenLockSupported, apiSttReady } from './aiVoice.js';
 import { getInstallState, promptInstall, isOfflineReady } from './pwa.js';
 import { isSignedIn, getUser, startSignIn, signOut } from './account.js';
 import { pushBundle, restoreFromCloud, getLastSyncAt } from './sync.js';
@@ -196,6 +197,12 @@ export async function handleInstallApp() {
  */
 function aiSettingsHtml() {
     const c = getAiConfig();
+    // The wake word needs the browser's microphone. With a voice model set the
+    // microphone records and sends a clip instead, so there is nothing listening
+    // for a phrase - and a toggle that switches on something that cannot happen
+    // is worse than one that explains itself. The setting itself is remembered
+    // either way, so detaching the model brings it straight back.
+    const wakeBlocked = apiSttReady();
     const options = (slot) => PROVIDER_IDS.map(id => {
         const selected = c[slot].provider === id ? ' selected' : '';
         return `<option value="${id}"${selected}>${t(`provider.${id}`)}</option>`;
@@ -309,12 +316,13 @@ function aiSettingsHtml() {
                         ${isScreenLockSupported() ? '' : 'disabled'}>${c.screenLock ? t('action.on') : t('action.off')}</button>
             </div>
 
+            ${wakeBlocked ? `<div class="ai-note" data-note="ai-wake-blocked">${t('ai.wakeNeedsBrowser')}</div>` : ''}
             <div class="ai-toggle-row" data-row="ai-wake">
                 <div class="settings-row-main">
                     <div class="settings-row-title">${t('ai.wake')}</div>
-                    <div class="settings-row-desc">${t('ai.wakeDesc')}</div>
+                    <div class="settings-row-desc">${wakeBlocked ? t('ai.wakeNeedsBrowser') : t('ai.wakeDesc')}</div>
                 </div>
-                <button class="settings-btn" onclick="window.handleAiToggle('wake')">${c.wake.enabled ? t('action.on') : t('action.off')}</button>
+                <button class="settings-btn" ${wakeBlocked ? 'disabled' : `onclick="window.handleAiToggle('wake')"`}>${c.wake.enabled ? t('action.on') : t('action.off')}</button>
             </div>
 
             ${c.wake.enabled ? `
