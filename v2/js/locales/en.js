@@ -393,6 +393,10 @@ export const en = {
         never: 'never tested',
         testing: 'Testing\u2026',
         ok: 'Connected. The model replied.',
+        // Reached, but the model thought for the whole budget and sent no
+        // words. That is a working endpoint, and saying otherwise sends the
+        // user hunting for a key problem they do not have.
+        okSpentBudget: 'Connected. The model used its whole token budget thinking and sent no words - raise the limit or pick a model that answers sooner.',
         failed: 'Could not reach that endpoint',
         noModels: 'The endpoint returned no models.',
         modelsLoaded: '{n} models loaded',

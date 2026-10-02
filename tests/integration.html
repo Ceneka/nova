@@ -1724,6 +1724,98 @@ CFG.setAiConfig({ text: { apiKey: SECRET } });
     ok('and no key in the message the user is shown', !line.includes('SUPERSECRET'), line);
 }
 
+// The success path of the same button, which nothing above exercised. "Test
+// connection" used to send maxTokens: 8, to make the ping cheap, and since
+// max_tokens is a THINKING budget rather than a reply length a reasoning model
+// spent all 8 thinking, returned zero content deltas with finish_reason
+// "length", and the button reported a reachable endpoint as "Could not reach
+// that endpoint". The 401 above cannot catch that: a 401 fails for a different
+// reason and takes the same path.
+//
+// The fake honours max_tokens the way a real reasoning model does, so putting
+// the 8 back makes this fail rather than quietly passing.
+{
+    const savedFetch = window.fetch;
+    let sawBudget = null;
+    const sse = (chunks) => new Response(
+        new ReadableStream({
+            start(c) {
+                const enc = new TextEncoder();
+                for (const line of chunks) c.enqueue(enc.encode(line));
+                c.close();
+            }
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+    );
+    window.fetch = async (u, init) => {
+        const body = JSON.parse(init.body);
+        sawBudget = body.max_tokens;
+        const reasoning = [
+            'data: {"choices":[{"delta":{"reasoning":"weighing it"}}]}\n\n',
+            'data: {"choices":[{"delta":{"content":""}}]}\n\n'
+        ];
+        if (body.max_tokens < 512) {
+            // Ran out of budget mid-thought, exactly like the live model did.
+            return sse([...reasoning,
+                'data: {"choices":[{"delta":{},"finish_reason":"length"}],'
+                + '"usage":{"prompt_tokens":1,"completion_tokens":8,"reasoning_tokens":8}}\n\n',
+                'data: [DONE]\n\n']);
+        }
+        return sse([
+            'data: {"choices":[{"delta":{"content":"pong"}}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}],'
+            + '"usage":{"prompt_tokens":1,"completion_tokens":1}}\n\n',
+            'data: [DONE]\n\n'
+        ]);
+    };
+
+    // The root fact, stated on its own: a budget too small to think in returns
+    // no text and says why, rather than erroring.
+    const tiny = await CLI.chat({
+        messages: [{ role: 'user', content: 'ping' }], maxTokens: 8, fetchImpl: window.fetch, slot: null
+    });
+    ok('a budget too small to think in comes back empty', tiny?.text === '', JSON.stringify(tiny?.text));
+    ok('and it says it was cut off rather than failing',
+       tiny?.finishReason === 'length', tiny?.finishReason);
+
+    const reached = await window.aiTestConnection();
+    const said = document.querySelector('#settings-body [data-ai-test]')?.textContent || '';
+    window.fetch = savedFetch;
+
+    ok('"Test connection" reports success against a working endpoint', reached === true, said);
+    ok('and it did not use a 8-token budget', sawBudget !== 8, `max_tokens sent: ${sawBudget}`);
+    ok('the row says the model replied', /replied/i.test(said), said);
+    ok('and never claims the endpoint was unreachable',
+       !/Could not reach/i.test(said), said);
+    ok('no key in that line either', !said.includes('SUPERSECRET'), said);
+}
+
+// The endpoint answers but the model still thinks the whole budget away. That
+// is a reachable endpoint, and reporting it as a failure sends the user
+// hunting for a key problem they do not have.
+{
+    const savedFetch = window.fetch;
+    window.fetch = async () => new Response(
+        new ReadableStream({
+            start(c) {
+                const enc = new TextEncoder();
+                c.enqueue(enc.encode('data: {"choices":[{"delta":{"reasoning":"thinking"}}]}\n\n'));
+                c.enqueue(enc.encode('data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n'));
+                c.enqueue(enc.encode('data: [DONE]\n\n'));
+                c.close();
+            }
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+    );
+    const reached = await window.aiTestConnection();
+    const said = document.querySelector('#settings-body [data-ai-test]')?.textContent || '';
+    window.fetch = savedFetch;
+
+    ok('a model that thought the whole budget away still counts as connected', reached === true, said);
+    ok('and the row says so in as many words',
+       /budget/i.test(said) && !/Could not reach/i.test(said), said);
+}
+
 // A wake word that is only at the start. This is the difference between a wake
 // word and something that answers to every other sentence.
 V.setRecognitionFactory(() => null);

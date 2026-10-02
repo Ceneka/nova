@@ -399,6 +399,9 @@ export const es = {
         never: 'sin probar',
         testing: 'Probando\u2026',
         ok: 'Conectado. El modelo respondió.',
+        // Alcanzó el endpoint, pero el modelo gastó todo el presupuesto
+        // pensando y no envió palabras. Eso no es una conexión fallida.
+        okSpentBudget: 'Conectado. El modelo usó todo su presupuesto de tokens pensando y no envió palabras: subí el límite o elegí un modelo que responda antes.',
         failed: 'No se pudo llegar a ese endpoint',
         noModels: 'El endpoint no devolvió modelos.',
         modelsLoaded: '{n} modelos cargados',

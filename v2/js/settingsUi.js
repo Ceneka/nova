@@ -807,14 +807,34 @@ export async function aiTestConnection({ fetchImpl = fetch } = {}) {
     setAiTestResult(t('settingsAi.testing'), '');
 
     try {
+        // No maxTokens override, and the absence of one IS the fix. This used
+        // to send 8, to make a ping cheap - but max_tokens is a THINKING budget
+        // and not a reply length (see DEFAULT_MAX_TOKENS). A reasoning model
+        // spends the whole 8 on reasoning, emits zero content deltas, and ends
+        // with finish_reason "length"; this button then reported a perfectly
+        // reachable endpoint as "Could not reach that endpoint", which is the
+        // worst possible answer to give somebody who is mid-setup. An unspent
+        // ceiling costs nothing, and a ceiling too small to think in costs the
+        // entire test.
         const res = await chat({
             messages: [{ role: 'user', content: 'ping' }],
-            maxTokens: 8,
             fetchImpl,
             slot
         });
-        setAiTestResult(res?.text ? t('settingsAi.ok') : t('settingsAi.failed'), res?.text ? 'ok' : 'bad');
-        return !!res?.text;
+
+        if (res?.text) {
+            setAiTestResult(t('settingsAi.ok'), 'ok');
+            return true;
+        }
+        if (res?.finishReason === 'length') {
+            // The endpoint answered, which is the question this button asks.
+            // Reporting that as a failure would be the same lie in the other
+            // direction: the key is good and the model is reachable.
+            setAiTestResult(t('settingsAi.okSpentBudget'), 'ok');
+            return true;
+        }
+        setAiTestResult(t('settingsAi.failed'), 'bad');
+        return false;
     } catch (err) {
         setAiTestResult(`${t('settingsAi.failed')}: ${redactAi(err?.message || String(err))}`, 'bad');
         return false;
