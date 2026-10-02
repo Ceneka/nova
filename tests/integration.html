@@ -1718,13 +1718,21 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     V.setStreamFactory(async () => fakeStream);
     // Headless Chrome DOES expose getUserMedia and MediaRecorder, so the
     // capability check passes and it is the SEAMS that make this drivable - not
-    // the absence of the APIs. Worth knowing, because "the harness cannot record"
-    // is the obvious assumption and it is wrong.
+    // the absence of the APIs. Worth knowing, because "the harness cannot
+    // record" is the obvious assumption and it is wrong.
     ok('the capability check passes here, so the seams are what make this drivable',
        V.canRecordAudio() === true, `canRecordAudio ${V.canRecordAudio()}`);
 
-    // No voice model yet: the browser still owns the microphone.
-    CFG.setAiConfig({ voice: { model: '', apiKey: '' } });
+    // Everything this block changes is restored at the end. It used to leave the
+    // text slot empty and break every settings check after it.
+    const savedConfig = JSON.stringify(CFG.getAiConfig());
+
+    // A clock that moves. performance.now() does not under --virtual-time-budget,
+    // so without this every press reads as a flick and the gesture is untestable.
+    let clock = 1000;
+    AI.setNowFactory(() => clock);
+
+    CFG.setAiConfig({ voice: { mode: 'own', model: '', apiKey: '' } });
     ok('with no voice model, the browser keeps the microphone',
        V.detectVoicePaths().stt === 'browser', V.detectVoicePaths().stt);
 
@@ -1754,38 +1762,84 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
        /micr|grab|record|activate/i.test(wakeRow?.textContent || ''),
        (wakeRow?.textContent || '').trim().slice(0, 90));
 
-    // End to end: press, release, and the transcript comes back as TEXT and goes
-    // through handleUtterance, so there is one path from words to a drill.
+    // The stub stays installed for the WHOLE block. The model call aiFinal fires
+    // is `void`ed and not awaited by the gesture, so restoring fetch early let a
+    // REAL request reach openrouter.ai from inside the suite - it came back 401.
     const savedFetch = window.fetch;
+    let asked = 0;
     let sentBody = null;
     window.fetch = async (u, i) => {
+        asked++;
         sentBody = i.body;
         return { ok: true, status: 200, json: async () => ({ text: 'push b, drive f' }) };
     };
+
+    // --- a real hold: press, wait past the minimum, release ---
+    // Counted from here, because "some turn was a model turn" is satisfied by
+    // any earlier test in this file and proves nothing.
+    const turnsBefore = AI.novaAiTrace().length;
     const started = await AI.holdMicStart();
-    const held = V.isRecording();
+    ok('holding the button starts a recording', started === true && V.isRecording(),
+       `started ${started} recording ${V.isRecording()}`);
+    clock += 900;
     const done = await AI.holdMicEnd();
+    await new Promise(r => setTimeout(r, 80));   // let the `void`ed model call land
+    ok('releasing after a real hold sends the clip',
+       done === true && !!sentBody, `done ${done} body ${sentBody ? 'yes' : 'no'}`);
+    ok('and nothing is left recording', V.isRecording() === false, `recording ${V.isRecording()}`);
+
+    // Spoken input is NOT guessed at: the transcript is the text model's job.
+    // Asserted over the turns THIS gesture produced, so an earlier model turn in
+    // this file cannot make it pass.
+    const fromSpeech = AI.novaAiTrace().slice(turnsBefore);
+    ok('and the transcript went to the model, never through the local tier',
+       fromSpeech.length > 0 && fromSpeech.every(e => e.source === 'model'),
+       JSON.stringify(fromSpeech.map(e => ({ source: e.source, net: e.network }))));
+    ok('no local turn was produced from speech at all',
+       !fromSpeech.some(e => e.source === 'tier0'),
+       JSON.stringify(fromSpeech.map(e => e.source)));
+
+    // --- a flick used to send an empty clip: started and stopped in one gesture,
+    // before the recorder produced any data ---
+    const askedBefore = asked;
+    await AI.holdMicStart();
+    const flicked = await AI.holdMicEnd();
+    ok('a flick does not end the recording, and sends nothing',
+       flicked === true && V.isRecording() === true && asked === askedBefore,
+       `flicked ${flicked} recording ${V.isRecording()} asked ${asked - askedBefore} new`);
+    const stopped = await AI.holdMicStart();   // the next tap is the stop
+    clock += 900;
+    await AI.holdMicEnd();
+    await new Promise(r => setTimeout(r, 40));
+    ok('and the next tap is what ends it', stopped === true && V.isRecording() === false,
+       `stopped ${stopped} recording ${V.isRecording()}`);
+
+    // Sliding off the button is a cancel, not a release: a recording whose end
+    // the user cannot reach is worse than one they abandoned.
+    await AI.holdMicStart();
+    const cancelled = await AI.holdMicEnd('cancel');
+    ok('sliding off discards rather than sending',
+       cancelled === false && V.isRecording() === false,
+       `cancelled ${cancelled} recording ${V.isRecording()}`);
+
+    // Spoken input with no text model says so, rather than falling back to the
+    // guess the user explicitly asked to have removed.
+    CFG.setAiConfig({ text: { apiKey: '', model: '', baseUrl: '' } });
+    AIS.setDraft(null);
+    AI.aiFinal('push b');
+    const refused = AI.aiTranscript().slice(-1)[0];
+    ok('speech without a text model is refused, not guessed',
+       !!refused && refused.error === true && /model/i.test(refused.text || ''),
+       JSON.stringify(refused));
+    ok('and nothing is built out of the transcript',
+       AIS.getDraft() === null, AIS.getDraft() === null ? 'no draft' : 'a draft exists');
+
     window.fetch = savedFetch;
-
-    ok('holding the button starts a recording', started === true && held === true,
-       `started ${started} recording ${held}`);
-    const saidLast = AI.aiTranscript().slice(-1)[0];
-    const panelSaid = saidLast ? `[${saidLast.role}${saidLast.error ? '!' : ''}] ${saidLast.text}` : 'nothing said';
-    ok('releasing sends the clip to the voice endpoint', done === true && !!sentBody,
-       `done ${done} body ${sentBody ? 'yes' : 'no'} | panel: ${panelSaid}`);
-    ok('and the answer arrives as a draft through the normal path',
-       !!AIS.getDraft() && AIS.getDraft().steps.length > 0,
-       `${AIS.getDraft()?.steps?.length} steps`);
-    ok('with no recording left open', V.isRecording() === false);
-
-    // A tap too short to produce audio must say so, not POST an empty body.
-    window.fetch = savedFetch;
-    const tooShort = await V.stopRecording();
-    ok('stopping with nothing recorded hands back nothing', tooShort === null, String(tooShort));
-
-    CFG.setAiConfig({ voice: { mode: 'own', model: '', apiKey: '' } });
-    ok('and emptying it gives the browser microphone back',
+    AI.setNowFactory(null);
+    CFG.setAiConfig(JSON.parse(savedConfig));
+    ok('and emptying the voice slot gives the browser microphone back',
        V.detectVoicePaths().stt === 'browser', V.detectVoicePaths().stt);
+
 }
 
 

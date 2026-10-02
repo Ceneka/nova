@@ -476,6 +476,8 @@ export const es = {
         partialAsk: 'Entendí el {pct}% de eso, así que se lo pregunto al modelo.',
         // Micrófono de presionar-y-mantener, para la ruta por API.
         holdToTalk: 'Mantené presionado para hablar',
+        // La voz nunca se adivina, así que sin modelo de texto lo dice.
+        voiceNeedsModel: 'Hablar necesita un modelo de texto y no hay ninguno configurado. No se adivina nada: configurá uno en Ajustes y hablá tranquilo.',
         voiceTranscribing: 'Escuchando…',
         voiceNoRecord: 'Este navegador no puede grabar audio, así que el micrófono está apagado. Escribí el ejercicio en su lugar — todo lo demás funciona igual.',
         wakeNeedsBrowser: 'La palabra de activación necesita el micrófono del navegador. Con un modelo de voz configurado, el micrófono graba y envía el clip, así que no queda nada escuchando una frase. Desasociá el modelo de voz en Ajustes para recuperar la palabra de activación.',

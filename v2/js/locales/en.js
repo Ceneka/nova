@@ -484,6 +484,8 @@ export const en = {
         partialAsk: 'I understood {pct}% of that, so I\u2019m asking the model.',
         // Press-and-hold microphone, for the API path.
         holdToTalk: 'Hold to talk',
+        // Spoken input is never guessed at, so without a text model it says so.
+        voiceNeedsModel: 'Speaking needs a text model, and none is set up. Nothing is guessed at — set one up in Settings and speak freely.',
         voiceTranscribing: 'Listening\u2026',
         voiceNoRecord: 'This browser cannot record audio, so the microphone is off. Type the drill instead \u2014 everything else works the same.',
         wakeNeedsBrowser: 'The wake word needs the browser\u2019s microphone. With a voice model set, the mic records and sends the clip instead, so there is nothing listening for a phrase. Detach the voice model in Settings to get the wake word back.',

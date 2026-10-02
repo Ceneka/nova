@@ -272,6 +272,14 @@ cannot be violated. Rules that have bitten people before:
   network and no model. Tier 1 is only entered for what Tier 0 could not read,
   and a Tier 0 result is never a dead end - there is always a one-tap "ask the
   AI". The panel says which tier answered.
+- **Typed input gets Tier 0. Spoken input never does.** Once there is a
+  transcript, the deterministic tier has nothing to add that a model cannot do
+  better and a great deal to lose: it answers from *part* of the sentence,
+  confidently, under a badge claiming it was read on this device. Speaking is
+  imprecise by nature, so the sentences that trigger it are exactly the ones a
+  keyword parser reads worst. A typed sentence is something meant; a spoken one
+  is something to be interpreted. With no text model configured, speech says
+  so and builds nothing - it does not silently fall back to the guess.
 - **They cannot drift.** `aiTerms.js` holds the vocabulary once; the parser
   matches on it and `systemPrompt()` renders it into the model tier's prompt.
 - **`aiTerms`, `aiMatch`, `aiCompile` and `aiClient` import cleanly under bare
@@ -347,9 +355,16 @@ tools need a yes, so a tool cannot quietly become destructive by omission.
 `delete_preset`, `update_preset` on a non-AI preset and clearing the IA category
 all ask every time; playing a draft is deliberately free.
 
-The loop is capped at **8 tool rounds and 45 seconds**, both abortable - a model
-that calls a tool forever would otherwise hold a spinner forever. Streaming is
-the default: a voice assistant that waits for the whole answer before it says
+The loop is capped at **8 tool rounds and 150 seconds**, both abortable - a
+model that calls a tool forever would otherwise hold a spinner forever. The
+per-request watchdog is 90s, and **the two caps have to be the right way round**:
+they were 30s inside a 45s total, so the *first* request of a reasoning model
+could eat two thirds of the whole budget before the agent made one tool call,
+and what the user saw was "The request was cancelled or timed out" from a model
+that was working correctly. `MAX_ROUNDS` is the cap that means something about
+the agent rather than about one HTTP round trip.
+
+Streaming is the default: a voice assistant that waits for the whole answer before it says
 anything feels broken, so `readSse()` parses the stream by hand (~30 lines, no
 SDK) and buffers across chunk boundaries, because a split in the middle of a
 tool call's JSON otherwise loses the call silently.
@@ -383,7 +398,50 @@ they are worth knowing before you "simplify" either one away:
 
 ### Voice
 
-Browser `SpeechRecognition` by default (Chrome and Safari only, **not
+**The microphone records when a voice model is configured, and listens when one
+is not** - the opposite of what this used to do, when the browser won whenever
+it existed and the voice slot was a stored key that nothing called. Two
+conditions, and the second is the one that bites:
+
+- The voice slot must be **detached** (`voice.mode === 'own'`) with its own
+  model. It defaults to `follow-text`, and `resolveVoiceSlot()` then returns
+  the *text* slot - so "is a voice model configured" is true for anybody who
+  ever configured a chat model. Routing on that POSTs audio to a model that
+  answers in text: a baffling failure for someone who set up a key to talk to
+  the assistant, and worse than useless because it silently replaces a working
+  free microphone with a bill. A chat model cannot transcribe, and only the
+  user knows which one can.
+- The browser must be able to record at all.
+
+**The wake word cannot coexist with the API microphone, and the UI says so.**
+Browser recognition runs continuously and raises an event on a phrase; a clip
+is recorded on demand. There is no event to hang a wake word on. The toggle is
+disabled with the reason in the row, and the setting itself is kept, so
+detaching the voice model brings it straight back.
+
+**The gesture is hold-to-talk OR two taps, and neither can send an empty
+clip.** A press shorter than `MIN_HOLD_MS` (300) does not stop the recording -
+it counts as a tap, the clip keeps going, and the next tap ends it. Without
+that, a quick flick started and stopped a recording inside one gesture, before
+`MediaRecorder` produced any data, and the endpoint received an empty body.
+Sliding off the button is a **cancel**, not a release: a recording whose end the
+user cannot reach is worse than one they abandoned.
+
+The clock is a seam (`setNowFactory`). `performance.now()` is the obvious way to
+measure a press and the wrong way to test one - under `--virtual-time-budget`
+timers fire immediately and the clock barely moves, so every gesture reads as a
+flick and the gesture is untestable at all.
+
+The transcription prompt is seeded with `voicePhrases()` - the same seeding the
+browser recogniser gets - which is the biggest accuracy win for exactly the
+words a general-purpose transcriber gets wrong.
+
+Speech OUT stays on `speechSynthesis` and reports `none` for the API path,
+because there is no API TTS here, OpenRouter is not a speech service, and the
+browser voice is free and works offline. A path that does not exist is reported
+as absent rather than offered.
+
+Browser `SpeechRecognition` is the fallback path (Chrome and Safari only, **not
 Baseline, not Firefox** - and Chrome's engine is cloud-backed, so it does not
 work offline, which is the opposite of everything else here). `phrases` is
 seeded with the app's own vocabulary, which is the single biggest accuracy win

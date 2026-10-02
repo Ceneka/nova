@@ -65,7 +65,7 @@ import { isTextConfigured, getAiConfig, chatUrl } from './aiConfig.js';
 import {
     startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths,
     arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
-    startRecording, stopRecording, isRecording, transcribeAudio, voicePhrases,
+    startRecording, stopRecording, isRecording, releaseRecording, transcribeAudio, voicePhrases,
     holdScreenLock, isScreenLockHeld, isScreenLockSupported
 } from './aiVoice.js';
 import { startSequence, isDrillRunning } from './runner.js';
@@ -160,7 +160,32 @@ export function aiFinal(text) {
     const said = String(text ?? '').trim();
     if (!said) return;
     pushMessage('user', said);
-    handleUtterance(said, { tier: 'local' });
+
+    // **Spoken input does not get a guess.** Once there is a transcript, the
+    // deterministic tier has nothing to add that a model cannot do better and
+    // a great deal to lose: it answers from part of the sentence, confidently,
+    // under a badge claiming it was read on this device. Speaking is imprecise
+    // by nature, so the sentences that trigger it are exactly the ones a
+    // keyword parser reads worst - connectors, dropped words, a whole clause
+    // built on one noun it does not know.
+    //
+    // Typed input still gets Tier 0, and keeps it: a typed sentence is precise,
+    // Tier 0 is free and offline, and it is the whole app working with no key.
+    // That is the real difference - something typed is something meant, and
+    // something spoken is something to be interpreted.
+    if (!isTextConfigured()) {
+        // Not a silent fallback to the guess the user just asked us to drop.
+        // Say what is missing and what would fix it.
+        aiModelSay(t('ai.voiceNeedsModel'), { error: true });
+        renderAi();
+        return null;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        aiModelSay(t('ai.offline'), { error: true });
+        return null;
+    }
+    void askAiModel(said);
+    return null;
 }
 
 export function aiModelSay(text, { error = false } = {}) {
@@ -633,8 +658,8 @@ function renderComposer() {
             const up = () => { void window.aiHoldMicEnd(); };
             mic.onpointerdown = down;
             mic.onpointerup = up;
-            mic.onpointerleave = up;
-            mic.onpointercancel = up;
+            mic.onpointerleave = () => { void window.aiHoldMicEnd('cancel'); };
+            mic.onpointercancel = () => { void window.aiHoldMicEnd('cancel'); };
             // Keyboard and assistive tech, which have no pointer.
             mic.onkeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); void window.aiHoldMicStart(); } };
             mic.onkeyup = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); void window.aiHoldMicEnd(); } };
@@ -864,8 +889,13 @@ export function openAiInEditor() {
  * there is one path from words to a drill and not three.
  */
 export async function holdMicStart() {
+    // A tap while a short press is still recording is the "stop" half of the
+    // two-tap gesture, not a request to start a second recording.
+    if (awaitingStopTap && isRecording()) return finishClip();
+
     if (detectVoicePaths().stt !== 'api') return false;
     if (isRecording()) return false;
+    pressStartedAt = nowFactory();
     const ok = await startRecording();
     if (!ok) {
         aiModelSay(t('ai.voiceNoRecord'), { error: true });
@@ -875,8 +905,47 @@ export async function holdMicStart() {
     return true;
 }
 
-export async function holdMicEnd() {
-    if (!isRecording()) return false;
+/**
+ * How long a press has to last before releasing it ends the recording.
+ *
+ * Without this, a quick tap-and-flick sent an empty clip: the recording started
+ * and was stopped inside the same gesture, the recorder had not produced any
+ * data yet, and the endpoint received a body with nothing in it. That reads as
+ * the app being broken rather than as a gesture being too short.
+ *
+ * A press shorter than this does not stop the recording. It counts as a TAP:
+ * the clip keeps going and the next tap ends it. Both gestures therefore work,
+ * neither can send an empty clip, and neither needs a mode to be learned.
+ */
+const MIN_HOLD_MS = 300;
+
+let pressStartedAt = 0;
+let awaitingStopTap = false;
+
+/**
+ * The clock, as a seam.
+ *
+ * `performance.now()` is the obvious thing to measure a press with and it is
+ * the wrong thing to TEST one with: under `--virtual-time-budget` timers fire
+ * immediately and the clock barely moves, so a real hold of a third of a second
+ * measures as a millisecond and every gesture reads as a flick. The suite
+ * cannot drive the gesture at all without driving the clock.
+ */
+let nowFactory = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+export function setNowFactory(fn) {
+    nowFactory = typeof fn === 'function' ? fn : () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+}
+
+/** Release with no usable clip yet: the user flicked it. Keep going, await a tap. */
+function holdTooShort() {
+    awaitingStopTap = true;
+    renderAi();
+    return true;
+}
+
+/** However the gesture ended, this is where the clip is made and sent. */
+async function finishClip() {
+    awaitingStopTap = false;
     const blob = await stopRecording();
     renderAi();
     if (!blob) {
@@ -887,13 +956,13 @@ export async function holdMicEnd() {
 
     const slot = getAiConfig().voice;
     try {
+        // The app's own vocabulary as a biasing hint. This is the same seeding
+        // the browser recogniser gets via `phrases`, and it is the single
+        // biggest accuracy win for exactly the words that trip a general-purpose
+        // transcriber up: "saque", "torpedo", "block".
         const text = await transcribeAudio(blob, {
             slot,
             language: slot?.language || getLang(),
-            // The app's own vocabulary as a biasing hint. This is the same
-            // seeding the browser recogniser gets via `phrases`, and it is the
-            // single biggest accuracy win for exactly the words that trip a
-            // general-purpose transcriber up: "saque", "torpedo", "block".
             prompt: voicePhrases().join(', ')
         });
         const said = String(text || '').trim();
@@ -901,13 +970,37 @@ export async function holdMicEnd() {
             aiModelSay(t('ai.voiceNothingHeard'), { error: true });
             return false;
         }
-        handleUtterance(said, { tier: 'local' });
+        // Through aiFinal, like every other spoken sentence, so there is one
+        // path from a transcript to a drill and not two.
+        aiFinal(said);
         return true;
     } catch (err) {
         // Already redacted by the client, and shown as text.
         aiModelSay(err?.message || String(err), { error: true });
         return false;
     }
+}
+
+/**
+ * `reason` is 'release' or 'cancel'. A release shorter than MIN_HOLD_MS keeps
+ * recording; a cancel - the pointer sliding off the button, or a lost focus -
+ * discards, because a recording whose end the user cannot reach is worse than
+ * one they abandoned.
+ */
+export async function holdMicEnd(reason = 'release') {
+    if (!isRecording()) {
+        awaitingStopTap = false;
+        return false;
+    }
+    if (reason === 'cancel') {
+        awaitingStopTap = false;
+        releaseRecording();
+        renderAi();
+        return false;
+    }
+    return (nowFactory() - pressStartedAt) < MIN_HOLD_MS
+        ? holdTooShort()
+        : finishClip();
 }
 
 export function toggleMic() {

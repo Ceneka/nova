@@ -13,10 +13,21 @@
  *
  * ## Hard caps, because an agent loop is an unbounded loop without them
  *
- * **8 tool rounds** and **45 seconds total**, both abortable. A model that
+ * **8 tool rounds** and **150 seconds total**, both abortable. A model that
  * calls a tool forever is a model that holds a spinner forever; a cap turns
  * that into an error the assistant can say out loud. `MAX_ROUNDS` is the
  * reason the "never stops calling tools" test passes instead of hanging.
+ *
+ * **The two caps have to be the right way round, and they were not.** The
+ * per-request watchdog was 30s inside a 45s total, so the FIRST request of a
+ * reasoning model could consume two thirds of the entire budget before the
+ * agent had made one tool call - and the thing the user saw was "The request
+ * was cancelled or timed out" on a model that was working correctly and had
+ * three seconds of agent budget left anyway. Reported against a live endpoint
+ * running `deepseek/deepseek-v4.1-flash` with a 2048-token THINKING budget:
+ * thinking alone ran past 30 seconds. `MAX_ROUNDS` is now the binding cap,
+ * because it is the one that means something about the agent rather than about
+ * one HTTP round trip.
  *
  * ## Streaming is the default, not a nicety
  *
@@ -55,8 +66,8 @@ import { vocabularyForPrompt, ROLES, ROTATIONS, SIDES, DEPTHS } from './aiTerms.
 
 /** The plan's caps. Changing these changes what a runaway model costs. */
 export const MAX_ROUNDS = 8;
-export const TOTAL_TIMEOUT_MS = 45000;
-export const PER_REQUEST_TIMEOUT_MS = 30000;
+export const TOTAL_TIMEOUT_MS = 150000;
+export const PER_REQUEST_TIMEOUT_MS = 90000;
 
 /**
  * Tokens per turn.
