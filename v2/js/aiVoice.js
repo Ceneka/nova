@@ -390,9 +390,25 @@ export function startListening({
     if ('phrases' in rec) {
         try { rec.phrases = voicePhrases(); } catch { /* not supported: harmless */ }
     }
-    // Opt in to on-device recognition when the browser offers it.
+    // On-device recognition is explicitly OFF, and this used to be explicitly
+    // ON.
+    //
+    // The local engine is installed per LANGUAGE, so asking for it when Chrome
+    // has no local model for this one answers `language-not-supported` - and
+    // the cloud engine, Chrome's default and the one that actually works, is
+    // never reached. It turned a working path into a hard failure, and then
+    // reported it as the user's language being missing, which is what that
+    // message means and is not what happened.
+    //
+    // It also contradicted the row above, which tells the user this browser
+    // needs a connection for speech: that sentence describes the cloud engine,
+    // which this was opting out of. Pinning it off matches what the app already
+    // promises, and is deterministic rather than at the mercy of a browser or
+    // user setting nobody can see. If on-device ever comes back it belongs here
+    // - and behind a check that the model is actually installed, which the API
+    // surface used here cannot do synchronously.
     if ('processLocally' in rec) {
-        try { rec.processLocally = true; } catch { /* not supported */ }
+        try { rec.processLocally = false; } catch { /* not supported: harmless */ }
     }
 
     const guard = (fn) => (e) => { try { fn(e); } catch { /* an engine callback must not throw */ } };

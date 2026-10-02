@@ -1583,6 +1583,73 @@ live.onresult({
     results: [{ isFinal: false, 0: { transcript: 'saque corto a la ' } }, { isFinal: true, 0: { transcript: 'derecha' } }]
 });
 ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', finalSeen);
+
+// The mic failed for a real user with "This browser does not speak that
+// language" on a perfectly normal setup. The recogniser was being opted into
+// ON-DISABLE recognition unconditionally, and that engine is installed per
+// LANGUAGE: asking for it with no local model for this one answers
+// `language-not-supported` - and the cloud engine, Chrome's default and the one
+// that works, was never reached. The message then blamed the user's language.
+//
+// FakeRecognition above records `processLocally` and nothing ever asserted on
+// it, which is how a hard failure sat there. These drive an engine that
+// behaves the way Chrome's does, so putting the opt-in back fails them.
+{
+    class ChromeLike extends FakeRecognition {
+        start() {
+            this.started = true;
+            // This is the whole point of the fake: local recognition without a
+            // downloaded model for this language is refused.
+            if (this.processLocally === true) {
+                setTimeout(() => { this.onerror?.({ error: 'language-not-supported' }); this.onend?.({}); }, 0);
+            }
+        }
+    }
+    let heard = '';
+    let spoken = '';
+    V.setRecognitionFactory(() => new ChromeLike());
+    V.startListening({
+        onFinal: (text) => { heard += text; },
+        onError: (msg) => { spoken += msg; }
+    });
+    const withLocal = recorded[recorded.length - 1];
+
+    ok('the recogniser is not opted into on-device recognition',
+       withLocal.processLocally === false, `processLocally: ${withLocal.processLocally}`);
+
+    // And the engine does not refuse it.
+    await new Promise(r => setTimeout(r, 20));
+    withLocal.onresult({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'push b' } }] });
+    ok('so the language is not reported as missing', spoken === '', spoken);
+    ok('and it is still hearing the user', heard === 'push b', heard);
+}
+
+// One refusal must not wedge the mic. Whatever the engine said, the next
+// attempt is built the same way - on the cloud engine - so a browser or user
+// setting that turns local on cannot make the mic permanently dead.
+{
+    class AlwaysLocal extends FakeRecognition {
+        start() {
+            this.started = true;
+            setTimeout(() => { this.onerror?.({ error: 'language-not-supported' }); this.onend?.({}); }, 0);
+        }
+    }
+    let said = '';
+    V.setRecognitionFactory(() => new AlwaysLocal());
+    V.startListening({ onError: (m) => { said += m; } });
+    await new Promise(r => setTimeout(r, 20));
+    ok('an engine that insists on local still gets reported', said !== '', said || 'nothing was reported');
+
+    V.startListening({ onError: () => {} });
+    const retry = recorded[recorded.length - 1];
+    ok('and the next attempt is still built for the cloud engine',
+       retry.processLocally === false, `processLocally: ${retry.processLocally}`);
+
+    // Language is still the caller's, not something this fix quietly narrowed.
+    V.startListening({ lang: 'en-US', onError: () => {} });
+    const other = recorded[recorded.length - 1];
+    ok('an explicit language is still honoured', other.lang === 'en-US', other.lang);
+}
 V.stopListening();
 
 rec.onerror({ error: 'not-allowed' });
