@@ -472,6 +472,11 @@ export const en = {
             one: '{n} preset looked at',
             other: '{n} presets looked at'
         },
+        // How much of what was said the vocabulary actually read. A tier that
+        // understood two words of a sentence and answered from the rest looks
+        // identical, without this, to one that understood all of it.
+        traceCoverage: 'read {pct}% of what you said',
+        traceDropped: 'never heard: {words}',
         chipGenerated: {
             one: '{n} ball generated',
             other: '{n} balls generated'

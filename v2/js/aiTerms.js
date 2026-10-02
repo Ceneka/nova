@@ -461,6 +461,10 @@ function scan(text) {
             hits.push({
                 raw: originalSlice(src, map, m.index, m.index + m[0].length) || m[0],
                 index: m.index,
+                // The length of the match IN THE FOLDED TEXT, which is the text
+                // `index` is an index into. Coverage cannot be measured without
+                // it, and measuring it is the point - see `leftoverWords`.
+                len: m[0].length,
                 entries
             });
         }
@@ -679,6 +683,80 @@ function readPresetRef(text, presets) {
  *          `null` when nothing at all was understood - the caller's cue to ask
  *          the model tier. Never throws: junk in gives `null` out.
  */
+/**
+ * Words that are grammar, not vocabulary.
+ *
+ * Only used to decide what counts against coverage. "genera un drill" leaves
+ * three words behind that the user did not mean as shots and would not be
+ * confused by losing, so they count as understood - treating them as missed
+ * would report every ordinary sentence as a near-total failure and make the
+ * number worthless. Everything NOT here that scan() did not consume is a real
+ * gap, and "torpedos" is the one that mattered.
+ */
+const FILLER = new Set([
+    'un', 'una', 'uno', 'unos', 'unas', 'el', 'la', 'lo', 'los', 'las', 'de', 'del',
+    'y', 'e', 'o', 'u', 'a', 'al', 'en', 'para', 'por', 'con', 'sin', 'que', 'me',
+    'mi', 'te', 'se', 'su', 'sus', 'le', 'les', 'muy', 'mas', 'pero', 'otra', 'otro',
+    'genera', 'generame', 'haz', 'hazme', 'dame', 'quiero', 'necesito', 'pon',
+    'agrega', 'anade', 'añade', 'sigue', 'continue', 'drill', 'drills',
+    'ejercicio', 'ejercicios', 'ronda', 'serie', 'vez', 'veces', 'va', 'venga',
+    'porfa', 'favor', 'gracias', 'nada', 'todo', 'solo', 'ahora', 'despues',
+    'luego', 'entonces', 'finalmente', 'bien'
+]);
+
+/**
+ * The words of `body` that scan() did not consume.
+ *
+ * This is the measurement `unknown` was never able to make. `unknown` collects
+ * only from clauses that matched NOTHING, so a clause that is mostly noise but
+ * contains one known word is recorded as fully understood - which is how
+ * "dos torpedos largos a la izquierda" became a clean intent with "torpedos"
+ * silently deleted and "dos" read as a repetition count.
+ *
+ * A word counts as consumed if ANY character of it was covered by a hit, so a
+ * partial match like "cortadito" counts as understood rather than as a gap
+ * plus a word.
+ */
+export function leftoverWords(body, hits) {
+    const folded = fold(body);
+    if (!folded) return [];
+    const covered = new Set();
+    for (const h of hits || []) {
+        const end = h.index + (h.len ?? 0);
+        for (let i = h.index; i < end; i++) covered.add(i);
+    }
+    const out = [];
+    for (const m of folded.matchAll(/[a-z0-9]+/g)) {
+        // A one-character token is shorthand hanging off a phrase we already
+        // read - "push b", "drive f" - and counting it as a gap would report the
+        // shortest and most idiomatic sentence in the vocabulary as a half-missed
+        // one. It carries no meaning of its own.
+        if (m[0].length < 2) continue;
+        let touched = false;
+        for (let i = m.index; i < m.index + m[0].length; i++) {
+            if (covered.has(i)) { touched = true; break; }
+        }
+        if (!touched) out.push(m[0]);
+    }
+    return out;
+}
+
+/**
+ * Percent of the utterance that reached an intent.
+ *
+ * Counted per INTENT, not per clause: a clause that matched nothing still
+ * produced a stub intent carrying the user's own words, so it counts as heard
+ * even though nothing was recognised in it. What does not count is a word
+ * nobody read inside a clause that otherwise parsed - that is exactly the case
+ * `unknown` could not see.
+ */
+function coverageOf(intents, dropped) {
+    const heard = intents.reduce((n, i) => n + Math.max(1, String(i.note || '').trim().split(/\s+/).filter(Boolean).length), 0);
+    const total = heard + dropped.length;
+    if (!total) return 100;
+    return Math.max(0, Math.min(100, Math.round((heard / total) * 100)));
+}
+
 export function parseUtterance(text, { presets = null } = {}) {
     if (typeof text !== 'string' || !text.trim()) return null;
 
@@ -692,6 +770,8 @@ export function parseUtterance(text, { presets = null } = {}) {
 
     const intents = [];
     const unknown = [];
+    // Words dropped from clauses that DID produce an intent. See FILLER.
+    const leftover = [];
     let prevRole = null;
     // How many clauses the vocabulary actually understood.
     let real = 0;
@@ -736,6 +816,13 @@ export function parseUtterance(text, { presets = null } = {}) {
         if (preset) intent.presetId = preset.id;
         if (preset && !intent.note) intent.note = preset.name;
 
+        // Measured, NOT acted on. This clause produced an intent, so Tier 0
+        // counts as having understood it - that is what `unresolved` means and
+        // changing it would send every ordinary sentence to the model. But the
+        // words nobody read are recorded here, because a tier that drops them
+        // silently is a tier that cannot be debugged.
+        for (const w of leftoverWords(body, hits)) if (!FILLER.has(w)) leftover.push(w);
+
         prevRole = intent.role;
         real++;
         intents.push(intent);
@@ -751,7 +838,22 @@ export function parseUtterance(text, { presets = null } = {}) {
     // nothing at all counts as unresolved even if every other clause parsed
     // cleanly, because the draft is then missing a step the user asked for.
     const unresolved = unknown.length > 0;
-    return { intents, unresolved, unknown: [...new Set(unknown)] };
+    const dropped = [...new Set(leftover)];
+    return {
+        intents,
+        unresolved,
+        unknown: [...new Set(unknown)],
+        // The words nobody read, for the trace and the console. Measured only -
+        // `unresolved` above is unchanged and still governs whether Tier 1 is
+        // entered, because that decision is a product choice and this is a fact.
+        dropped,
+        // How much of what was SAID the vocabulary actually read, as a whole
+        // percent, counting filler as understood. 100 is a sentence made
+        // entirely of known words. Anything much below that is a tier that is
+        // going to answer from part of the request - which is worth seeing, and
+        // is what the panel's trace now shows.
+        coverage: coverageOf(intents, dropped)
+    };
 }
 
 // --- readouts ---------------------------------------------------------------

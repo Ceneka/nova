@@ -1584,6 +1584,60 @@ live.onresult({
 });
 ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', finalSeen);
 
+// ---------------------------------------------------------------------------
+// The debug log. Reported as "it answered instantly and got it wrong", which is
+// not a symptom anybody can debug: the panel showed which tier answered, and
+// "tier 0" looks the same whether it read the whole sentence or two words of it
+// and invented the rest. Nothing showed a duration, a token count, or a word
+// the vocabulary had never heard.
+// ---------------------------------------------------------------------------
+{
+    const said = 'genera un drill cortado a la izquierda despues cortado largo a la derecha y despues dos torpedos largos a la izquierda';
+    AI.handleUtterance(said, { tier: 'local' });
+    const turns = AI.novaAiTrace();
+    const turn = turns[turns.length - 1];
+
+    ok('the log has an entry for the turn', !!turn, JSON.stringify(turns.length));
+    ok('it says which tier answered, and that it was local',
+       turn?.tier === 'local' && turn?.network === false, `${turn?.tier} / network ${turn?.network}`);
+    ok('it was fast, which is the thing that looked wrong',
+       typeof turn?.ms === 'number' && turn.ms < 50, `${turn?.ms}ms`);
+
+    // The number that was missing entirely.
+    ok('it reports how much of the sentence the vocabulary read',
+       turn?.coverage === 60, `${turn?.coverage}%`);
+    ok('and names the words it never heard',
+       Array.isArray(turn?.dropped) && turn.dropped.includes('torpedos'),
+       JSON.stringify(turn?.dropped));
+    // 3 intents, and MORE steps than intents because a preset expands into its
+    // placements. The count of both is the point: one of those three intents
+    // exists only because "dos" was read as a count and "torpedos" was not read
+    // at all, and nothing before this log said so.
+    ok('so the intent invented out of "torpedos" is now visible',
+       turn?.intents === 3 && turn?.steps >= turn.intents,
+       `${turn?.intents} intents / ${turn?.steps} steps`);
+
+    // A clean sentence must still read 100, or the number means nothing.
+    AI.handleUtterance('saque corto al reves, luego drive fuerte a la derecha', { tier: 'local' });
+    const clean = AI.novaAiTrace();
+    const cleanTurn = clean[clean.length - 1];
+    ok('an ordinary sentence still reads 100%', cleanTurn?.coverage === 100,
+       `${cleanTurn?.coverage}% dropped ${JSON.stringify(cleanTurn?.dropped)}`);
+
+    // A tier that matched nothing is recorded as NOT understood, which is the
+    // case that takes the user to the model instead.
+    AI.handleUtterance('blorptronic', { tier: 'local' });
+    const miss = AI.novaAiTrace();
+    ok('a total miss is recorded as not understood',
+       miss[miss.length - 1]?.understood === false,
+       JSON.stringify(miss[miss.length - 1]?.reason));
+
+    // The key must never reach a console.
+    ok('and the log never holds the key',
+       !JSON.stringify(window.novaAiTrace()).includes('SUPERSECRET'),
+       'log scanned');
+}
+
 // The mic failed for a real user with "This browser does not speak that
 // language" on a perfectly normal setup. The recogniser was being opted into
 // ON-DISABLE recognition unconditionally, and that engine is installed per

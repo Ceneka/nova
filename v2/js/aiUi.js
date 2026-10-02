@@ -59,9 +59,9 @@ import { currentDrills, setLastPlayed } from './state.js';
 import { openEditor } from './editor.js';
 import { getPresets } from './presets.js';
 import { bleState } from './bluetooth.js';
-import { runAgent } from './aiClient.js';
+import { runAgent, DEFAULT_MAX_TOKENS } from './aiClient.js';
 import { TOOLS, makeToolHandlers } from './aiAgent.js';
-import { isTextConfigured, getAiConfig } from './aiConfig.js';
+import { isTextConfigured, getAiConfig, chatUrl } from './aiConfig.js';
 import {
     startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths,
     arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
@@ -226,6 +226,8 @@ export function stepReadout(index, meta) {
  */
 export function handleUtterance(text, { tier = 'local' } = {}) {
     const parsed = parseUtterance(text, { presets: getPresets() });
+    const turn = debugTurn(text, tier === 'model' ? 'model' : 'local');
+
     if (!parsed) {
         // Not understood at all. Say so with the sentence in hand, and offer
         // the model tier - Tier 0 is a floor, never a trap. Unless there is no
@@ -239,6 +241,7 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
         // source, prose included, so do not quote the pattern in a comment
         // either: that reads as a call site and fails the build.)
         const said = String(text).slice(0, 120);
+        debugFinish(turn, { understood: false, reason: 'tier0 matched nothing at all' });
         pushMessage('model', isTextConfigured()
             ? t('ai.notUnderstood', { text: said })
             : t('ai.notUnderstoodNoModel', { text: said }), { error: true });
@@ -246,10 +249,13 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
     }
 
     const plan = buildPlan({ intents: parsed.intents, presets: getPresets() });
-    if (!plan.steps.length) return null;
+    if (!plan.steps.length) {
+        debugFinish(turn, { understood: false, reason: 'intents produced no steps' });
+        return null;
+    }
 
     setDraft(plan);
-    tracePlan(plan, parsed, tier);
+    tracePlan(plan, parsed, tier, turn);
     return plan;
 }
 
@@ -262,8 +268,26 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
  * the middle of a Spanish panel the moment somebody switched language, which
  * is the half-translated build the i18n checks exist to prevent.
  */
-function tracePlan(plan, parsed, tier) {
+function tracePlan(plan, parsed, tier, turn = null) {
     const lines = [{ kind: tier === 'model' ? 'tierModel' : 'tierLocal' }];
+
+    // The number that was missing. A tier that read two words of a sentence and
+    // answered from the rest looks exactly like one that read all of it.
+    lines.push({ kind: 'coverage', pct: parsed.coverage });
+    if (parsed.dropped?.length) lines.push({ kind: 'dropped', words: parsed.dropped.join(', ') });
+
+    if (turn) {
+        debugFinish(turn, {
+            understood: true,
+            coverage: parsed.coverage,
+            dropped: parsed.dropped || [],
+            intents: parsed.intents.length,
+            steps: plan.steps.length,
+            usedFallback: plan.meta.filter(m => m.usedFallback).length,
+            source: tier === 'model' ? 'model' : 'tier0',
+            network: false
+        });
+    }
 
     if (parsed.unknown.length) {
         const ranked = rankPresets(parsed.intents[0], getPresets(), 3);
@@ -299,8 +323,65 @@ const TRACE_TEXT = {
     used: ({ name }) => t('ai.traceTool', { name }),
     from: ({ name }) => t('ai.chipFrom', { name }),
     generated: ({ n }) => t('ai.chipGenerated', { n }),
-    presetsFound: ({ n }) => t('ai.presetsFound', { n })
+    presetsFound: ({ n }) => t('ai.presetsFound', { n }),
+    coverage: ({ pct }) => t('ai.traceCoverage', { pct }),
+    dropped: ({ words }) => t('ai.traceDropped', { words })
 };
+
+/**
+ * The debug log. Everything a turn did, in order, kept so it can be READ.
+ *
+ * This exists because "it answered instantly and got it wrong" is not a
+ * symptom anybody can debug: both halves are invisible from the panel. The
+ * panel shows WHICH tier answered, and "tier 0" looks identical whether it read
+ * the whole sentence or two words of it and invented the rest. Nothing showed
+ * a duration, a token count, or the words the vocabulary had never heard.
+ *
+ * Read it from the console with `novaAiTrace()`. The key is redacted here the
+ * same way every other error path does it, because a log that lands in a
+ * console is a log that lands in a screenshot.
+ */
+const DEBUG_LOG = [];
+const DEBUG_LIMIT = 20;
+
+/** A handle for one turn, so a tier decision and its outcome can be joined up. */
+function debugTurn(text, tier) {
+    const entry = {
+        at: new Date().toISOString(),
+        said: String(text ?? '').slice(0, 300),
+        tier,
+        startedMs: performance.now(),
+        model: null,
+        error: null
+    };
+    DEBUG_LOG.push(entry);
+    while (DEBUG_LOG.length > DEBUG_LIMIT) DEBUG_LOG.shift();
+    return entry;
+}
+
+function debugFinish(entry, extra = {}) {
+    if (!entry) return entry;
+    entry.ms = Math.round(performance.now() - entry.startedMs);
+    Object.assign(entry, extra);
+    return entry;
+}
+
+/** Redact a key out of a URL or a header bag before it is written to the log. */
+function debugRedact(value) {
+    const key = getAiConfig().text?.apiKey || '';
+    let out = String(value ?? '');
+    if (key) out = out.split(key).join('<key>');
+    return out.replace(/sk-[A-Za-z0-9_-]{8,}/g, '<key>');
+}
+
+/** The whole log, newest last. `novaAiTrace()` in the console. */
+export function novaAiTrace() {
+    return DEBUG_LOG.map(e => ({
+        ...e,
+        said: debugRedact(e.said),
+        model: e.model ? { ...e.model, url: debugRedact(e.model.url) } : null
+    }));
+}
 
 let trace = [];
 function aiTrace(lines) {
@@ -818,6 +899,19 @@ export async function askAiModel(text = '') {
     inFlight = new AbortController();
     trace = [{ kind: 'tierModel' }];
 
+    // The call, recorded BEFORE it goes out: a turn that hangs, or never sends,
+    // is exactly the turn you cannot debug afterwards.
+    const turn = debugTurn(said, 'model');
+    const slot = getAiConfig().text;
+    turn.model = {
+        url: chatUrl(slot),
+        model: slot?.model || '',
+        maxTokens: DEFAULT_MAX_TOKENS,
+        stream: true,
+        startedMs: performance.now(),
+        firstTokenMs: null
+    };
+
     try {
         const handlers = makeToolHandlers({
             ask: askUserInPanel,
@@ -833,11 +927,27 @@ export async function askAiModel(text = '') {
             language: getLang(),
             slot: getAiConfig().text,
             signal: inFlight.signal,
-            onText: (partial) => { streaming = partial; renderAi(); },
+            onText: (partial) => {
+                // Time to FIRST token, separately from the total. "It answered
+                // instantly" and "it took four seconds to start" are different
+                // faults and a single duration cannot tell them apart.
+                if (turn.model.firstTokenMs === null) {
+                    turn.model.firstTokenMs = Math.round(performance.now() - turn.model.startedMs);
+                }
+                streaming = partial; renderAi();
+            },
             onTool: (name) => noteTool('used', { name })
         });
 
         streaming = '';
+        turn.model.usage = res.usage || null;
+        turn.model.finishReason = res.stopped || res.finishReason || null;
+        debugFinish(turn, {
+            network: true,
+            source: 'model',
+            text: res.text || '',
+            ms: Math.round(performance.now() - turn.model.startedMs)
+        });
         if (res.text) {
             aiModelSay(res.text);
             speakReply(res.text);
@@ -845,6 +955,8 @@ export async function askAiModel(text = '') {
         return res;
     } catch (err) {
         streaming = '';
+        turn.error = debugRedact(err?.message || String(err));
+        debugFinish(turn, { network: true, source: 'model' });
         // The message is already redacted by the client, and shown as text.
         aiModelSay(err?.message || String(err), { error: true });
         return null;
@@ -951,4 +1063,10 @@ if (typeof window !== 'undefined') {
     // neither touches the microphone.
     window.__matchWake = matchWakePhrase;
     window.__wakePhrases = wakePhrasesForUi;
+    // The assistant's debug log, for the console. Named without the __ prefix
+    // because it is meant to be typed by a person debugging their own
+    // install: novaAiTrace() shows which tier answered, how long it took, what
+    // the model was sent, and - the one that was invisible - how much of the
+    // sentence the vocabulary actually read.
+    window.novaAiTrace = novaAiTrace;
 }
