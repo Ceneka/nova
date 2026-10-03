@@ -493,6 +493,18 @@ cuts on a sentence boundary where there is one, and on a word boundary where
 there is not, because a spoken reply that stops mid-word is the failure this
 exists to prevent.
 
+**And a qualified name in a file that imports names is a runtime error nobody
+sees.** `V.shortReply(...)` in `aiUi.js` - which imports `shortReply` - threw
+on EVERY model reply and the turn was swallowed, and the suite stayed green
+because no test drove the model path with a text response through that line.
+The model tier is the one place a typo costs everything and shows nothing.
+
+**Editing a precached file means bumping `VERSION`, even for a comment.** The
+service worker serves `aiUi.js` out of the precache, so a UI change is
+invisible until the cache name moves - which looks exactly like the change not
+working. Check `caches.keys()` before believing the browser is running your
+code.
+
 **The cap is applied to the STREAMING PREVIEW too, and that was the whole
 miss.** The reply is painted as it arrives, so capping only the final text
 left the user watching a markdown table being drawn row by row - and then, a

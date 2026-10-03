@@ -1240,7 +1240,7 @@ export async function askAiModel(text = '') {
             // Short BEFORE it is shown, not only before it is spoken: the
             // complaint was that the reply was long, and a cap that only
             // applied to the voice would leave the screen just as long.
-            const brief = V.shortReply(res.text);
+            const brief = shortReply(res.text);
             turn.model.capped = brief !== plainForSpeech(res.text);
             if (brief) {
                 aiModelSay(brief);
