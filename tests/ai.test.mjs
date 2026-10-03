@@ -204,8 +204,11 @@ test('the drop sign matches the app\'s own factory data', () => {
 test('the plan\'s compiler table', () => {
     const table = [
         // utterance,            speed, spin, type,  height, bpm
-        ['saque corto', 4.5, 2.5, 'back', 30, 60],
-        ['saque largo', 5.5, 3, 'back', 55, 60],
+        // The two serves are NEGATIVE and that is the point: a service is
+        // played down onto the receiver's half. They used to be 30 and 55 -
+        // positive, above the table, which is a rally trajectory.
+        ['saque corto', 4.5, 2.5, 'back', -35, 60],
+        ['saque largo', 5.5, 3, 'back', -50, 60],
         ['push b', 1.5, 4, 'back', 45, 45],
         ['drive f', 5, 3, 'top', 55, 72],
         ['loop f', 4, 3.5, 'back', 60, 60],
@@ -363,9 +366,30 @@ test('a matched preset wins the depth and the side', () => {
     if (m) {
         assert.equal(plan.steps[0][0][B.HEIGHT], m.preset.depths.find(d => d.label === 'Long').height);
     }
-    // With no preset, the nominal table is used instead.
+    // With no preset, the nominal table is used instead: a long serve is -50.
     const bare = C.compile({ ...intent, presetId: null }, null);
-    assert.equal(bare[0][0][B.HEIGHT], 55);
+    assert.equal(bare[0][0][B.HEIGHT], -50);
+});
+
+test('a serve still matches a preset, which the negative heights nearly broke', () => {
+    // Every preset is a rally shot with a POSITIVE height, and a serve is now
+    // -35 or -50. Scoring one number against the other saturated the depth term
+    // and pushed every preset past MATCH_THRESHOLD: correcting the sign made
+    // serves stop matching presets entirely. A serve is therefore scored
+    // against its depth LABEL, which is the word the sentence actually used.
+    const short = M.matchPreset(T.parseUtterance('saque corto a la derecha').intents[0], library);
+    assert.ok(short, 'a short serve still finds a preset');
+    const long = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], library);
+    assert.ok(long, 'a long serve still finds a preset');
+    assert.ok(short && long && short.preset.id !== long.preset.id,
+       `short -> ${short?.preset.id}, long -> ${long?.preset.id}`);
+});
+
+test('a rename does not change how a serve is scored', () => {
+    const renamed = library.map(p2 => ({ ...p2, name: 'preset sin nombre ' + p2.id }));
+    const a = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], library);
+    const b = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], renamed);
+    assert.equal(a.preset.id, b.preset.id);
 });
 
 test('a preset axis is narrowed by what the sentence asked for', () => {

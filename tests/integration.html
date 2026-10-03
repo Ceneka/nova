@@ -1841,6 +1841,106 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
        V.detectVoicePaths().stt === 'browser', V.detectVoicePaths().stt);
 
 }
+// A serve DROPS the ball. The assistant's serves were 30/40/55 - all positive,
+// all above the table - which is a rally trajectory, not a service.
+{
+    const h = AI.SERVE_HEIGHTS || null;
+    const terms = await import('../../v2/js/aiTerms.js');
+    ok('every serve height is negative',
+       Object.values(terms.SERVE_HEIGHTS).every(v => v < 0),
+       JSON.stringify(terms.SERVE_HEIGHTS));
+    ok('a short serve is about -35 and a long one about -50',
+       terms.SERVE_HEIGHTS.short === -35 && terms.SERVE_HEIGHTS.long === -50,
+       `short ${terms.SERVE_HEIGHTS.short} long ${terms.SERVE_HEIGHTS.long}`);
+    ok('and the long serve sits at the bottom of the range the robot accepts',
+       terms.SERVE_HEIGHTS.long === -50, `${terms.SERVE_HEIGHTS.long}`);
+    ok('the role defaults agree with the table',
+       terms.ROLE_DEFAULTS.serve.height < 0 && terms.ROLE_DEFAULTS.serveLong.height < 0,
+       `serve ${terms.ROLE_DEFAULTS.serve.height} serveLong ${terms.ROLE_DEFAULTS.serveLong.height}`);
+
+    // And it reaches the ball array, not just the vocabulary.
+    const ball = await import('../../v2/js/ball.js');
+    const built = ball.makeBall({ height: terms.SERVE_HEIGHTS.long, speed: 5, type: 'back' });
+    ok('a -50 height survives into the ball array',
+       built[ball.B.HEIGHT] === -50, `${built[ball.B.HEIGHT]}`);
+}
+
+// The coverage display is gone. The escalation it justified is not.
+{
+    // Scoped to the panel and the settings group, NOT document.body - the suite's
+    // own <pre id="out"> is full of these very phrases as check names, so a
+    // whole-body search tests the test.
+    const panelText = (document.querySelector('#ai-body')?.textContent || '')
+        + (document.querySelector('#settings-body')?.textContent || '');
+    ok('no coverage or dropped-word string reaches the panel or Settings',
+       !/never heard|never oy|of what you said|lo que dijiste|% of|el \d/.test(panelText),
+       panelText.trim().slice(0, 120));
+
+    const said = 'genera un drill cortado a la izquierda despues dos torpedos largos a la izquierda';
+    const savedFetch = window.fetch;
+    let asked = 0;
+    window.fetch = async () => { asked++; return { ok: false, status: 401, text: async () => 'no', json: async () => ({}) }; };
+    CFG.setAiConfig({ text: { apiKey: SECRET, model: 'fake/model', baseUrl: 'https://example.invalid/v1' } });
+    AI.handleUtterance(said, { tier: 'local' });
+    await new Promise(r => setTimeout(r, 60));
+    window.fetch = savedFetch;
+
+    const turns = AI.novaAiTrace();
+    ok('but a partial sentence is still escalated to the model',
+       turns[turns.length - 2]?.escalated === true && asked > 0,
+       `asked ${asked}`);
+    const last = AI.aiTranscript().slice(-1)[0];
+    ok('and it does so without narrating the percentage',
+       !/%/.test(last?.text || ''), JSON.stringify(last?.text));
+    CFG.setAiConfig({ text: { apiKey: SECRET } });
+}
+
+// The spoken reply could not be stopped by anything the user could reach: the
+// only interrupt was starting to listen, which in the API path means starting
+// a RECORDING.
+{
+    // A speech engine that talks until it is told to stop.
+    const spoken = [];
+    let finishSpeech = null;
+    const fakeSynth = {
+        speak(u) { spoken.push(u.text); finishSpeech = () => { u.onend?.(); }; },
+        cancel() { spoken.length = 0; if (finishSpeech) finishSpeech(); },
+        getVoices: () => [], addEventListener() { }, removeEventListener() { }
+    };
+    const hadSynth = window.speechSynthesis;
+    const hadUtter = window.SpeechSynthesisUtterance;
+    Object.defineProperty(window, 'speechSynthesis', { value: fakeSynth, configurable: true, writable: true });
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+
+    CFG.setAiConfig({ speak: true });
+    AI.openAiView();
+
+    const started = V.speak('a drill for you');
+    ok('a reply can be spoken', started === true && spoken.length === 1, `${spoken.length} utterance(s)`);
+    // Set on the call, not on `onstart` - this fake never fires `onstart`, and
+    // a reply the user cannot interrupt must not also be one they cannot SEE
+    // they cannot interrupt.
+    ok('the assistant knows it is speaking without waiting for an event',
+       V.isSpeaking() === true, `isSpeaking ${V.isSpeaking()}`);
+
+    // The control itself, on the real rendered panel.
+    AI.handleUtterance('push b, drive f', { tier: 'local' });
+    ok('a stop control appears while it talks',
+       document.querySelectorAll('#ai-body #ai-stop').length === 1,
+       `${document.querySelectorAll('#ai-body #ai-stop').length} button(s)`);
+
+    const stopped = AI.stopAi();
+    ok('stop ends the speech', stopped === true && spoken.length === 0,
+       `stopped ${stopped} remaining ${spoken.length}`);
+    ok('and the control goes away with it, rather than outliving the thing it stops',
+       document.querySelectorAll('#ai-body #ai-stop').length === 0,
+       `${document.querySelectorAll('#ai-body #ai-stop').length} left`);
+
+    Object.defineProperty(window, 'speechSynthesis', { value: hadSynth, configurable: true, writable: true });
+    window.SpeechSynthesisUtterance = hadUtter;
+    CFG.setAiConfig({ speak: false });
+}
+
 
 
 

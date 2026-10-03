@@ -92,17 +92,30 @@ export const NEUTRAL_INTENSITY = 5;
 // keeps the two readings apart.
 
 export const ROLE_DEFAULTS = {
-    serve: { speed: 4.5, spin: 2.5, type: 'back', height: 30, drop: null, bpm: 60 },
+    serve: { speed: 4.5, spin: 2.5, type: 'back', height: -35, drop: null, bpm: 60 },
     // A long serve is a different ball, not a tweak of the short one.
-    serveLong: { speed: 5.5, spin: 3, type: 'back', height: 55, drop: null, bpm: 60 },
+    serveLong: { speed: 5.5, spin: 3, type: 'back', height: -50, drop: null, bpm: 60 },
     push: { speed: 1.5, spin: 4, type: 'back', height: 45, drop: -5, bpm: 45 },
     drive: { speed: 5, spin: 3, type: 'top', height: 55, drop: -5, bpm: 72 },
     loop: { speed: 4, spin: 3.5, type: 'back', height: 60, drop: -5, bpm: 60 },
     block: { speed: 2, spin: 1, type: 'top', height: 70, drop: 0, bpm: 80 }
 };
 
-/** A serve is the one role whose height genuinely varies with the depth word. */
-export const SERVE_HEIGHTS = { short: 30, mid: 40, long: 55 };
+/**
+ * A serve is the one role whose height genuinely varies with the depth word.
+ *
+ * **Negative, and the sign is the whole point.** A serve drops the ball; a
+ * positive height plays it upward like a rally ball, which is what these used
+ * to do - a short serve was 30 and a long one 55, both above the table. A
+ * service is played DOWN: about -35 for a short one and -50 for a long one, so
+ * the ball falls onto the receiver's half. `-50` is the bottom of the range the
+ * robot accepts, and a long serve is where it belongs.
+ *
+ * Only the assistant's serves. The factory drills are rally strokes - `push(b)`
+ * is a push because it carries no depth word - and they store their own
+ * heights, which are not this decision and must not move with it.
+ */
+export const SERVE_HEIGHTS = { short: -35, mid: -42, long: -50 };
 
 /**
  * Lateral placement, from the receiver's point of view for a right-handed

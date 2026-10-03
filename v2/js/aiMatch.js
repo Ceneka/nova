@@ -79,7 +79,30 @@ function intensityDistance(preset, target) {
     return clamp(Math.abs(preset.speed - target) / 10, 0, 1);
 }
 
-function depthDistance(preset, nominal) {
+/**
+ * How far the preset is from the depth that was asked for.
+ *
+ * **A serve is scored against its DEPTH LABEL, not its ball height.** A serve
+ * height is negative - a service is played down onto the receiver's half - and
+ * a rally preset's height is positive, so comparing the two numbers measures
+ * nothing at all and saturates the term: `|50 - (-35)| / 60` clamps to 1, and
+ * every preset is pushed past MATCH_THRESHOLD for being a rally shot. Serves
+ * stopped matching presets entirely when the heights were corrected.
+ *
+ * The labels are the right comparison and the module already preferred them:
+ * `standardDepths()` writes `Short` / `Mid` / `Long`, and those are the words a
+ * sentence uses. A preset with a `Long` depth entry is a better stand-in for a
+ * long serve than one without, and a preset with no depth axis says nothing
+ * about it - which is neutral, not disqualifying.
+ */
+function depthDistance(preset, nominal, intent = null) {
+    if (intent?.role === 'serve' && intent.depth) {
+        const wanted = String(intent.depth).toLowerCase();
+        const entries = Array.isArray(preset.depths) ? preset.depths : [];
+        if (!entries.length) return 0;
+        const hit = entries.some(d => String(d.label || '').toLowerCase() === wanted);
+        return hit ? 0 : 1;
+    }
     if (nominal === null || nominal === undefined) return 0;
     return clamp(Math.abs((preset.height ?? 50) - nominal) / 60, 0, 1);
 }
@@ -95,7 +118,7 @@ export function scorePreset(intent, preset) {
     const parts = {
         rotation: rotationDistance(preset, intent.rotation),
         intensity: intensityDistance(preset, want.speed),
-        depth: depthDistance(preset, want.height),
+        depth: depthDistance(preset, want.height, intent),
         side: sideDistance(preset, want.drop)
     };
 

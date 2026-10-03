@@ -272,6 +272,13 @@ cannot be violated. Rules that have bitten people before:
   network and no model. Tier 1 is only entered for what Tier 0 could not read,
   and a Tier 0 result is never a dead end - there is always a one-tap "ask the
   AI". The panel says which tier answered.
+- **Below full coverage, Tier 0's answer is not shipped.** It is escalated to
+  the model silently: the coverage percentage and the dropped words were on
+  screen for one build and read as noise. "understood 40%, never heard: haceme,
+  fuertes, largos" describes the *vocabulary's* limits, not anything the user
+  did or can act on. The measurement is still taken and `novaAiTrace()` still
+  reports it - it is a debugging instrument, not something to put in front of
+  somebody mid-session.
 - **Typed input gets Tier 0. Spoken input never does.** Once there is a
   transcript, the deterministic tier has nothing to add that a model cannot do
   better and a great deal to lose: it answers from *part* of the sentence,
@@ -292,6 +299,21 @@ cannot be violated. Rules that have bitten people before:
   ends of the table. One vocabulary entry, two readings, and a fixed rule: a
   **depth word means serve**, no depth word means rally push. The speed
   difference (4.5 vs 1.5) is the point of telling them apart.
+- **A serve height is NEGATIVE, and the sign is the whole point.** `SERVE_HEIGHTS`
+  is `{ short: -35, mid: -42, long: -50 }`. A service is played *down* onto the
+  receiver's half, and these were `30 / 40 / 55` - all positive, all above the
+  table, which is a rally trajectory. `-50` is the bottom of the range the robot
+  accepts and a long serve belongs there. This is the assistant's serves only:
+  the factory drills are rally strokes (`push(b)` is a push because it carries
+  no depth word) and store their own heights, which are not this decision.
+- **A serve is scored against its DEPTH LABEL, not its ball height.**
+  Correcting the sign above nearly broke preset matching: every preset is a
+  rally shot with a positive height, so `depthDistance` comparing -35 against
+  +50 saturated its term (`|50 - (-35)| / 60` clamps to 1) and pushed every
+  preset past `MATCH_THRESHOLD`. Correcting the sign made serves stop matching
+  presets entirely. `Short` / `Mid` / `Long` in `preset.depths` are the words
+  the sentence actually uses, so those are the comparison; a preset with no
+  depth axis is neutral rather than disqualified.
 - **Intensity is a speed, never a scatter.** "fuerte" moves `speed` by at most
   +/-2. Scatter stays the explicit "con dispersion", so a drill can never
   surprise you mid-rally.
@@ -364,8 +386,8 @@ and what the user saw was "The request was cancelled or timed out" from a model
 that was working correctly. `MAX_ROUNDS` is the cap that means something about
 the agent rather than about one HTTP round trip.
 
-Streaming is the default: a voice assistant that waits for the whole answer before it says
-anything feels broken, so `readSse()` parses the stream by hand (~30 lines, no
+Streaming is the default: a voice assistant that waits for the whole answer
+before it says anything feels broken, so `readSse()` parses the stream by hand (~30 lines, no
 SDK) and buffers across chunk boundaries, because a split in the middle of a
 tool call's JSON otherwise loses the call silently.
 
@@ -440,6 +462,23 @@ Speech OUT stays on `speechSynthesis` and reports `none` for the API path,
 because there is no API TTS here, OpenRouter is not a speech service, and the
 browser voice is free and works offline. A path that does not exist is reported
 as absent rather than offered.
+
+**A spoken reply can be stopped, because for a long time it could not.** A
+model turn may run to 150 seconds and `speechSynthesis` talks until it is
+finished, so the only interrupt was starting to listen - which in the API path
+means starting a *recording*. `stopAi()` covers all three timers at once (the
+speech, the in-flight turn, an open recording), and the `#ai-stop` control
+appears whenever any of them is running. Two rules make it honest:
+
+- **`speaking` is set on the `speak()` call, not on `onstart`.** Some engines
+  fire `onstart` late, and a cancelled utterance may never fire it at all. Since
+  `speaking` is what puts the stop control on screen, waiting meant a reply the
+  user could not interrupt was also one they could not see they could not
+  interrupt.
+- **`speak()` takes an `onDone` callback that re-renders.** Speech has no
+  length the panel knows about, so without it the control either never appears
+  or appears forever - and a button that outlives the thing it stops teaches
+  you that buttons here lie.
 
 Browser `SpeechRecognition` is the fallback path (Chrome and Safari only, **not
 Baseline, not Firefox** - and Chrome's engine is cloud-backed, so it does not
@@ -1051,12 +1090,12 @@ belong on somebody else's *server* either.
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 110 unit tests, no dependencies
+node --test tests/*.test.mjs            # 112 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (518 checks, needs the HTTP server above):
+Browser integration (579 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

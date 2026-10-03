@@ -752,7 +752,7 @@ export function isSpeaking() {
  * Say something. `speechSynthesis` by default: offline, free, no key, and it
  * degrades to silence rather than an error when no voice is installed.
  */
-export function speak(text, { lang = null, rate = 1.02 } = {}) {
+export function speak(text, { lang = null, rate = 1.02, onDone = null } = {}) {
     const say = String(text || '').trim();
     if (!say) return false;
     if (!getAiConfig().speak) return false;
@@ -763,10 +763,18 @@ export function speak(text, { lang = null, rate = 1.02 } = {}) {
         const utter = new window.SpeechSynthesisUtterance(say);
         utter.lang = lang || getSpeechLang();
         utter.rate = rate;
+        const done = () => { speaking = false; try { onDone?.(); } catch { /* a render must not throw */ } };
         utter.onstart = () => { speaking = true; };
-        utter.onend = () => { speaking = false; };
-        utter.onerror = () => { speaking = false; };
+        utter.onend = done;
+        utter.onerror = done;
         window.speechSynthesis.speak(utter);
+        // Marked speaking HERE, not on `onstart`. `onstart` is an event some
+        // engines do not fire promptly, and a cancelled or instantly-failing
+        // utterance may never fire it at all - and `speaking` is what puts the
+        // stop control on screen. Waiting for the event meant a reply the user
+        // could not interrupt was also one they could not see they could not
+        // interrupt.
+        speaking = true;
         return true;
     } catch {
         speaking = false;

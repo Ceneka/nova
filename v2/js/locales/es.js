@@ -466,14 +466,6 @@ export const es = {
             one: '{n} preset looked at',
             other: '{n} presets looked at'
         },
-        // How much of what was said the vocabulary actually read. A tier that
-        // understood two words of a sentence and answered from the rest looks
-        // identical, without this, to one that understood all of it.
-        traceCoverage: 'entendió el {pct}% de lo que dijiste',
-        traceDropped: 'nunca oyó: {words}',
-        // Shown when the local tier read part of a sentence and the model is
-        // being asked for the rest. The reason the answer is slower now.
-        partialAsk: 'Entendí el {pct}% de eso, así que se lo pregunto al modelo.',
         // Micrófono de presionar-y-mantener, para la ruta por API.
         holdToTalk: 'Mantené presionado para hablar',
         // La voz nunca se adivina, así que sin modelo de texto lo dice.
@@ -646,7 +638,10 @@ export const es = {
         installApp: 'Instalar Nova',
         openAi: 'Abrir el asistente IA',
         talk: 'Hablarle al asistente',
-        send: 'Enviar lo que escribiste'
+        send: 'Enviar lo que escribiste',
+        // El botón de parar cubre la respuesta hablada, el turno del modelo en
+        // curso y una grabación abierta, así que dice las tres cosas.
+        stop: 'Detener al asistente'
     },
 
     placeholder: {

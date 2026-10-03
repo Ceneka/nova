@@ -66,6 +66,7 @@ import {
     startListening, stopListening, isListening, speak, releaseVoice, detectVoicePaths,
     arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
     startRecording, stopRecording, isRecording, releaseRecording, transcribeAudio, voicePhrases,
+    isSpeaking, stopSpeaking,
     holdScreenLock, isScreenLockHeld, isScreenLockSupported
 } from './aiVoice.js';
 import { startSequence, isDrillRunning } from './runner.js';
@@ -311,21 +312,12 @@ export function handleUtterance(text, { tier = 'local' } = {}) {
 
     // Not awaited: the caller is a tap handler, and the draft is already on
     // screen. Failures are the model's own to report.
-    pushMessage('model', t('ai.partialAsk', { pct: parsed.coverage }));
-    void askAiModel(text, { seed: lastTraceLines() });
+    // Silently. It used to announce the coverage, and the number was worse than
+    // useless to the person hearing it: "understood 40%, never heard: haceme,
+    // fuertes, largos" describes the vocabulary's limits, not anything the user
+    // did or can act on. The escalation still happens; it just stops editorialising.
+    void askAiModel(text);
     return plan;
-}
-
-/**
- * The trace lines just rendered, so the model tier can keep the coverage on
- * screen while it works.
- *
- * Without this the escalation would erase the evidence for why it happened: the
- * user asks why the answer was slow, and the panel says "answered by the model"
- * with nothing about the 60% that caused it.
- */
-function lastTraceLines() {
-    return trace.filter(l => l && (l.kind === 'coverage' || l.kind === 'dropped'));
 }
 
 /**
@@ -339,11 +331,6 @@ function lastTraceLines() {
  */
 function tracePlan(plan, parsed, tier, turn = null) {
     const lines = [{ kind: tier === 'model' ? 'tierModel' : 'tierLocal' }];
-
-    // The number that was missing. A tier that read two words of a sentence and
-    // answered from the rest looks exactly like one that read all of it.
-    lines.push({ kind: 'coverage', pct: parsed.coverage });
-    if (parsed.dropped?.length) lines.push({ kind: 'dropped', words: parsed.dropped.join(', ') });
 
     if (turn) {
         debugFinish(turn, {
@@ -392,9 +379,7 @@ const TRACE_TEXT = {
     used: ({ name }) => t('ai.traceTool', { name }),
     from: ({ name }) => t('ai.chipFrom', { name }),
     generated: ({ n }) => t('ai.chipGenerated', { n }),
-    presetsFound: ({ n }) => t('ai.presetsFound', { n }),
-    coverage: ({ pct }) => t('ai.traceCoverage', { pct }),
-    dropped: ({ words }) => t('ai.traceDropped', { words })
+    presetsFound: ({ n }) => t('ai.presetsFound', { n })
 };
 
 /**
@@ -679,6 +664,24 @@ function renderComposer() {
     send.title = t('a11y.send');
     send.innerHTML = ICON_SEND;
     send.onclick = () => window.aiSubmit();
+
+    // Stop. Present exactly when there is something to stop, and covering both
+    // things that can be running.
+    //
+    // The model turn can now run for up to 150 seconds and the spoken reply has
+    // no end of its own - `speechSynthesis` talks until it is finished, and the
+    // only way to interrupt it was to start listening, which in the API path
+    // means starting a RECORDING. So a reply could not be stopped by anything
+    // the user could reach, which is the definition of a stuck spinner.
+    if (isAiBusy() || isSpeaking()) {
+        const stop = el('button', 'ai-icon-btn ai-stop-btn');
+        stop.id = 'ai-stop';
+        stop.setAttribute('aria-label', t('a11y.stop'));
+        stop.title = t('a11y.stop');
+        stop.innerHTML = ICON_STOP;
+        stop.onclick = () => window.aiStop();
+        row.appendChild(stop);
+    }
     row.appendChild(send);
 
     // A fragment, not a bare row: the notes below belong UNDER the composer,
@@ -732,6 +735,8 @@ const ICON_MIC = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" st
     <path d="M5.5 12a6.5 6.5 0 0 0 13 0"></path>
     <line x1="12" y1="18.5" x2="12" y2="22"></line>
 </svg>`;
+
+const ICON_STOP = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 
 const ICON_SEND = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -906,6 +911,33 @@ export async function holdMicStart() {
 }
 
 /**
+ * Stop whatever is running: the spoken reply, the in-flight model turn, and a
+ * recording that is still open.
+ *
+ * All three, because they are three different timers and a user who taps "stop"
+ * means all of them. Stopping only the speech leaves the model still burning
+ * tokens against a draft nobody will read.
+ */
+export function stopAi() {
+    let did = false;
+    if (isSpeaking()) { stopSpeaking(); did = true; }
+    if (inFlight) {
+        inFlight.abort();
+        inFlight = null;
+        did = true;
+    }
+    if (isRecording() || awaitingStopTap) {
+        releaseRecording();
+        awaitingStopTap = false;
+        did = true;
+    }
+    streaming = '';
+    setAiBusy(false);
+    renderAi();
+    return did;
+}
+
+/**
  * How long a press has to last before releasing it ends the recording.
  *
  * Without this, a quick tap-and-flick sent an empty clip: the recording started
@@ -1073,7 +1105,13 @@ function onWakeWord({ phrase, rest, alone }) {
 /** Say the assistant's answer, if the user asked for replies to be spoken. */
 function speakReply(text) {
     if (!text) return;
-    if (getAiConfig().speak) speak(text);
+    if (!getAiConfig().speak) return;
+    // Re-render on both ends. Speech has no length the panel knows about, so
+    // without the callback the stop control either never appears or appears
+    // forever - and a button that outlives the thing it stops is worse than no
+    // button, because it teaches you that buttons here lie.
+    speak(text, { onDone: () => renderAi() });
+    renderAi();
 }
 
 // --- the model tier ---------------------------------------------------------
@@ -1089,7 +1127,7 @@ function speakReply(text) {
  * The reply is rendered with `textContent` like everything else here. This is
  * the one function in the file whose input is a remote server.
  */
-export async function askAiModel(text = '', { seed = null } = {}) {
+export async function askAiModel(text = '') {
     const said = String(text || lastUserUtterance() || '').trim();
     if (!said) return null;
 
@@ -1111,9 +1149,7 @@ export async function askAiModel(text = '', { seed = null } = {}) {
     setAiBusy(true);
     streaming = '';
     inFlight = new AbortController();
-    // The caller's coverage lines ride along, so the reason for the escalation
-    // is still on screen while the model is thinking.
-    trace = [{ kind: 'tierModel' }, ...(Array.isArray(seed) ? seed.filter(l => TRACE_TEXT[l?.kind]) : [])];
+    trace = [{ kind: 'tierModel' }];
 
     // The call, recorded BEFORE it goes out: a turn that hangs, or never sends,
     // is exactly the turn you cannot debug afterwards.
@@ -1285,6 +1321,7 @@ if (typeof window !== 'undefined') {
     window.aiToggleMic = toggleMic;
     window.aiHoldMicStart = holdMicStart;
     window.aiHoldMicEnd = holdMicEnd;
+    window.aiStop = stopAi;
     window.aiOpenInEditor = openAiInEditor;
     window.aiOpenModelSetup = aiOpenModelSetup;
     window.playAiDrill = playAiDrill;
