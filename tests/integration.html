@@ -2058,6 +2058,19 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     ok('and never runs past the ceiling',
        cutShort.length <= 260, `${cutShort.length}`);
 
+    // The reply is PAINTED as it streams, so the cap has to hold at every
+    // prefix, not only at the end. Capping only the final text left the user
+    // watching a table being drawn row by row and then getting a short bubble.
+    let worst = 0, worstAt = 0;
+    for (let n = 1; n <= wordy.length; n++) {
+        const len = V.shortReply(wordy.slice(0, n)).length;
+        if (len > worst) { worst = len; worstAt = n; }
+    }
+    ok('no prefix of a streaming reply ever exceeds the ceiling',
+       worst <= 260, `${worst} chars at prefix ${worstAt}`);
+    ok('and the prefix preview is never the full length either',
+       V.shortReply(wordy.slice(0, 40)).length < 40 || wordy.length <= 40);
+
     // And a preset that spins the other way is refused, whoever named it.
     {
         const termz = await import('../../v2/js/aiTerms.js');

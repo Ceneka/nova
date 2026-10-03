@@ -491,7 +491,17 @@ which is the part the complaint was actually about - a table of a drill that is
 already rendered in full three lines above it, plus a menu of next steps. It
 cuts on a sentence boundary where there is one, and on a word boundary where
 there is not, because a spoken reply that stops mid-word is the failure this
-exists to prevent. Two traps in that regex, both found by the suite: **`\s?!`
+exists to prevent.
+
+**The cap is applied to the STREAMING PREVIEW too, and that was the whole
+miss.** The reply is painted as it arrives, so capping only the final text
+left the user watching a markdown table being drawn row by row - and then, a
+moment later, a short bubble. Both halves of the complaint were true at once,
+and the long one was the live preview. The suite checks every prefix of a long
+reply, not only the finished one, because "the end is capped" and "what you
+watched being drawn is capped" are different promises.
+
+Two traps in that regex, both found by the suite: **`\s?!`
 is not "space then ! or ?"** - the `?` binds to `\s` as a quantifier and the
 branch only ever matched `!`, so every question mark was invisible; and **no
 digits**, or "1. Probarlo" reads as a sentence and the cut lands inside the

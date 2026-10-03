@@ -1217,7 +1217,12 @@ export async function askAiModel(text = '') {
                 if (turn.model.firstTokenMs === null) {
                     turn.model.firstTokenMs = Math.round(performance.now() - turn.model.startedMs);
                 }
-                streaming = partial; renderAi();
+                // Capped HERE, not only at the end. The reply is painted as
+                // it arrives, so capping the final text left the user watching
+                // a markdown table being drawn row by row - and then a short
+                // bubble. Both halves of the complaint were true at once: the
+                // long one was the live preview, and it was the longest part.
+                streaming = shortReply(partial); renderAi();
             },
             onTool: (name) => noteTool('used', { name })
         });
