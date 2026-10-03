@@ -114,7 +114,9 @@ export const ROLE_DEFAULTS = {
  * The values are the robot's, given by the user who owns it:
  *   -35 short, -40 mid, -45 long.
  * A long serve is the hardest of the three: -45 can be done but it is a
- * harder ball to place. `10` is very high; `0` is flat.
+ * harder ball to place. The scale runs -50 (down) .. 100 (up): **100 is
+ * very high** and `0` is flat, which is the same horizontal ball.
+
  *
  * The ball array's own limit is -50 .. 100, so a long serve is not at the
  * floor - it is 5 above it.

@@ -308,7 +308,8 @@ cannot be violated. Rules that have bitten people before:
   negative because it is launched from below the table line: the ball bounces
   on the robot's side, clears the net and bounces on the far side.
   `SERVE_HEIGHTS` is `{ short: -35, mid: -40, long: -45 }` - the robot's own
-  numbers. `10` is very high and `0` is flat. **A longer serve is lower and
+  numbers. The scale is -50 (down) .. 100 (up): **100 is very high** and `0`
+  is flat, which is the same horizontal ball. **A longer serve is lower and
   harder**, so the numbers descend; the long one is not at the -50 floor of the
   ball array's range, it is 5 above it.
 - **A serve's HEIGHT is never the preset's, even though a preset's is
