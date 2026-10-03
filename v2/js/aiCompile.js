@@ -59,6 +59,28 @@ export { SIDE_DROP, DEPTH_HEIGHT };
  * three placements. An axis with no matching entry falls back to the preset's
  * own drop/height, which is the same anchoring trick as the matcher.
  */
+/**
+ * The one place rotation becomes a ball type. 'side' maps to backspin because
+ * that is the only gear the robot has - sidespin is the head turned by hand,
+ * and the step says so rather than pretending the machine did it.
+ */
+const typeFor = rotation => (rotation === 'back' || rotation === 'side') ? 'back' : 'top';
+
+/**
+ * Does this preset at least agree with the intent about WHICH WAY IT SPINS?
+ *
+ * The matcher has always weighed rotation, but a preset the MODEL names used
+ * to be taken on trust, so the weighting was skipped exactly when it was
+ * needed most. A disagreement is not a near miss worth tolerating: back and
+ * top are different balls, and quietly swapping one for the other produces a
+ * drill that plays something the user did not ask for and will not notice
+ * until the robot does it.
+ */
+function agreesOnRotation(intent, preset) {
+    if (!intent.rotation || !preset || !preset.type) return true;
+    return typeFor(intent.rotation) === preset.type;
+}
+
 function resolveAxes(preset, intent) {
     const placements = (preset.placements || []).filter(Boolean);
     const depths = (preset.depths || []).filter(Boolean);
@@ -113,7 +135,7 @@ function configFor(intent, match) {
     const spin = preset ? preset.spin : base.spin;
 
     let type = preset ? preset.type : base.type;
-    if (intent.rotation) type = (intent.rotation === 'back' || intent.rotation === 'side') ? 'back' : 'top';
+    if (intent.rotation) type = typeFor(intent.rotation);
     if (intent.rotation === 'flat') type = 'top';
 
     const { drops, heights } = preset
@@ -225,7 +247,13 @@ export function buildPlan({ intents, name = '', presets = [] } = {}) {
         let match = null;
         if (intent.presetId) {
             const named = presets.find(p => p && p.id === intent.presetId);
-            if (named) match = { preset: named, score: 0 };
+            // ...and verify it does not CONTRADICT the intent. "saque cortado
+            // corto al reves" came back as "Topspin loop" because a model that
+            // picked a preset took its speed and spin wholesale, and a loop is
+            // the one ball in the library whose spin is not backspin. Naming a
+            // preset is a preference; naming one that is the other rotation is
+            // not, and silently honouring it makes the drill play a loop.
+            if (named && agreesOnRotation(intent, named)) match = { preset: named, score: 0 };
         }
         if (!match) match = matchPreset(intent, presets, { threshold: MATCH_THRESHOLD });
 

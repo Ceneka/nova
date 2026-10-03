@@ -2020,7 +2020,60 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     ok('the prompt says the reply is read aloud', /read out loud|spoken| aloud/i.test(prompt));
     ok('and forbids tables and lists outright', /no tables|no markdown/i.test(prompt));
     ok('and tells it not to restate the drill', /do not restate|don't restate/i.test(prompt));
+    // The model invented sidespin on a plain cut, and the app then told the
+    // user to go turn a motor by hand. These are the rules that stop it.
+    ok('the prompt says sidespin is only for an actual sidespin',
+       /only if the user actually asked/i.test(prompt), String(prompt).slice(-320));
+    ok('and spells out what a cut and a top mean',
+       /BACK/i.test(prompt) && /TOP/i.test(prompt));
+    ok('and says only "saque" is a serve',
+       /nothing else does|does not make one/i.test(prompt), String(prompt).slice(-320));
+    ok('and that a preset may not contradict the intent',
+       /must agree with the intent/i.test(prompt));
+
+    // The reply is capped on screen as well as in the voice: a cap that only
+    // applied to speech would leave the screen just as long.
+    ok('a markdown table plus a menu of next steps is cut down',
+       V.shortReply(table).length < table.length / 2,
+       `${V.shortReply(table).length} of ${table.length}`);
+    ok('a short reply is left alone',
+       V.shortReply('Push back short, then two strong tops down the middle.')
+           === 'Push back short, then two strong tops down the middle.');
+    // Only meaningful once the reply is actually over the ceiling: stripping
+    // the table out of `table` leaves under 260 chars, so it is returned whole
+    // and there is no boundary to land on. Pad it with real prose.
+    const wordy = table.replace('¿Que sigue?',
+        'Antes de que lo pruebes hay un aviso importante que conviene que '
+        + 'escuches con atencion. El paso uno no se compilo como un saque cortado '
+        + 'corto al reves. El matcher eligio el preset equivocado y quedo con el '
+        + 'perfil de un loop. Como seguimos?');
+    ok('a long reply is cut, and the cut is over the ceiling',
+       V.shortReply(wordy).length < wordy.length, `${V.shortReply(wordy).length} of ${wordy.length}`);
+    // Not "ends on a full stop": the ceiling can land mid-sentence, and then
+    // the only promise worth making is the one a listener can hear - a whole
+    // word, never a fragment like "muj largo".
+    const cutShort = V.shortReply(wordy);
+    ok('the cut never ends mid-word',
+       /^\S+$/.test(cutShort.trim().split(/\s+/).pop()), cutShort.slice(-24));
+    ok('and never runs past the ceiling',
+       cutShort.length <= 260, `${cutShort.length}`);
+
+    // And a preset that spins the other way is refused, whoever named it.
+    {
+        const termz = await import('../../v2/js/aiTerms.js');
+        const libz = (await import('../../v2/js/presets.js')).DEFAULT_PRESETS;
+        const cut = termz.parseUtterance('saque cortado corto al reves').intents[0];
+        const forced = (await import('../../v2/js/aiCompile.js')).buildPlan({
+            intents: [{ ...cut, presetId: 'preset_loop' }], presets: libz
+        });
+        ok('a topspin preset cannot serve a cut, even when the model names it',
+           forced.meta[0].presetName !== 'Topspin loop', `${forced.meta[0].presetName}`);
+        ok('and the ball still comes out backspin',
+           forced.steps[0][0][(await import('../../v2/js/ball.js')).B.TYPE] === 'back',
+           `${forced.steps[0][0][(await import('../../v2/js/ball.js')).B.TYPE]}`);
+    }
 }
+
 
 
 

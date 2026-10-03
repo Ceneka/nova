@@ -464,6 +464,39 @@ one that matters:
   nothing rather than dictating a table. This is the guarantee; the prompt is
   the request.
 
+### The model invents things, and the app does not have to believe it
+
+Three cases, all from one real drill ("saque cortado corto al reves, cortado
+largo al drive y dos tops fuertes largos al medio"):
+
+- **A preset the MODEL named used to be taken on trust.** It matched a cut to
+  "Topspin loop" - the one ball in the library whose spin is not backspin -
+  because a model that picks a preset takes its speed and spin wholesale.
+  `agreesOnRotation()` now refuses a preset that spins the other way, whoever
+  named it. Back and top are different balls; quietly swapping one for the
+  other produces a drill that does something the user did not ask for and will
+  not notice until the robot does it.
+- **The model said "side" on a plain cut**, and the app then told the user to
+  turn a motor by hand for no reason. The prompt now says sidespin is only for
+  an actual sidespin, and spells out that a cut is BACK and a top is TOP.
+- **It treated a rally shot as a serve.** "dos tops fuertes largos" became a
+  serve because a depth word was in the sentence. The prompt now says **only
+  "saque" is a serve** and nothing else is. (The deterministic parser was
+  already right, which is the shape of this whole feature: the model tier adds
+  reach, and the deterministic tier is the one that does not need supervising.)
+
+**The reply is capped at the SOURCE, not only at the speaker.** `plainForSpeech()`
+removed the markdown; `shortReply()` then keeps the first 260 characters,
+which is the part the complaint was actually about - a table of a drill that is
+already rendered in full three lines above it, plus a menu of next steps. It
+cuts on a sentence boundary where there is one, and on a word boundary where
+there is not, because a spoken reply that stops mid-word is the failure this
+exists to prevent. Two traps in that regex, both found by the suite: **`\s?!`
+is not "space then ! or ?"** - the `?` binds to `\s` as a quantifier and the
+branch only ever matched `!`, so every question mark was invisible; and **no
+digits**, or "1. Probarlo" reads as a sentence and the cut lands inside the
+numbered menu instead of before it.
+
 ### Voice
 
 **The microphone records when a voice model is configured, and listens when one

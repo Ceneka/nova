@@ -67,7 +67,8 @@ import {
     arm, disarm, isArmed, matchWakePhrase, DEFAULT_WAKE_PHRASES,
     startRecording, stopRecording, isRecording, releaseRecording, transcribeAudio, voicePhrases,
     isSpeaking, stopSpeaking,
-    holdScreenLock, isScreenLockHeld, isScreenLockSupported
+    holdScreenLock, isScreenLockHeld, isScreenLockSupported,
+    shortReply, plainForSpeech
 } from './aiVoice.js';
 import { startSequence, isDrillRunning } from './runner.js';
 import { t, getLang } from './i18n.js';
@@ -1231,8 +1232,15 @@ export async function askAiModel(text = '') {
             ms: Math.round(performance.now() - turn.model.startedMs)
         });
         if (res.text) {
-            aiModelSay(res.text);
-            speakReply(res.text);
+            // Short BEFORE it is shown, not only before it is spoken: the
+            // complaint was that the reply was long, and a cap that only
+            // applied to the voice would leave the screen just as long.
+            const brief = V.shortReply(res.text);
+            turn.model.capped = brief !== plainForSpeech(res.text);
+            if (brief) {
+                aiModelSay(brief);
+                speakReply(brief);
+            }
         }
         return res;
     } catch (err) {

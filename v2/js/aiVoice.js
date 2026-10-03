@@ -753,6 +753,50 @@ export function isSpeaking() {
  * degrades to silence rather than an error when no voice is installed.
  */
 /**
+ * Cut a reply down to what a person actually wants to read or hear.
+ *
+ * The prompt already asks for one or two sentences, and the model mostly
+ * obeys. When it does not, the reply arrived as a full markdown table of the
+ * drill that is ALREADY rendered, in full, three lines above it - and then a
+ * bulleted menu of next steps. Reading that out loud is the worst version of
+ * it. A prompt is a request; this is the consequence.
+ *
+ * Two sentences, and a hard character ceiling so a single rambling sentence
+ * cannot get through either. Kept whole sentences, so the reply never stops
+ * mid-clause - which is the thing that makes a spoken reply sound broken.
+ */
+export function shortReply(text) {
+    const clean = plainForSpeech(text);
+    if (!clean) return '';
+
+    const LIMIT = 260;
+    if (clean.length <= LIMIT) return clean;
+
+    // A sentence ends after a LETTER. Matching a bare '.' finds the one in
+    // "1. Probarlo" - the numbered menu the reply is supposed to not have -
+    // and cuts halfway into it, which is the exact failure this exists to
+    // prevent: a spoken reply that stops mid-list sounds broken rather than
+    // short. So the terminator has to be preceded by a word character.
+    const cut = clean.slice(0, LIMIT);
+    let end = 0;
+    // Two things this regex has to get right, and got wrong twice:
+    //  - `\s?!` is NOT "space then ! or ?" - the `?` binds to `\s` as a
+    //    quantifier, so the branch only ever matched `!` and every question
+    //    mark was invisible to the cut.
+    //  - No DIGITS. "1. Probarlo" is not a sentence, and with digits in the
+    //    class the cut landed inside the numbered menu - the very thing it
+    //    exists to remove - and stopped there instead.
+    for (const m of cut.matchAll(/[A-Za-zÀ-ÿ)"'][.!?](?=\s|$)/g)) end = m.index + 1;
+
+    // No sentence ends inside the ceiling. Then cut at a WORD boundary, not a
+    // character one: "... twelve muy largo" already reads as broken, and the
+    // whole reason for the cap is to avoid that.
+    if (end <= 40) return cut.slice(0, cut.lastIndexOf(' ')).trim();
+    return clean.slice(0, end).trim();
+}
+
+
+/**
  * Strip everything structural out of a reply before it is SPOKEN.
  *
  * This is the guarantee behind the prompt's request for short replies, not a

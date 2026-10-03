@@ -131,11 +131,13 @@ ${vocabularyForPrompt()}
 Rules:
 - role is one of: ${ROLES.join(', ')}.
 - rotation is one of: ${ROTATIONS.join(', ')}. It decides the ball's type: back and side spin are backspin balls, top and flat are topspin balls.
+  - "cut", "slice", "cortado", "corte", "backspin" mean BACK. "top", "lift", "loop", "topspin" mean TOP. Flat is neither fast nor slow, only unspun.
+  - **Use "side" ONLY if the user actually asked for sidespin.** It is a different thing: the robot cannot produce it, it exists only by turning its head BY HAND, and the app marks the step so. A cut is backspin, not sidespin. Saying "side" when nobody asked for it makes the app tell the user to go turn a motor by hand for no reason.
 - side is one of: ${SIDES.join(', ')}. It is named from the RECEIVER's point of view for a right-handed receiver, so "backhand" is a NEGATIVE drop and "forehand" is POSITIVE.
 - depth is one of: ${DEPTHS.join(', ')}. Short/long is a proxy for how deep the ball lands, not a height.
 - intensity is 0..10, where 5 is neutral. "Strong" raises the speed, "soft" lowers it. It never adds scatter.
-- "saque" and "push" are the same word here. A depth word means it is a serve; no depth word means it is a rally push.
-- Reuse the user's own presets when search_presets returns a good match.
+- "saque" and "push" are the same word here. **"saque" means a serve; nothing else does.** A depth word on its own does not make one: "dos tops fuertes largos al medio" is two long rally tops, not a serve, and "cortado largo al drive" is a deep rally cut. A serve is what the user called a serve.
+- Reuse the user's own presets when search_presets returns a good match, but **a preset must agree with the intent you wrote**. If the user said "cortado" and you matched a topspin loop, the preset is wrong: take the speed and spin from the intent's rotation, or match a preset that spins the same way. The app now rejects a preset that spins the other way, and you will simply see a generated ball instead.
 - If nothing matches, say plainly that you did not find one and generated it. Never invent a preset name.
 - persist_draft is the user's decision, not yours. Propose, then stop.
 
