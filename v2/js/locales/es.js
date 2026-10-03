@@ -527,6 +527,13 @@ export const es = {
             side: 'lateral',
             flat: 'plano'
         },
+        // El sidespin es un NOMBRE, no una máquina: el robot solo gira top o
+        // back, y el sidespin sale girando la cabeza a mano.
+        sideSpinManual: 'sidespin - girá la cabeza a mano',
+        sideSpinManualTo: 'sidespin al {where} - girá la cabeza a mano',
+        sideSpinChip: 'cabeza a mano',
+        sideSpinChipTo: 'cabeza a mano, {where}',
+        sideSpinWhy: 'El robot no puede girar sideways solo. Girale la cabeza a mano antes de este paso.',
         side: {
             bh: 'al revés',
             center: 'al medio',

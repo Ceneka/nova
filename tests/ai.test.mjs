@@ -208,7 +208,7 @@ test('the plan\'s compiler table', () => {
         // played down onto the receiver's half. They used to be 30 and 55 -
         // positive, above the table, which is a rally trajectory.
         ['saque corto', 4.5, 2.5, 'back', -35, 60],
-        ['saque largo', 5.5, 3, 'back', -50, 60],
+        ['saque largo', 5.5, 3, 'back', -45, 60],
         ['push b', 1.5, 4, 'back', 45, 45],
         ['drive f', 5, 3, 'top', 55, 72],
         ['loop f', 4, 3.5, 'back', 60, 60],
@@ -403,7 +403,7 @@ test('a matched preset cannot put a serve back above the table', () => {
     // preset's to override. The preset still owns speed, spin, type and drop.
     for (const [utterance, expected] of [
         ['saque cortado corto al reves', -35],
-        ['saque cortado largo a la derecha', -50]
+        ['saque cortado largo a la derecha', -45]
     ]) {
         const intent = T.parseUtterance(utterance).intents[0];
         const plan = C.buildPlan({ intents: [intent], presets: library });

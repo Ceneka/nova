@@ -299,13 +299,18 @@ cannot be violated. Rules that have bitten people before:
   ends of the table. One vocabulary entry, two readings, and a fixed rule: a
   **depth word means serve**, no depth word means rally push. The speed
   difference (4.5 vs 1.5) is the point of telling them apart.
-- **A serve height is NEGATIVE, and the sign is the whole point.** `SERVE_HEIGHTS`
-  is `{ short: -35, mid: -42, long: -50 }`. A service is played *down* onto the
-  receiver's half, and these were `30 / 40 / 55` - all positive, all above the
-  table, which is a rally trajectory. `-50` is the bottom of the range the robot
-  accepts and a long serve belongs there. This is the assistant's serves only:
-  the factory drills are rally strokes (`push(b)` is a push because it carries
-  no depth word) and store their own heights, which are not this decision.
+- **A serve height is the ROBOT'S HEAD HEIGHT, not a direction of travel.**
+  This was wrong here for a while and it is worth stating precisely, because
+  the fix that followed from the wrong version of it nearly broke preset
+  matching. `height` is where the head launches from; **0 is a horizontal
+  ball**, which would need real speed and topspin to dip over the net - a
+  backspin cut at 0 would never reach the far half at all. So a serve is
+  negative because it is launched from below the table line: the ball bounces
+  on the robot's side, clears the net and bounces on the far side.
+  `SERVE_HEIGHTS` is `{ short: -35, mid: -40, long: -45 }` - the robot's own
+  numbers. `10` is very high and `0` is flat. **A longer serve is lower and
+  harder**, so the numbers descend; the long one is not at the -50 floor of the
+  ball array's range, it is 5 above it.
 - **A serve's HEIGHT is never the preset's, even though a preset's is
   otherwise.** This is the exception to "a preset owns speed, spin, type and
   height", and it was found by using it: `saque cortado corto al reves` came
@@ -314,6 +319,15 @@ cannot be violated. Rules that have bitten people before:
   is what "serve" means, and it is not the preset's to override. The preset
   still supplies everything that makes it that serve - speed, spin, type and
   the lateral drop.
+- **Sidespin is a NAME, not a machine setting.** The robot can only spin top or
+  back; sidespin exists only by turning its head by hand. `rotation: 'side'`
+  compiles to a backspin ball - correctly, mechanically, that is the only gear
+  there is - but the step says so, in words and as a chip, because a drill that
+  quietly plays backspin where the user asked for sidespin is a drill that does
+  not do what it says. `intent.side` is the lateral target and is what names
+  WHICH way the head has to be turned. Note that "corte con side" parses as
+  **back**, not side: "corte" wins, and a test sentence has to be one that
+  really means sidespin.
 - **`preset_loop` is stored as `type: 'top'`, and the name was the honest
   one.** It was `'back'`, so it both played the wrong rotation and made the
   matcher read it as a backspin preset - which is how a backspin serve chose

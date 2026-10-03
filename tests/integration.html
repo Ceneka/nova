@@ -1849,11 +1849,22 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     ok('every serve height is negative',
        Object.values(terms.SERVE_HEIGHTS).every(v => v < 0),
        JSON.stringify(terms.SERVE_HEIGHTS));
-    ok('a short serve is about -35 and a long one about -50',
-       terms.SERVE_HEIGHTS.short === -35 && terms.SERVE_HEIGHTS.long === -50,
-       `short ${terms.SERVE_HEIGHTS.short} long ${terms.SERVE_HEIGHTS.long}`);
-    ok('and the long serve sits at the bottom of the range the robot accepts',
-       terms.SERVE_HEIGHTS.long === -50, `${terms.SERVE_HEIGHTS.long}`);
+    // The robot's own numbers: -35 short, -40 mid, -45 long. Height is the
+    // HEAD's height above the table, 0 being a horizontal ball - so these are
+    // negative because a serve is launched from below the table line, and the
+    // long one is the hardest, not the extreme.
+    ok('a short serve is -35 and a long one -45',
+       terms.SERVE_HEIGHTS.short === -35 && terms.SERVE_HEIGHTS.long === -45,
+       `short ${terms.SERVE_HEIGHTS.short} mid ${terms.SERVE_HEIGHTS.mid} long ${terms.SERVE_HEIGHTS.long}`);
+    // Longer is LOWER: a long serve launches from further below the table and
+    // is the hardest of the three to place. So the numbers descend, -35 to -45.
+    ok('and a longer serve launches from lower down',
+       terms.SERVE_HEIGHTS.mid === -40
+       && terms.SERVE_HEIGHTS.short > terms.SERVE_HEIGHTS.mid
+       && terms.SERVE_HEIGHTS.mid > terms.SERVE_HEIGHTS.long,
+       JSON.stringify(terms.SERVE_HEIGHTS));
+    ok('the long serve is NOT at the floor of the range the robot accepts',
+       terms.SERVE_HEIGHTS.long > -50, `${terms.SERVE_HEIGHTS.long} vs a floor of -50`);
     ok('the role defaults agree with the table',
        terms.ROLE_DEFAULTS.serve.height < 0 && terms.ROLE_DEFAULTS.serveLong.height < 0,
        `serve ${terms.ROLE_DEFAULTS.serve.height} serveLong ${terms.ROLE_DEFAULTS.serveLong.height}`);
@@ -1861,9 +1872,50 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     // And it reaches the ball array, not just the vocabulary.
     const ball = await import('../../v2/js/ball.js');
     const built = ball.makeBall({ height: terms.SERVE_HEIGHTS.long, speed: 5, type: 'back' });
-    ok('a -50 height survives into the ball array',
-       built[ball.B.HEIGHT] === -50, `${built[ball.B.HEIGHT]}`);
+    ok('a -45 height survives into the ball array',
+       built[ball.B.HEIGHT] === -45, `${built[ball.B.HEIGHT]}`);
 }
+// Sidespin is a NAME, not a machine setting. The robot can only spin top or
+// back; sidespin exists only by turning its head by hand. It compiles to
+// backspin - correctly, mechanically - but the step has to say so, because a
+// drill that quietly plays backspin where the user asked for sidespin is a
+// drill that does not do what it says.
+{
+    const terms = await import('../../v2/js/aiTerms.js');
+    const said = AI.describeIntent({ role: 'push', rotation: 'side', side: 'bh', intensity: 5 });
+    ok('a sidespin step says the head has to be turned by hand',
+       /mano|hand/i.test(said), said);
+    ok('and names which way, from the lateral target',
+       /backhand|forehand|rev|bh|fh/i.test(said), said);
+    ok('it does not read as something the robot did',
+       !/^sidespin$/i.test(said.trim()), said);
+
+    const none = AI.describeIntent({ role: 'push', rotation: 'side', side: null, intensity: 5 });
+    ok('with no side to name it still says the head is manual',
+       /mano|hand/i.test(none), none);
+
+    // And the chip, so it survives being scrolled past.
+    AIS.setDraft(null);
+    const plan = (await import('../../v2/js/aiCompile.js')).buildPlan({
+        intents: [terms.parseUtterance('saque side al reves').intents[0]],
+        presets: (await import('../../v2/js/presets.js')).DEFAULT_PRESETS
+    });
+    AI.openAiView();
+    await AI.handleUtterance('saque side al reves', { tier: 'local' });
+    ok('the step card carries a sidespin chip',
+       document.querySelectorAll('#ai-body .ai-chip.side-spin').length >= 1,
+       `${document.querySelectorAll('#ai-body .ai-chip.side-spin').length} chip(s)`);
+
+    // Mechanically it is still a backspin ball: the robot has no other gear.
+    const plan2 = (await import('../../v2/js/aiCompile.js')).buildPlan({
+        intents: [terms.parseUtterance('saque side al reves').intents[0]],
+        presets: []
+    });
+    const B = (await import('../../v2/js/ball.js')).B;
+    ok('and the ball itself is still a backspin ball',
+       plan2.steps[0][0][B.TYPE] === 'back', `${plan2.steps[0][0][B.TYPE]}`);
+}
+
 
 // The coverage display is gone. The escalation it justified is not.
 {

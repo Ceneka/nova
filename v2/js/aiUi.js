@@ -220,9 +220,23 @@ export function clearAiTranscript() {
  */
 export function describeIntent(intent) {
     const words = [];
-    if (intent.rotation) words.push(t(`ai.rot.${intent.rotation}`));
+    // Sidespin is a NAME here, not a machine setting. The robot can only spin
+    // top or back - sidespin exists only by turning its head by hand - so it
+    // compiles to backspin and the step says so, because a drill that quietly
+    // plays backspin where the user asked for sidespin is a drill that does
+    // not do what it says. `intent.side` is the lateral target, so it is what
+    // names WHICH way the head has to be turned.
+    const sideSpin = intent.rotation === 'side';
+    if (sideSpin) {
+        // The side is named HERE and not again below: the manual message
+        // already carries it, and printing "to the backhand ... backhand"
+        // twice is the kind of thing that makes a person stop reading.
+        words.push(intent.side
+            ? t('ai.sideSpinManualTo', { where: t(`ai.side.${intent.side}`) })
+            : t('ai.sideSpinManual'));
+    } else if (intent.rotation) words.push(t(`ai.rot.${intent.rotation}`));
     if (intent.depth) words.push(t(`axis.${intent.depth}`));
-    if (intent.side) words.push(t(`ai.side.${intent.side}`));
+    if (intent.side && !sideSpin) words.push(t(`ai.side.${intent.side}`));
     if (!words.length) words.push(t(`ai.role.${intent.role}`));
     if (intent.intensity <= 3) words.push(t('ai.strength.low'));
     if (intent.intensity >= 7) words.push(t('ai.strength.high'));
@@ -543,7 +557,23 @@ function renderDraft(draft) {
         const chip = el('div', `ai-chip${meta.usedFallback ? ' generated' : ''}`,
             meta.usedFallback ? t('ai.generated') : meta.presetName);
         chip.title = meta.usedFallback ? '' : String(meta.presetName);
+
+        // A sidespin step is not done by the robot, so it carries its own chip
+        // rather than being a word buried in the step title. This is the one
+        // thing about a drill the user has to do with their hands, and it has
+        // to survive being scrolled past.
         step.appendChild(chip);
+        // After the append, because `chip.after()` on a parentless element is a
+        // silent no-op - which is exactly what it was, and why the chip never
+        // appeared in any run of the suite.
+        if (meta.intent?.rotation === 'side') {
+            const hand = el('div', 'ai-chip side-spin',
+                meta.intent.side
+                    ? t('ai.sideSpinChipTo', { where: t(`ai.side.${meta.intent.side}`) })
+                    : t('ai.sideSpinChip'));
+            hand.title = t('ai.sideSpinWhy');
+            chip.after(hand);
+        }
         card.appendChild(step);
     });
 

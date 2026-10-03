@@ -2870,3 +2870,11 @@ input[type="number"],
     width: 100%;
     box-sizing: border-box;
 }
+
+/* A sidespin step is the one thing the robot cannot do by itself, so the chip
+   that says so is deliberately the loudest non-generated chip on the card. */
+.ai-chip.side-spin {
+    border-color: var(--spin-back);
+    color: var(--spin-back);
+    font-weight: 600;
+}

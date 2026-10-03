@@ -104,18 +104,22 @@ export const ROLE_DEFAULTS = {
 /**
  * A serve is the one role whose height genuinely varies with the depth word.
  *
- * **Negative, and the sign is the whole point.** A serve drops the ball; a
- * positive height plays it upward like a rally ball, which is what these used
- * to do - a short serve was 30 and a long one 55, both above the table. A
- * service is played DOWN: about -35 for a short one and -50 for a long one, so
- * the ball falls onto the receiver's half. `-50` is the bottom of the range the
- * robot accepts, and a long serve is where it belongs.
+ * **Height is the ROBOT'S HEAD HEIGHT, not a direction of travel.** 0 is a
+ * horizontal ball off the head: it would need real speed and topspin to dip
+ * over the net, and a backspin cut would never reach the far half at all. So a
+ * serve height is where the head launches from, and these are negative because
+ * a serve is launched from below the table line - the ball bounces on the
+ * robot's side, clears the net and bounces on the far side.
  *
- * Only the assistant's serves. The factory drills are rally strokes - `push(b)`
- * is a push because it carries no depth word - and they store their own
- * heights, which are not this decision and must not move with it.
+ * The values are the robot's, given by the user who owns it:
+ *   -35 short, -40 mid, -45 long.
+ * A long serve is the hardest of the three: -45 can be done but it is a
+ * harder ball to place. `10` is very high; `0` is flat.
+ *
+ * The ball array's own limit is -50 .. 100, so a long serve is not at the
+ * floor - it is 5 above it.
  */
-export const SERVE_HEIGHTS = { short: -35, mid: -42, long: -50 };
+export const SERVE_HEIGHTS = { short: -35, mid: -40, long: -45 };
 
 /**
  * Lateral placement, from the receiver's point of view for a right-handed

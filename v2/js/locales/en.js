@@ -536,6 +536,13 @@ export const en = {
             side: 'sidespin',
             flat: 'flat'
         },
+        // Sidespin is a NAME, not a machine setting: the robot can only spin
+        // top or back, and sidespin happens by turning its head by hand.
+        sideSpinManual: 'sidespin - turn the head by hand',
+        sideSpinManualTo: 'sidespin to the {where} - turn the head by hand',
+        sideSpinChip: 'head by hand',
+        sideSpinChipTo: 'head by hand, {where}',
+        sideSpinWhy: 'The robot cannot spin sideways on its own. Turn its head by hand before this step.',
         side: {
             bh: 'backhand',
             center: 'the middle',
