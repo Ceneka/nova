@@ -306,6 +306,18 @@ cannot be violated. Rules that have bitten people before:
   accepts and a long serve belongs there. This is the assistant's serves only:
   the factory drills are rally strokes (`push(b)` is a push because it carries
   no depth word) and store their own heights, which are not this decision.
+- **A serve's HEIGHT is never the preset's, even though a preset's is
+  otherwise.** This is the exception to "a preset owns speed, spin, type and
+  height", and it was found by using it: `saque cortado corto al reves` came
+  out at **+5** and the long one at **+75**, because `SERVE_HEIGHTS` was being
+  overridden by the match and every preset's depth axis is positive. The band
+  is what "serve" means, and it is not the preset's to override. The preset
+  still supplies everything that makes it that serve - speed, spin, type and
+  the lateral drop.
+- **`preset_loop` is stored as `type: 'top'`, and the name was the honest
+  one.** It was `'back'`, so it both played the wrong rotation and made the
+  matcher read it as a backspin preset - which is how a backspin serve chose
+  "Topspin loop" over the sidespin serve the sentence actually meant.
 - **A serve is scored against its DEPTH LABEL, not its ball height.**
   Correcting the sign above nearly broke preset matching: every preset is a
   rally shot with a positive height, so `depthDistance` comparing -35 against
@@ -387,8 +399,8 @@ that was working correctly. `MAX_ROUNDS` is the cap that means something about
 the agent rather than about one HTTP round trip.
 
 Streaming is the default: a voice assistant that waits for the whole answer
-before it says anything feels broken, so `readSse()` parses the stream by hand (~30 lines, no
-SDK) and buffers across chunk boundaries, because a split in the middle of a
+before it says anything feels broken, so `readSse()` parses the stream by hand
+(~30 lines, no SDK) and buffers across chunk boundaries, because a split in the middle of a
 tool call's JSON otherwise loses the call silently.
 
 ### Two things only a live call finds
@@ -417,6 +429,25 @@ they are worth knowing before you "simplify" either one away:
   **OpenRouter does not list transcription models in `GET /models`** - that
   endpoint covers chat models only, so "it is not in the list" is not evidence
   a transcription model does not work.
+
+### What the model is told, and what is spoken
+
+**The reply is READ ALOUD, so structure becomes nonsense in the air.** The model
+wrote a markdown table and the app read the column header out loud followed by
+fragments with no meaning between them - which sounds broken rather than
+absent, and is worse than saying nothing. Two defences, and the second is the
+one that matters:
+
+- The prompt says so explicitly: one or two short sentences, no markdown, no
+  tables, no lists, no headings, do not restate the drill because the panel
+  already shows every step and number, and never end with a numbered menu of
+  next steps.
+- **`plainForSpeech()` strips structure anyway.** A prompt is a suggestion to a
+  model trying to be helpful, and a helpful assistant reaches for a table. The
+  stripper removes fences, table rows, headings, list markers, emphasis and
+  link syntax, and returns `''` when that leaves nothing - so `speak()` says
+  nothing rather than dictating a table. This is the guarantee; the prompt is
+  the request.
 
 ### Voice
 
@@ -1090,12 +1121,12 @@ belong on somebody else's *server* either.
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 112 unit tests, no dependencies
+node --test tests/*.test.mjs            # 115 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (579 checks, needs the HTTP server above):
+Browser integration (587 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

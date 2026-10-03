@@ -1940,6 +1940,36 @@ ok('and the final phrase separately, with no repeat', finalSeen === 'derecha', f
     window.SpeechSynthesisUtterance = hadUtter;
     CFG.setAiConfig({ speak: false });
 }
+// The model was writing markdown tables and the app was READING THEM ALOUD -
+// a column header followed by fragments, which sounds broken rather than
+// absent. The prompt asks for short replies; this is the guarantee behind that
+// request, not a second copy of it.
+{
+    const table = 'Listo, ya tengo el draft armado:\n\n'
+        + '| # | Paso | Preset | Vel / Spin |\n|---|---|---|---|\n'
+        + '| 1 | Corte corto al reves | Short sidespin serve | 5.4 / 3.0 |\n\n'
+        + 'Dos cosas que resolvi:\n\n- **"al drive"** lo interprete como forehand.\n\n'
+        + '¿Que sigue?\n\n1. **Probarlo en el robot**\n2. **Guardarlo**';
+
+    const spoken = V.plainForSpeech(table);
+    ok('a markdown table never reaches the speaker', !spoken.includes('|'), spoken.slice(0, 120));
+    ok('nor a column header', !/Paso.*Preset/.test(spoken), spoken.slice(0, 120));
+    ok('but the sentence inside it survives',
+       /forehand/.test(spoken), spoken.slice(0, 160));
+
+    ok('plain prose is left exactly as it was',
+       V.plainForSpeech('Push back short, then two strong tops down the middle.')
+           === 'Push back short, then two strong tops down the middle.');
+    ok('a reply that was nothing but a table says nothing at all',
+       V.plainForSpeech('| a | b |\n|---|---|\n| 1 | 2 |') === '', V.plainForSpeech('| a | b |\n|---|---|\n| 1 | 2 |'));
+
+    // And the prompt has to forbid it, because a prompt is a suggestion.
+    const prompt = CLI.systemPrompt({ language: 'es', tools: [] });
+    ok('the prompt says the reply is read aloud', /read out loud|spoken| aloud/i.test(prompt));
+    ok('and forbids tables and lists outright', /no tables|no markdown/i.test(prompt));
+    ok('and tells it not to restate the drill', /do not restate|don't restate/i.test(prompt));
+}
+
 
 
 

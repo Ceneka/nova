@@ -62,7 +62,11 @@ export const DEFAULT_PRESETS = [
     mk('preset_heavy_push', 'Heavy backspin push', 1.5, 4, 'back', 45, -5, 45),
     mk('preset_safe_push', 'Safe push', 1.5, 1, 'top', 40, -5, 40),
     mk('preset_fast_drive', 'Fast drive', 5, 3, 'top', 55, -5, 72),
-    mk('preset_loop', 'Topspin loop', 4, 3.5, 'back', 60, -5, 60)
+    // 'top', not 'back'. The name has always said Topspin and a loop IS a
+    // topspin ball; stored as backspin it both played the wrong rotation and
+    // made the matcher treat it as a backspin preset, so a backspin serve
+    // matched it over the sidespin serve the sentence actually meant.
+    mk('preset_loop', 'Topspin loop', 4, 3.5, 'top', 60, -5, 60)
 ];
 
 // --- STORE -----------------------------------------------------------------

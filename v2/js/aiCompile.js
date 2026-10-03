@@ -41,7 +41,7 @@ import { makeBall, B, LIMITS, freqToBpm, maxScatterFor } from './ball.js';
 import { clamp } from './utils.js';
 import {
     sideFromLabel, depthFromLabel, baseFor, expectationFor,
-    SIDE_DROP, DEPTH_HEIGHT, SCATTER_UNITS
+    SIDE_DROP, DEPTH_HEIGHT, SERVE_HEIGHTS, SCATTER_UNITS
 } from './aiTerms.js';
 import { matchPreset, MATCH_THRESHOLD } from './aiMatch.js';
 
@@ -70,13 +70,31 @@ function resolveAxes(preset, intent) {
         ? depths.find(d => depthFromLabel(d.label) === intent.depth)
         : null;
 
+    // **A serve's height comes from the serve band, never from the preset.**
+    // Everywhere else a preset owns the height - it is the user's own answer to
+    // "how deep" - but a serve is played DOWN (-35 short, -50 long) and every
+    // preset's depth axis is positive, written for a rally ball. Letting the
+    // preset win here is how "saque corto al reves" came out at +35 and "saque
+    // largo" at +75: the sign correction in SERVE_HEIGHTS was simply being
+    // overridden by the match, and the assistant produced rallies labelled as
+    // serves.
+    //
+    // The preset still supplies everything that makes it that serve - speed,
+    // spin, type, and the lateral drop. Only the vertical band is not the
+    // preset's to decide, because the band is what "serve" means.
+    const serveHeight = intent.role === 'serve'
+        ? (SERVE_HEIGHTS[intent.depth] ?? SERVE_HEIGHTS.mid)
+        : null;
+
     return {
         drops: placements.length
             ? (wantedSide ? [wantedSide.drop] : placements.map(p => p.drop))
             : [preset.drop],
-        heights: depths.length
-            ? (wantedDepth ? [wantedDepth.height] : depths.map(d => d.height))
-            : [preset.height]
+        heights: serveHeight !== null
+            ? [serveHeight]
+            : depths.length
+                ? (wantedDepth ? [wantedDepth.height] : depths.map(d => d.height))
+                : [preset.height]
     };
 }
 

@@ -752,8 +752,54 @@ export function isSpeaking() {
  * Say something. `speechSynthesis` by default: offline, free, no key, and it
  * degrades to silence rather than an error when no voice is installed.
  */
+/**
+ * Strip everything structural out of a reply before it is SPOKEN.
+ *
+ * This is the guarantee behind the prompt's request for short replies, not a
+ * second copy of it. A prompt says "no tables"; a prompt is a suggestion to a
+ * model that is trying to be helpful, and a helpful assistant reaches for a
+ * table. The app then reads that table out loud - a column header, then
+ * fragments with no meaning between them - which is worse than silence because
+ * it sounds broken rather than absent.
+ *
+ * What goes: fenced blocks, table rows, headings, list bullets, emphasis and
+ * link syntax, and any leftover pipe or hash. What stays is the sentence. If
+ * stripping leaves nothing, the caller is told so and says nothing rather than
+ * reading a table aloud.
+ */
+export function plainForSpeech(text) {
+    let out = String(text ?? '');
+    if (!out.trim()) return '';
+
+    // Fenced code: drop the fences and their contents entirely.
+    out = out.replace(/```[\s\S]*?```/g, ' ');
+    // Table rows: any line that is mostly pipes. A row and its header are both
+    // noise spoken aloud.
+    out = out.split('\n').filter(line => {
+        const ticks = (line.match(/\|/g) || []).length;
+        return ticks < 2;
+    }).join('\n');
+    // Headings, blockquote and list markers, at the start of a line.
+    out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+    out = out.replace(/^\s{0,3}>\s?/gm, '');
+    out = out.replace(/^\s*[-*+]\s+/gm, '');
+    out = out.replace(/^\s*\d+[.)]\s+/gm, '');
+    // Emphasis and inline code and links.
+    out = out.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/__([^_]+)__/g, '$1');
+    out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1$2');
+    out = out.replace(/`([^`]+)`/g, '$1');
+    out = out.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    // Horizontal rules and leftover decoration.
+    out = out.replace(/^\s*([-*_])\s*(\1\s*){2,}$/gm, ' ');
+    out = out.replace(/[|#]/g, ' ');
+    out = out.replace(/[ \t]{2,}/g, ' ');
+    out = out.replace(/\n{3,}/g, '\n\n');
+    return out.replace(/\s+/g, ' ').trim();
+}
+
 export function speak(text, { lang = null, rate = 1.02, onDone = null } = {}) {
-    const say = String(text || '').trim();
+    // Nothing structural ever reaches the speaker.
+    const say = plainForSpeech(text);
     if (!say) return false;
     if (!getAiConfig().speak) return false;
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;

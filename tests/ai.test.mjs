@@ -360,15 +360,18 @@ test('a named preset the intent asked for is honoured over re-matching', () => {
 test('a matched preset wins the depth and the side', () => {
     // The plan's own example: the preset's Long is height 55, not the nominal
     // 70, and that is the whole reason the preset is the source of truth.
-    const intent = T.parseUtterance('saque largo a la derecha').intents[0];
+    // A RALLY stroke. A serve is the documented exception and has its own test,
+    // because "the preset owns the height" is precisely the rule that put serves
+    // back above the table.
+    const intent = T.parseUtterance('loop b largo').intents[0];
     const plan = C.buildPlan({ intents: [intent], presets: library });
     const m = M.matchPreset(intent, library);
     if (m) {
         assert.equal(plan.steps[0][0][B.HEIGHT], m.preset.depths.find(d => d.label === 'Long').height);
     }
-    // With no preset, the nominal table is used instead: a long serve is -50.
+    // With no preset, the nominal table is used instead.
     const bare = C.compile({ ...intent, presetId: null }, null);
-    assert.equal(bare[0][0][B.HEIGHT], -50);
+    assert.equal(bare[0][0][B.HEIGHT], T.DEPTH_HEIGHT.long);
 });
 
 test('a serve still matches a preset, which the negative heights nearly broke', () => {
@@ -390,6 +393,40 @@ test('a rename does not change how a serve is scored', () => {
     const a = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], library);
     const b = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], renamed);
     assert.equal(a.preset.id, b.preset.id);
+});
+
+test('a matched preset cannot put a serve back above the table', () => {
+    // Reported as "the serve put the height back to 5". It did: SERVE_HEIGHTS is
+    // negative, but a matched preset owns the height everywhere else, and every
+    // preset's depth axis is positive - so a short sidespin serve came out at
+    // +5 and a long one at +75. The band is what "serve" means; it is not the
+    // preset's to override. The preset still owns speed, spin, type and drop.
+    for (const [utterance, expected] of [
+        ['saque cortado corto al reves', -35],
+        ['saque cortado largo a la derecha', -50]
+    ]) {
+        const intent = T.parseUtterance(utterance).intents[0];
+        const plan = C.buildPlan({ intents: [intent], presets: library });
+        const matched = plan.meta[0]?.presetName;
+        assert.ok(matched, `${utterance} matched no preset at all`);
+        assert.equal(plan.steps[0][0][B.HEIGHT], expected,
+            `${utterance} via ${matched} -> ${plan.steps[0][0][B.HEIGHT]}`);
+    }
+});
+
+test('a rally stroke keeps its positive height', () => {
+    // The fix is for serves only. A drive or a loop is still played upward.
+    const drive = C.buildPlan({ intents: [T.parseUtterance('drive f fuerte').intents[0]], presets: library });
+    assert.ok(drive.steps[0][0][B.HEIGHT] > 0, `${drive.steps[0][0][B.HEIGHT]}`);
+});
+
+test('"Topspin loop" is stored as topspin', () => {
+    // The name has always said Topspin and a loop IS a topspin ball. Stored as
+    // backspin it both played the wrong rotation AND made the matcher read it
+    // as a backspin preset, so a backspin serve chose it over the sidespin
+    // serve the sentence actually meant.
+    const loop = library.find(p => p.id === 'preset_loop');
+    assert.equal(loop.type, 'top', `preset_loop.type is ${loop.type}`);
 });
 
 test('a preset axis is narrowed by what the sentence asked for', () => {

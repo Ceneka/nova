@@ -22,7 +22,7 @@
  *     install at all, rather than an app that half-works offline.
  */
 
-const VERSION = 'v15';
+const VERSION = 'v16';
 const CACHE = `nova-shell-${VERSION}`;
 
 /** The precached address of the app itself. Serve as the navigation fallback. */
