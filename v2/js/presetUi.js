@@ -196,7 +196,6 @@ function renderPresetForm() {
 
     const p = working;
     const maxSpin = maxSpinFor(p.speed);
-    const spinStyle = p.type === 'back' ? 'background:var(--danger); color:#fff; border-radius:4px;' : '';
     const scatterMax = maxScatterFor(p.drop);
 
     // The label input shows the STORED label, never axisLabel() of it. This
@@ -237,7 +236,7 @@ function renderPresetForm() {
             <div class="editor-field">
                 <div class="field-header"><label>${t('field.spin')}</label><span class="range-hint" id="pf-spin-max">${t('unit.max', { n: maxSpin })}</span></div>
                 <input type="number" inputmode="decimal" id="pf-spin" value="${p.spin}" step="0.5" min="0" max="${maxSpin}"
-                    style="${spinStyle}" onchange="window.handlePresetField('spin', this.value)">
+                    onchange="window.handlePresetField('spin', this.value)">
             </div>
             <div class="editor-field">
                 <div class="field-header"><label>${t('field.height')}</label><span class="range-hint">-50/100</span></div>

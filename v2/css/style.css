@@ -372,37 +372,87 @@ h1 {
 .reset-item:hover { background: var(--danger-dim); color: var(--danger-ink); }
 
 /* --- CONNECTION CARD --- */
-.settings-card {
+/* The main screen's one status surface. It used to be a full card with the
+   connect button, the level picker, the mode switch and three number fields
+   always open - about 300px before the first drill, on every visit, for
+   settings that change once a session. The card is now one row; the settings
+   are a tap away in a native <details> whose summary states the next run. */
+.session-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 20px;
-    transition: background-color var(--trans-speed);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color var(--trans-speed), background-color var(--trans-speed);
+}
+.session-card.is-connected { border-color: var(--accent-line); }
+.session-card.is-error { border-color: rgba(229, 72, 77, 0.55); }
+
+.session-state {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
 }
 
+/* The dot is the state at a glance; the words beside it say the same thing for
+   anyone who cannot see the colour, so it is decorative and aria-hidden. */
+.conn-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-light);
+    box-shadow: 0 0 0 3px rgba(126, 145, 141, 0.12);
+    transition: background var(--trans-speed), box-shadow var(--trans-speed);
+}
+.is-connected .conn-dot {
+    background: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-dim);
+}
+.is-busy .conn-dot {
+    background: var(--primary);
+    animation: connect-pulse 1.2s ease-in-out infinite;
+}
+.is-error .conn-dot { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-dim); }
+
+.conn-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.is-connected .conn-label { color: var(--primary); }
+.is-error .conn-label { color: var(--danger-ink); }
+
 .btn-connect {
-    width: 100%;
-    padding: 12px;
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 0 18px;
     border: 1px solid transparent;
     border-radius: 9px;
     font-family: inherit;
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     letter-spacing: 0.01em;
     cursor: pointer;
     background: var(--primary);
     color: var(--primary-solid-ink);
-    margin-bottom: 16px;
     transition: background var(--trans-speed), border-color var(--trans-speed),
                 color var(--trans-speed), transform 0.1s;
 }
-.btn-connect:active { transform: scale(0.99); }
+.btn-connect:active { transform: scale(0.98); }
 
 /* Connected swaps the solid fill for the accent pill the rest of the site
    uses for "this is the one that is on". */
 .btn-connect.connected {
-    background: var(--accent-fill);
+    background: transparent;
     border-color: var(--accent-line);
     color: var(--primary);
 }
@@ -412,8 +462,76 @@ h1 {
 @keyframes connect-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
 .btn-connect.connecting { animation: connect-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-    .btn-connect.connecting { animation: none; }
+    .btn-connect.connecting, .is-busy .conn-dot { animation: none; }
 }
+
+/* --- the run settings, behind one row --- */
+.session-setup { border-top: 1px solid var(--border); }
+
+.setup-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 12px;
+    cursor: pointer;
+    list-style: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.setup-summary::-webkit-details-marker { display: none; }
+.setup-summary::marker { content: ''; }
+.setup-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+.setup-values {
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.setup-chevron {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: var(--text-light);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s;
+}
+.session-setup[open] .setup-chevron { transform: rotate(180deg); }
+.session-setup[open] .setup-summary { border-bottom: 1px solid var(--border); }
+
+.setup-panel { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.setup-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+}
+.setup-field-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-light);
+}
+.setup-field .level-select { margin: 0; gap: 8px; }
+.setup-field .mode-switch { width: 190px; margin: 0; }
+.setup-panel .controls-row { margin: 0; }
 
 .control-group {
     display: flex;
@@ -571,51 +689,56 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 
 /* --- TABS --- */
+/* Two rows: the factory drills on top, the user's sets plus the assistant's
+   category below. Seven pills in a 3x3 grid left two holes and cost ~220px;
+   this is one deliberate strip of ~96px, and every row is full. */
 .tabs-container {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 8px;
-    margin-bottom: 16px;
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 6px;
+    padding: 6px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
+
+.tab-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+.tab-row-4 { grid-template-columns: repeat(4, 1fr); }
 
 .tab-btn {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    padding: 11px 5px;
-    border-radius: 9px;
+    min-height: 38px;
+    padding: 0 6px;
+    border-radius: 8px;
     border: 1px solid transparent;
     background: transparent;
     color: var(--text-light);
     font-family: inherit;
     font-weight: 600;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     cursor: pointer;
-    transition: all var(--trans-speed);
+    transition: background var(--trans-speed), color var(--trans-speed),
+                border-color var(--trans-speed);
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-tap-highlight-color: transparent;
 }
+.tab-btn:hover { background: var(--hover); color: var(--text); }
 
 .tab-btn.active {
     background: var(--accent-fill);
     border-color: var(--accent-line);
     color: var(--primary);
 }
-
-.icon-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px;
-    width: 9px;
-    height: 9px;
-}
-.icon-dot { background-color: currentColor; border-radius: 2px; opacity: 0.45; }
-.tab-btn.active .icon-dot { opacity: 1; }
 
 /* --- DRILL LIST --- */
 .drill-list {
@@ -626,115 +749,191 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 .hidden { display: none !important; }
 
+/* One drill is one row with two explicit controls: play, and everything else
+   opens the editor. The row is a container (not a <button>) so the play control
+   can be a real button without nesting one inside another. */
 .btn-drill {
     width: 100%;
-    min-height: 56px;
-    padding: 0 14px;
+    min-height: 58px;
     display: flex;
     flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 14px;
+    align-items: stretch;
+    gap: 2px;
 
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     color: var(--text);
     position: relative;
     transition: transform 0.1s, background-color var(--trans-speed),
                 border-color var(--trans-speed), color var(--trans-speed);
     user-select: none;
     -webkit-user-select: none;
-    cursor: pointer;
 }
 
-.btn-drill:active { transform: scale(0.99); }
+.btn-drill:active { transform: scale(0.995); }
 .btn-drill.running {
     border-color: var(--accent-line);
     background: var(--accent-fill);
     color: var(--primary);
 }
-.btn-drill:disabled { opacity: 0.5; cursor: not-allowed; background: var(--card-bg); }
-
-.btn-drill .drill-icon {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    width: 13px;
-    height: 13px;
-    flex-shrink: 0;
-    opacity: 0.55;
-}
-.btn-drill .drill-icon .d-dot {
-    background-color: currentColor;
-    border-radius: 2px;
-    transition: background-color var(--trans-speed);
-}
-.btn-drill.running .drill-icon .d-dot { background-color: var(--primary); }
-
-.btn-drill span {
-    flex: 1;
-    text-align: left;
-    font-size: 0.92rem;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mark-random {
-    position: static;
-    width: 22px;
-    height: 22px;
-    border: 1.5px solid var(--danger);
-    color: var(--danger-ink);
-    border-radius: 50%;
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    line-height: 1;
-    flex-shrink: 0;
-}
-
-.drill-grab-handle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 100%;
-    cursor: grab;
-    color: var(--text-light);
-    opacity: 0.35;
-    font-size: 1.3rem;
-    margin-left: 2px;
-    border-left: 1px solid var(--border);
-    padding-left: 8px;
-    flex-shrink: 0;
-    transition: opacity 0.2s;
-}
-.drill-grab-handle:hover { opacity: 1; color: var(--primary); }
-
 .btn-drill.dragging {
     opacity: 0.5;
     background: var(--card-bg);
     border: 1px dashed var(--text-light);
 }
 
-/* --- STATUS, FOOTER, LOG --- */
-#status-text {
-    text-align: center;
-    font-size: 0.65rem;
+/* The one thing a row exists for. A play triangle is the least ambiguous
+   "start this" there is, and it is the only control that needs a robot: with
+   no connection it stays legible but muted, and the row still edits normally. */
+.drill-play {
+    flex: 0 0 46px;
+    width: 46px;
+    border: none;
+    background: transparent;
     color: var(--primary);
-    font-weight: 700;
-    height: 18px;
-    margin-bottom: 6px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px 0 0 12px;
+    transition: background 0.15s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
 }
+.drill-play svg {
+    width: 30px;
+    height: 30px;
+    padding: 7px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: var(--primary-dim);
+    fill: currentColor;
+    stroke: none;
+    margin-left: 2px;   /* optical centring: a triangle's mass sits left */
+}
+.drill-play:hover { background: var(--primary-dim); }
+.drill-play:active { background: var(--accent-fill); }
+.is-offline .drill-play { color: var(--text-light); opacity: 0.65; }
+.btn-drill.running .drill-play { color: var(--primary); }
+.btn-drill.running .drill-play svg { display: none; }
+.btn-drill.running .drill-play::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: currentColor;
+}
+
+.drill-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 2px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+/* Name over count; the pencil and the random chip are siblings on the right. */
+.drill-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+.drill-name {
+    width: 100%;
+    font-size: 0.92rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.drill-meta {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+.btn-drill.running .drill-meta { color: var(--primary); }
+
+/* The pencil is the affordance that says the row's body is the editor. It is
+   decorative: the button already names itself "Edit drill". */
+.drill-edit-mark {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    color: var(--text-light);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.drill-edit-mark svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.drill-main:hover .drill-edit-mark,
+.drill-main:focus-visible .drill-edit-mark { opacity: 0.9; }
+@media (hover: none) {
+    .drill-edit-mark { opacity: 0.55; }
+}
+
+.btn-drill.last-played { border-color: var(--accent-line); }
+.btn-drill.last-played .drill-play { background: var(--primary-dim); }
+
+/* The random marker used to be a red-ringed circle, which read as an error. */
+.mark-random {
+    flex: 0 0 auto;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--input-bg);
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+/* Dragging is desktop-only (HTML5 DnD does not fire on touch), so the grip is
+   a quiet strip at the right edge rather than a visible control on a phone. */
+.drill-grab-handle {
+    flex: 0 0 26px;
+    width: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: var(--text-light);
+    opacity: 0.28;
+    border-left: 1px solid transparent;
+    border-radius: 0 11px 11px 0;
+    transition: opacity 0.2s, border-color 0.2s, color 0.2s;
+}
+.drill-grab-handle svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.drill-grab-handle:hover {
+    opacity: 1;
+    color: var(--primary);
+    border-left-color: var(--border);
+}
+@media (hover: none) { .drill-grab-handle { display: none; } }
+
+/* --- STATUS, FOOTER, LOG --- */
+/* #status-text is the `.conn-label` inside .session-card now; the state colours
+   live there, driven by the classes updateDrillButtonStates() puts on the card. */
 
 .log-box {
     margin-top: 10px;
@@ -1031,7 +1230,8 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 
 .group-title {
     background: var(--card-bg);
-    padding: 9px 12px;
+    padding: 8px 12px;
+    min-height: 46px;
     font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-light);
@@ -1041,7 +1241,36 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
 }
+.group-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ball-index { white-space: nowrap; }
+
+/* Scatter belongs to the step, not to a variant, so it lives in the header as
+   one number with a label rather than as a boxed field inside the form. */
+.scatter-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-light);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+.scatter-field input {
+    width: 42px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    border-radius: 6px;
+    padding: 3px 4px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.scatter-field input:focus { outline: none; border-color: var(--accent-line); color: var(--primary); }
 
 /* --- toggles --- */
 .ball-toggle {
@@ -1049,6 +1278,13 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     align-items: center;
     gap: 8px;
     cursor: pointer;
+    padding: 0;
+    border: none;
+    background: transparent;
+    /* 32x18 of artwork inside a real 40px tap target, without moving the row */
+    min-height: 40px;
+    margin: -10px 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .toggle-switch {
@@ -1091,33 +1327,14 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .random-toggle-container input:checked + .toggle-switch { background: var(--primary); }
 .random-toggle-container input:checked + .toggle-switch::after { transform: translateX(14px); background: var(--on-accent); }
 
-.btn-add-opt {
-    background: transparent;
-    border: 1px solid var(--accent-line);
-    color: var(--primary);
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.1rem;
-    font-weight: 400;
-    line-height: 1;
-    padding: 0 0 2px 0;
-    transition: all 0.2s;
-}
-.btn-add-opt:hover { background: var(--accent-fill); transform: scale(1.08); }
-
-.option-card { padding: 10px; border-bottom: 1px solid var(--border); position: relative; }
+.option-card { padding: 11px 12px; border-bottom: 1px solid var(--border); position: relative; }
 .option-card:last-child { border-bottom: none; }
 
 .option-label {
     font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-light);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     display: block;
@@ -1136,17 +1353,19 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     flex-direction: column;
     background: var(--input-bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 5px;
+    border-radius: 9px;
+    padding: 6px 6px 2px;
     min-width: 0;
+    transition: border-color 0.15s;
 }
+.editor-field:focus-within { border-color: var(--accent-line); }
 
 .field-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1px;
-    padding: 0 4px;
+    padding: 0 2px;
     gap: 4px;
 }
 
@@ -1171,12 +1390,12 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     border: none;
     background: transparent;
     font-family: var(--font-mono);
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--text);
     font-weight: 700;
     text-align: center;
     width: 100%;
-    padding: 4px 0;
+    padding: 5px 0 6px;
     -moz-appearance: textfield;
 }
 .editor-field input:focus { outline: none; color: var(--primary); }
@@ -1186,8 +1405,8 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    padding: 0 4px;
+    margin-bottom: 9px;
+    padding: 0 2px;
 }
 
 .spin-label {
@@ -1207,18 +1426,20 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 
 .sc-opt {
-    padding: 5px 12px;
+    padding: 6px 12px;
     font-size: 0.65rem;
     font-weight: 700;
     border-radius: 6px;
     cursor: pointer;
     color: var(--text-light);
     transition: all 0.2s;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
 }
 
-/* The neutral selected state first, then the two semantic fills. editor.js
-   and presetUi.js also set `background` inline on the selected .sc-opt; both
-   write var(--spin-top) / var(--spin-back), so the token and the markup agree. */
+/* Top and back are the only two semantic colours left in the editor, and they
+   mean something: amber is topspin, blue is backspin, in every theme. */
 .sc-opt.active {
     background: var(--card-bg);
     color: var(--text);
@@ -1226,14 +1447,24 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .sc-opt:first-child.active { background: var(--spin-top); color: var(--on-accent); }
 .sc-opt:last-child.active { background: var(--spin-back); color: var(--on-accent); }
 
-/* --- per-ball actions --- */
-.card-actions { display: flex; gap: 6px; margin-top: 6px; }
+/* --- per-ball actions ---
+   One toolbar, one look. Test is the only action a normal edit needs; the
+   rest of what used to be four differently-coloured buttons (a blue Variant,
+   a red Delete, a green star) is one list behind "more". */
+.card-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 8px;
+}
 
 .btn-action {
     flex: 1;
+    min-height: 40px;
     padding: 8px;
     border-radius: 8px;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
+    background: transparent;
     font-family: inherit;
     font-size: 0.68rem;
     font-weight: 700;
@@ -1241,22 +1472,91 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 7px;
     transition: background 0.2s, border-color 0.2s, color 0.2s;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--text);
+    color: var(--text-light);
+}
+.btn-action svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.btn-action:hover { color: var(--text); border-color: var(--accent-line); }
+.btn-action:disabled { opacity: 0.45; cursor: not-allowed; border-color: var(--border); }
+.btn-act-test:hover:not(:disabled) { color: var(--primary); background: var(--primary-dim); }
+
+.btn-more {
+    flex: 0 0 52px;
+    position: relative;
+    list-style: none;
+    color: var(--text-light);
+}
+.btn-more::-webkit-details-marker { display: none; }
+.btn-more::marker { content: ''; }
+.btn-more svg { fill: currentColor; stroke: none; width: 17px; height: 17px; }
+
+.ball-more { position: relative; display: flex; }
+.ball-more[open] .btn-more {
+    color: var(--primary);
+    border-color: var(--accent-line);
+    background: var(--accent-fill);
 }
 
-.btn-act-test { background: var(--input-bg); border-color: var(--border); }
-.btn-act-test:hover { border-color: var(--accent-line); color: var(--primary); }
-.btn-act-test:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-act-clone { background: var(--spin-back); color: var(--on-accent); }
-.btn-act-clone:hover { opacity: 0.88; }
-
-.btn-act-del { background: var(--danger); color: var(--on-accent); }
-.btn-act-del:hover { opacity: 0.88; }
-.btn-act-del:disabled { opacity: 0.3; cursor: not-allowed; }
+/* Opens upward: the toolbar is at the bottom of the card, and a menu that grew
+   downwards would open into the modal's scroll edge. */
+.ball-more-list {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: 232px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px var(--shadow);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ball-more-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.ball-more-item:hover { background: var(--hover); }
+.ball-more-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--text-light);
+}
+.ball-more-item.danger { color: var(--danger-ink); }
+.ball-more-item.danger svg { color: var(--danger-ink); }
+.ball-more-item:disabled { opacity: 0.4; cursor: not-allowed; background: transparent; }
 
 .btn-header-share {
     background: transparent;
@@ -1308,13 +1608,17 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 }
 .btn-modal:active { transform: scale(0.97); }
 
+/* Destructive, but not shouting: it is an icon at the end of the footer, and a
+   filled red block next to Save read as a second primary action. */
 .btn-delete-drill {
-    background: var(--danger);
-    color: var(--on-accent);
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--danger-ink);
     width: 44px;
     flex: 0 0 44px;
     padding: 0;
 }
+.btn-delete-drill:hover { background: var(--danger-dim); border-color: var(--danger); }
 .btn-delete-drill svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-delete-drill:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -1453,9 +1757,9 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     gap: 7px;
     padding: 11px;
     margin: 0 0 14px 0;
-    border: 1px dashed var(--accent-line);
+    border: 1px dashed var(--border);
     border-radius: 10px;
-    background: var(--accent-fill);
+    background: transparent;
     color: var(--primary);
     font-size: 0.68rem;
     font-weight: 700;
@@ -1464,7 +1768,7 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     cursor: pointer;
     transition: background 0.2s, transform 0.1s;
 }
-.preset-entry:hover { background: var(--primary-dim); }
+.preset-entry:hover { background: var(--primary-dim); border-color: var(--accent-line); }
 .preset-entry:active { transform: scale(0.99); }
 .preset-entry svg { flex-shrink: 0; width: 16px; height: 16px; fill: none; stroke: currentColor; }
 
@@ -1511,13 +1815,16 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
 .preset-chip-axis { font-size: 0.65rem; color: var(--text-light); }
 
 .preset-actions { display: flex; gap: 6px; margin-top: 10px; }
+/* Three ways to insert one preset, but only one of them is the default: the
+   two alternatives are quiet so the card reads as "Add" first. */
 .btn-preset-add {
     flex: 1;
-    padding: 9px 4px;
+    min-height: 36px;
+    padding: 8px 4px;
     border-radius: 8px;
-    border: 1px solid var(--accent-line);
+    border: 1px solid var(--border);
     background: transparent;
-    color: var(--primary);
+    color: var(--text-light);
     font-family: inherit;
     font-size: 0.66rem;
     font-weight: 700;
@@ -1525,12 +1832,13 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
-    transition: background 0.2s, transform 0.1s;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
 }
-.btn-preset-add:hover { background: var(--accent-fill); }
+.btn-preset-add:hover { background: var(--hover); color: var(--text); border-color: var(--accent-line); }
 .btn-preset-add:disabled { color: var(--text-light); border-color: var(--border); background: transparent; }
 .btn-preset-add:active { transform: scale(0.97); }
 .btn-preset-add.solid { background: var(--primary); border-color: var(--primary); color: var(--primary-solid-ink); }
+.btn-preset-add.solid:hover { opacity: 0.9; color: var(--primary-solid-ink); }
 .btn-preset-add:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .preset-empty { text-align: center; color: var(--text-light); font-size: 0.82rem; padding: 24px 10px; line-height: 1.6; }
@@ -2464,6 +2772,9 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     position: static;
     margin: 0;
 }
+/* Same weight as the hamburger beside it: two quiet glyphs, not a button and
+   a glyph. The border made the assistant look like the header's primary
+   action on a screen whose primary action is Connect. */
 .ai-open-btn {
     display: flex;
     align-items: center;
@@ -2471,13 +2782,14 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     width: 40px;
     height: 40px;
     margin-right: 2px;
-    border: 1px solid var(--border);
+    border: none;
     border-radius: 9px;
-    background: var(--input-bg);
-    color: var(--text);
+    background: transparent;
+    color: var(--text-light);
     cursor: pointer;
+    transition: color var(--trans-speed), background var(--trans-speed);
 }
-.ai-open-btn:hover { border-color: var(--accent-line); color: var(--primary); }
+.ai-open-btn:hover { color: var(--primary); background: var(--hover); }
 
 /* --- the AI settings form -----------------------------------------------
    The first place in the app with a real form in it, so it brings its own

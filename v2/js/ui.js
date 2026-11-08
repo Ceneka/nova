@@ -214,34 +214,20 @@ function iaRow(drill) {
     const wrap = document.createElement('div');
     wrap.className = 'ia-row';
 
-    const btn = document.createElement('button');
-    btn.className = 'btn-drill';
+    const row = document.createElement('div');
+    row.className = 'btn-drill';
     // The key is minted from the clock, so interpolating it into this
     // attribute is safe - see aiStore.newAiDrillKey().
-    btn.dataset.key = drill.key;
+    row.dataset.key = drill.key;
 
-    const icon = document.createElement('div');
-    icon.className = 'drill-icon';
-    for (let i = 0; i < 4; i++) icon.appendChild(document.createElement('div')).className = 'd-dot';
-    btn.appendChild(icon);
-
-    const label = document.createElement('span');
-    // A model-authored name: textContent, never innerHTML.
-    label.textContent = drill.name;
-    btn.appendChild(label);
-
-    const chip = document.createElement('div');
-    chip.className = 'mark-ai';
-    chip.textContent = 'IA';
-    btn.appendChild(chip);
-
-    const glyph = document.createElement('div');
-    glyph.className = 'mark-source';
-    glyph.textContent = SOURCE_GLYPH[drill.source] || SOURCE_GLYPH.text;
-    glyph.title = t(`ia.source.${drill.source}`);
-    btn.appendChild(glyph);
-
-    btn.onclick = () => {
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'drill-play';
+    play.innerHTML = ICON_PLAY;
+    play.title = t('a11y.playDrill');
+    play.setAttribute('aria-label', `${t('a11y.playDrill')}: ${drill.name}`);
+    play.onclick = (e) => {
+        e.stopPropagation();
         if (!bleState.isConnected) {
             showToast(t('toast.notConnected'));
             return;
@@ -249,18 +235,46 @@ function iaRow(drill) {
         window.playAiDrill(drill.key);
     };
 
-    // Long-press opens the normal editor, exactly as every other drill does.
-    let pressTimer = null;
-    btn.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openEditor(drill.key), 600); });
-    for (const ev of ['mouseup', 'mouseleave']) {
-        btn.addEventListener(ev, () => { clearTimeout(pressTimer); pressTimer = null; });
-    }
-    btn.addEventListener('touchstart', () => { pressTimer = setTimeout(() => openEditor(drill.key), 600); }, { passive: true });
-    for (const ev of ['touchend', 'touchcancel']) {
-        btn.addEventListener(ev, () => { clearTimeout(pressTimer); pressTimer = null; });
-    }
+    const main = document.createElement('button');
+    main.type = 'button';
+    main.className = 'drill-main';
+    main.title = t('a11y.editDrill');
+    main.setAttribute('aria-label', `${t('a11y.editDrill')}: ${drill.name}`);
 
-    wrap.appendChild(btn);
+    const text = document.createElement('span');
+    text.className = 'drill-text';
+
+    const label = document.createElement('span');
+    label.className = 'drill-name';
+    // A model-authored name: textContent, never innerHTML.
+    label.textContent = drill.name;
+    text.appendChild(label);
+
+    const meta = document.createElement('span');
+    meta.className = 'drill-meta';
+    meta.textContent = t('ia.meta');
+    text.appendChild(meta);
+    main.appendChild(text);
+
+    const chip = document.createElement('div');
+    chip.className = 'mark-ai';
+    chip.textContent = 'IA';
+    main.appendChild(chip);
+
+    const glyph = document.createElement('div');
+    glyph.className = 'mark-source';
+    glyph.textContent = SOURCE_GLYPH[drill.source] || SOURCE_GLYPH.text;
+    glyph.title = t(`ia.source.${drill.source}`);
+    main.appendChild(glyph);
+
+    // Tap the body to edit it, exactly like every other drill. Playing lives on
+    // its own button; on this row that button is also the only thing that needs
+    // a robot.
+    main.onclick = () => openEditor(drill.key);
+
+    row.appendChild(play);
+    row.appendChild(main);
+    wrap.appendChild(row);
 
     const actions = document.createElement('div');
     actions.className = 'ia-row-actions';
@@ -331,39 +345,97 @@ export function updateLastPlayedHighlight() {
     }
 }
 
-function createButton(container, key, label, allowSort, category) {
-    const btn = document.createElement('button');
-    btn.className = 'btn-drill';
-    btn.dataset.key = key;
-    
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'drill-icon';
-    for(let i=0; i<4; i++) {
-        iconDiv.appendChild(document.createElement('div')).className = 'd-dot';
-    }
-    btn.appendChild(iconDiv);
+/* Stroke icons, explicitly painted. The icon-paint check in the integration
+   suite exists because an <svg> with no fill/stroke paints solid black. */
+const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5z"></path></svg>';
+const ICON_GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<circle cx="9" cy="7" r="1.4"></circle><circle cx="15" cy="7" r="1.4"></circle>'
+    + '<circle cx="9" cy="12" r="1.4"></circle><circle cx="15" cy="12" r="1.4"></circle>'
+    + '<circle cx="9" cy="17" r="1.4"></circle><circle cx="15" cy="17" r="1.4"></circle></svg>';
 
-    const span = document.createElement('span');
-    span.textContent = label;
-    btn.appendChild(span);
+/** The line under a drill's name: how much is in it, and a hint that it edits. */
+function drillMeta(key) {
+    const steps = currentDrills[key]?.[selectedLevel]?.length || 0;
+    return steps ? t('unit.countBalls', { n: steps }) : t('drill.noBalls');
+}
+
+/**
+ * One row in the drill list: play, name, edit.
+ *
+ * A single tap used to *start* the drill and editing was hidden behind a 600ms
+ * press, which meant the common action was easy and the one people could not
+ * find was invisible. Now the row says what it does:
+ *
+ *   [▶]  starts the drill          (the only action that needs a robot)
+ *   name / count  opens the editor  (the row's body, with a pencil affordance)
+ *   grip  reorders it               (desktop drag, as before)
+ */
+function createButton(container, key, label, allowSort, category) {
+    const row = document.createElement('div');
+    row.className = 'btn-drill';
+    row.dataset.key = key;
+
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'drill-play';
+    play.innerHTML = ICON_PLAY;
+    play.title = t('a11y.playDrill');
+    play.setAttribute('aria-label', `${t('a11y.playDrill')}: ${label}`);
+    play.onclick = (e) => {
+        e.stopPropagation();
+        if (row.classList.contains('dragging')) return;
+        window.handleDrillClick(key, row);
+    };
+
+    const main = document.createElement('button');
+    main.type = 'button';
+    main.className = 'drill-main';
+    main.title = t('a11y.editDrill');
+    main.setAttribute('aria-label', `${t('a11y.editDrill')}: ${label}`);
+
+    const text = document.createElement('span');
+    text.className = 'drill-text';
+
+    const name = document.createElement('span');
+    name.className = 'drill-name';
+    name.textContent = label;
+    text.appendChild(name);
+
+    const meta = document.createElement('span');
+    meta.className = 'drill-meta';
+    meta.textContent = drillMeta(key);
+    text.appendChild(meta);
+    main.appendChild(text);
 
     if (currentDrills[key] && currentDrills[key].random) {
-        const rMark = document.createElement('div');
+        const rMark = document.createElement('span');
         rMark.className = 'mark-random';
         rMark.textContent = 'R';
-        btn.appendChild(rMark);
+        rMark.title = t('drill.word.random');
+        main.appendChild(rMark);
     }
-    
+
+    const edit = document.createElement('span');
+    edit.className = 'drill-edit-mark';
+    edit.setAttribute('aria-hidden', 'true');
+    edit.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16v4z"></path><path d="M13.5 6.5l4 4"></path></svg>';
+    main.appendChild(edit);
+
+    main.onclick = () => openEditor(key);
+
+    row.appendChild(play);
+    row.appendChild(main);
+
     if (allowSort) {
         const grip = document.createElement('div');
         grip.className = 'drill-grab-handle';
-        grip.innerHTML = '≡'; 
+        grip.innerHTML = ICON_GRIP;
         grip.title = t('a11y.dragToReorder');
-        
-        btn.draggable = false; 
 
-        const enableDrag = () => { btn.draggable = true; };
-        const disableDrag = () => { btn.draggable = false; };
+        row.draggable = false;
+
+        const enableDrag = () => { row.draggable = true; };
+        const disableDrag = () => { row.draggable = false; };
 
         grip.addEventListener('mousedown', enableDrag);
         grip.addEventListener('touchstart', enableDrag, {passive: true});
@@ -371,96 +443,37 @@ function createButton(container, key, label, allowSort, category) {
         grip.addEventListener('mouseleave', disableDrag);
         grip.addEventListener('touchend', disableDrag);
 
-        btn.addEventListener('dragstart', (e) => {
+        row.addEventListener('dragstart', (e) => {
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', key); 
-            btn.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', key);
+            row.classList.add('dragging');
         });
 
-        btn.addEventListener('dragend', () => {
-            btn.classList.remove('dragging');
-            btn.draggable = false; 
+        row.addEventListener('dragend', () => {
+            row.classList.remove('dragging');
+            row.draggable = false;
             handleReorder(container, category);
         });
-        
-        btn.addEventListener('dragover', (e) => {
-            e.preventDefault(); 
+
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
             const draggingItem = container.querySelector('.dragging');
-            if (draggingItem && draggingItem !== btn) {
-                const box = btn.getBoundingClientRect();
+            if (draggingItem && draggingItem !== row) {
+                const box = row.getBoundingClientRect();
                 const offset = e.clientY - box.top - (box.height / 2);
                 if (offset < 0) {
-                    container.insertBefore(draggingItem, btn);
+                    container.insertBefore(draggingItem, row);
                 } else {
-                    container.insertBefore(draggingItem, btn.nextSibling);
+                    container.insertBefore(draggingItem, row.nextSibling);
                 }
             }
         });
 
         grip.onclick = (e) => e.stopPropagation();
-        btn.appendChild(grip);
+        row.appendChild(grip);
     }
-    
-    btn.onclick = (e) => {
-        if(btn.classList.contains('dragging')) return;
-        window.handleDrillClick(key, btn);
-    };
 
-    let pressTimer;
-    let startX = 0, startY = 0;
-    
-    const start = (e) => {
-        if (e.target.closest('.drill-grab-handle')) return;
-        if(btn.classList.contains('running')) return;
-        
-        if (e.type === 'touchstart') {
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-        } else {
-            startX = e.clientX;
-            startY = e.clientY;
-        }
-
-        pressTimer = setTimeout(() => {
-            if (navigator.vibrate) navigator.vibrate(50);
-            openEditor(key);
-        }, 600);
-    };
-
-    const cancel = () => clearTimeout(pressTimer);
-
-    const move = (e) => {
-        if (!pressTimer) return;
-
-        let curX, curY;
-        if (e.type === 'touchmove') {
-            curX = e.touches[0].clientX;
-            curY = e.touches[0].clientY;
-        } else {
-            curX = e.clientX;
-            curY = e.clientY;
-        }
-
-        const diffX = Math.abs(curX - startX);
-        const diffY = Math.abs(curY - startY);
-
-        if (diffX > 10 || diffY > 10) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    };
-    
-    btn.addEventListener('mousedown', start);
-    btn.addEventListener('mousemove', move);
-    btn.addEventListener('mouseup', cancel);
-    btn.addEventListener('mouseleave', cancel);
-
-    btn.addEventListener('touchstart', start, { passive: true });
-    btn.addEventListener('touchmove', move, { passive: true });
-    btn.addEventListener('touchend', cancel);
-    btn.addEventListener('touchcancel', cancel);
-
-    container.appendChild(btn);
+    container.appendChild(row);
 }
 
 function handleReorder(container, category) {
@@ -487,13 +500,23 @@ function handleReorder(container, category) {
 }
 
 export function updateDrillButtonStates() {
-    const btns = document.querySelectorAll('.btn-drill');
-    btns.forEach(b => {
-         b.style.opacity = bleState.isConnected ? "1" : "0.6";
+    // The rows stay readable when there is no robot - only the play control is
+    // muted. Dimming the whole row also dimmed the name, which is the one thing
+    // you are still allowed to read and edit without a connection.
+    document.querySelectorAll('.btn-drill').forEach(b => {
+        b.classList.toggle('is-offline', !bleState.isConnected);
     });
 
     const btnConnect = document.getElementById('btn-connect');
     const statusText = document.getElementById('status-text');
+    const card = document.getElementById('session-card');
+
+    if (card) {
+        card.classList.toggle('is-connected', bleState.isConnected);
+        card.classList.toggle('is-busy', bleState.isConnecting);
+        card.classList.toggle('is-error',
+            !bleState.isConnected && !bleState.isConnecting && bleState.phase === 'error');
+    }
 
     if (btnConnect && statusText) {
         btnConnect.classList.toggle('connecting', bleState.isConnecting);
@@ -503,24 +526,20 @@ export function updateDrillButtonStates() {
             btnConnect.textContent = t('action.disconnect');
             btnConnect.classList.add('connected');
             statusText.textContent = t('status.connected');
-            statusText.style.color = "var(--primary)";
         } else if (bleState.isConnecting) {
             // Previously the button did not change at all during the whole
             // attempt, so a connection that hung looked like no-op.
             btnConnect.textContent = t('status.connecting');
             btnConnect.classList.remove('connected');
             statusText.textContent = bleState.statusText || t('status.connecting');
-            statusText.style.color = "var(--primary)";
         } else if (bleState.phase === 'error') {
             btnConnect.textContent = t('action.retry');
             btnConnect.classList.remove('connected');
             statusText.textContent = bleState.statusText || t('status.failed');
-            statusText.style.color = "var(--danger)";
         } else {
             btnConnect.textContent = t('action.connect');
             btnConnect.classList.remove('connected');
             statusText.textContent = t('status.disconnected');
-            statusText.style.color = "var(--text-light)";
         }
     }
 }

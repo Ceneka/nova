@@ -79,7 +79,14 @@ export const es = {
         drillSelection: 'Selección de ejercicio',
         shareCode: 'Código para compartir',
         selectDestination: 'Elegir destino',
-        drillNameMax40: 'Nombre (máx. 40)'
+        drillNameMax40: 'Nombre (máx. 40)',
+        runSetup: 'Ajustes de sesión',
+        level: 'Nivel',
+        mode: 'Modo',
+        levelShort: 'Nivel {n}',
+        repsShort: '{n} reps',
+        timeShort: '{n}s',
+        pauseShort: 'Pausa {n}s'
     },
 
     mode: {
@@ -176,7 +183,8 @@ export const es = {
         duplicateLastBall: 'Duplicar la última bola',
         addVariant: '+ Variante',
         saveBallAsPreset: 'Guardar esta bola como preset',
-        rotation: 'Rotación:'
+        rotation: 'Rotación:',
+        more: 'Más opciones'
     },
 
     // --- editor.js + presetUi.js: the shared ball fields ---
@@ -263,7 +271,8 @@ export const es = {
             all: 'Todo'
         },
         newDrill: 'Nuevo ejercicio',
-        sharedDrill: 'Ejercicio compartido'
+        sharedDrill: 'Ejercicio compartido',
+        noBalls: 'Sin bolas todavía'
     },
 
     // --- settingsUi.js: the Settings screen ---
@@ -354,6 +363,7 @@ export const es = {
     // --- ui.js: la pestaña IA ---
     ia: {
         emptyList: 'Todavía no hay nada. Armá un ejercicio en el asistente IA y guardalo, y aparece acá.',
+        meta: 'Creado por el asistente',
         moveTo: 'Mover a {bank}',
         source: {
             voice: 'Hablado',
@@ -642,6 +652,8 @@ export const es = {
         deleteSessionTitle: 'Eliminar esta sesión',
         createNewDrill: 'Crear un ejercicio nuevo',
         dragToReorder: 'Arrastra para reordenar',
+        playDrill: 'Iniciar ejercicio',
+        editDrill: 'Editar ejercicio',
         installApp: 'Instalar Nova',
         openAi: 'Abrir el asistente IA',
         talk: 'Hablarle al asistente',

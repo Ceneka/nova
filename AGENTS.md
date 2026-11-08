@@ -822,6 +822,97 @@ picks the language from `navigator.languages`; any later choice is stored in
 `nova_lang` and always wins, so a trip through an English browser cannot undo
 it.
 
+## The screens, and what each tap does
+
+The app is used one-handed at a table, so every screen has one obvious primary
+action and everything else is one deliberate step behind it. That is the rule
+the layout below is built on, not decoration.
+
+- **Main screen.** A compact status row (dot, state, Connect) and a collapsed
+  `<details>` holding the run settings. The summary line always states the next
+  run (`Level 1 · Reps 10 · Pause 0.0s`) so the card is never a mystery box, and
+  `updateSetupSummary()` redraws it after an edit or a language switch. The
+  settings used to be permanently open and pushed the first drill below the
+  fold on every visit.
+- **Tabs.** Two rows: the three factory groups, then Custom A/B/C and IA. Seven
+  items in a 3x3 grid left two holes; this costs ~96px instead of ~220px and
+  keeps every name on screen. The per-tab dot-grid icons went with the grid:
+  seven copies of the same decoration were not an affordance.
+- **A drill row.** Play disc = run it (the only control that needs a robot, so
+  it is the only thing that dims when disconnected). Row body = edit it, with a
+  pencil and an `aria-label`. Grip = reorder on desktop. A custom set also
+  carries a "+" at the end of its list to create a drill.
+- **The ball editor.** One card per step: a header (number, on/off, scatter) and
+  a body with rotation, six fields and two controls - `Test`, and one `⋯` that
+  holds Variant, Duplicate, Save as preset and Delete. The colours are the
+  semantic ones only: amber top, blue back, danger ink for destructive text.
+  It used to be five separately coloured buttons per ball (a blue clone, a red
+  delete, a filled star) beside the six fields, which is what made the screen
+  read as a control panel rather than a form.
+- **Preset sheet.** Inserting closes the sheet, so the balls that just arrived
+  are visible. Leaving it open hid the result behind the thing that produced it.
+  The three insert modes stay on every card (single, variants, sequence) and are
+  checked by the suite; only Sequence is filled, because it is the default.
+
+## The main screen: three surfaces, three weights
+
+The screen a user lands on has one job - get to a drill - and the layout now
+says so. It used to open with a connection card about 300px tall (one Connect
+button, a level picker, a reps/time switch and three number fields, all
+permanently open) above seven tabs in a 3x3 grid, so the first drill started
+more than half a page down. Measured on a 430x932 phone, the drill list began
+at ~650px; it now begins at ~300px.
+
+- **The connection row is one row.** A state dot, the word for the state, and
+  the Connect/Disconnect button. `updateDrillButtonStates()` drives all three
+  from `bleState`; the dot is `aria-hidden` because the words say the same
+  thing and colour alone is not a state.
+- **Run settings live in a native `<details>`.** The summary is a sentence -
+  `Level 1 · Reps 10 · Pause 0.0s` - rebuilt by `updateSetupSummary()` in
+  `main.js` on `input` and on `locale-changed`, so a collapsed row never
+  describes the last run. Native `<details>` again: keyboard support, the open
+  state in the accessibility tree, and no listener to keep working.
+  `#grp-difficulty` is still the element `switchTab()` hides for the custom and
+  IA tabs, so the level control disappears where it means nothing.
+- **The tabs are two rows: three factory drills, then four user categories.**
+  Seven pills in a 3x3 grid left two holes and cost ~220px; the two-row strip
+  is ~96px and every cell is used. The seven identical dot icons are gone -
+  they were decoration duplicated seven times, and the label was always doing
+  the work.
+- **A drill row is play, name, edit.** The green disc is a real `<button>`,
+  and only it needs a robot (`handleDrillClick`). The body of the row is
+  another `<button>` that opens the editor, with a pencil affordance that is
+  always visible on touch and on hover on desktop. This is the fix for "a tap
+  starts a drill and I cannot get to the editor": the common action got an
+  explicit control and the hidden one got a visible one. Rows are containers
+  rather than buttons, because a button cannot contain a button; the grip
+  still reorders on desktop only, since HTML5 drag-and-drop does not fire on
+  touch.
+
+### The editor card
+
+A ball card is a form with one toolbar, not five coloured buttons:
+
+- the ball header carries the number, the active switch and (single-variant
+  steps only) scatter;
+- the body is the six fields in the same order as always - speed, spin,
+  height, drop, bpm, reps - and the tests index them, so **do not reorder
+  them**;
+- the toolbar is `Test` plus one `⋯` list holding Variant, Duplicate, Save as
+  preset and Delete. There is no second blue, no filled red delete and no
+  inline red field for backspin: rotation is stated by the TOP/BACK capsule,
+  which is the only place in the card where colour means something. Delete
+  keeps `--danger-ink` as text, never a filled block.
+
+The modal footer is still four controls because they are four different jobs,
+but only Save is filled; Delete is a borderless red glyph and Test drill is an
+outline.
+
+**Inserting a preset closes the sheet.** It used to stay open on top of the
+editor, so the balls you had just added were behind it and the insert looked
+like it had done nothing. The listener is in `editor.js` (the `preset-insert`
+event) rather than `presetUi.js`: the editor owns the outcome.
+
 ## Design
 
 The visual system is [tenisdemesa.ar](https://tenisdemesa.ar)'s, so the app
@@ -1261,5 +1352,9 @@ wait. Do not remove it as "test-only cruft".
   whose steps were flat arrays instead of arrays-of-arrays.
 - The MD5 in `utils.js` is a minified vendored implementation, used only for
   the BLE handshake. Leave it.
-- Drill buttons use a 600 ms long-press to open the editor; the `.dragging`
-  class guards the click handler during drag-and-drop.
+- Drill rows are two controls, not one: the green play disc starts the drill,
+  the row's body opens the editor (`aria-label` "Edit drill"), and the grip
+  reorders it on desktop. There is no long-press any more - editing was the
+  thing nobody could find, and a drill that starts on a tap is a drill you
+  cannot look at. The `.dragging` class still guards the play button during
+  drag-and-drop.

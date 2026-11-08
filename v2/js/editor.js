@@ -98,7 +98,11 @@ function syncDrillContext() {
 
 document.addEventListener('preset-insert', (e) => {
     const { presetId, mode } = e.detail || {};
-    insertPresetIntoDrill(presetId, mode);
+    const added = insertPresetIntoDrill(presetId, mode);
+    // Close the picker on success: the sheet sits over the editor, so leaving
+    // it open hid the balls that were just added and made the insert look like
+    // it had done nothing.
+    if (added > 0 && typeof window.closePresetSheet === 'function') window.closePresetSheet();
 });
 
 /**
@@ -137,6 +141,16 @@ export function insertPresetIntoDrill(presetId, mode = 'single') {
 
 // --- RENDER EDITOR ---
 
+/* Stroke icons for the ball card. Explicit paint on every one: an <svg> with
+   no fill/stroke defaults to solid black, which is how a glyph turns into a
+   blob. The suite checks this. */
+const ICON_MORE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>';
+const ICON_TEST = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5z"></path></svg>';
+const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+const ICON_STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path></svg>';
+const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6h17"></path><path d="M8.7 6V4.3A1.3 1.3 0 0 1 10 3h4a1.3 1.3 0 0 1 1.3 1.3V6"></path><path d="M18.4 6l-.85 13.1a2 2 0 0 1-2 1.9H8.45a2 2 0 0 1-2-1.9L5.6 6"></path><path d="M10 10.5v6"></path><path d="M14 10.5v6"></path></svg>';
+const ICON_VARIANT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+
 function renderEditor() {
     const modalBody = document.getElementById('editor-body');
     modalBody.innerHTML = '';
@@ -170,7 +184,7 @@ function renderEditor() {
         if (stepIndex > 0) {
             const swapDiv = document.createElement('div');
             swapDiv.className = 'swap-zone';
-            swapDiv.innerHTML = `<button class="btn-swap" onclick="window.handleSwapSteps(${stepIndex - 1}, ${stepIndex})">⇅</button>`;
+            swapDiv.innerHTML = `<button class="btn-swap" onclick="window.handleSwapSteps(${stepIndex - 1}, ${stepIndex})" title="${t('a11y.dragToReorder')}">⇅</button>`;
             modalBody.appendChild(swapDiv);
         }
 
@@ -184,37 +198,28 @@ function renderEditor() {
         const currentScatter = stepOptions[0][10] || 0;
         const maxScatter = maxScatterFor(currentDrop);
 
+        // One quiet number, not a boxed field competing with the ball itself.
         const scatterHtml = isSingle ? `
-            <div style="display:flex; align-items:center; gap:5px; margin-left:auto; margin-right:10px;">
-                <div class="editor-field" style="flex-direction:row; align-items:center; gap:6px; padding:2px 6px; background:var(--bg); border:1px solid var(--border);">
-                    <label style="font-size:0.6rem; color:var(--text-light); font-weight:800; text-transform:uppercase;">${t('field.scatter')}</label>
-                    <input type="number" inputmode="decimal" 
-                           value="${currentScatter}" 
-                           step="0.5" min="0" max="${maxScatter}"
-                           style="width:40px; text-align:center; font-weight:bold; color:var(--primary); font-size:0.9rem;"
-                           onchange="window.handleScatterChange(${stepIndex}, this.value)">
-                </div>
-            </div>` : '';
-
-        // Duplicate/Next Step Button (Header)
-        const plusBtn = `
-            <button class="btn-add-opt" title="${t('editor.duplicateBall')}" onclick="window.handleAddSequenceStep(${stepIndex})">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-            </button>`;
+            <label class="scatter-field" title="${t('field.scatter')}">
+                <span>${t('field.scatter')}</span>
+                <input type="number" inputmode="decimal"
+                       value="${currentScatter}"
+                       step="0.5" min="0" max="${maxScatter}"
+                       onchange="window.handleScatterChange(${stepIndex}, this.value)">
+            </label>` : '';
 
         groupDiv.innerHTML = `
             <div class="group-title">
-                <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                    <span>${t('editor.ball', { n: stepIndex + 1 })}</span>
-                    <div class="ball-toggle ${isActive ? 'active' : ''}" onclick="window.handleToggleBallActive(${stepIndex})">
-                        <div class="toggle-switch"></div>
-                    </div>
-                    ${scatterHtml}
+                <div class="group-id">
+                    <span class="ball-index">${t('editor.ball', { n: stepIndex + 1 })}</span>
+                    <button type="button" class="ball-toggle ${isActive ? 'active' : ''}"
+                            role="switch" aria-checked="${isActive ? 'true' : 'false'}"
+                            title="${t('action.off')} / ${t('action.on')}"
+                            onclick="window.handleToggleBallActive(${stepIndex})">
+                        <span class="toggle-switch"></span>
+                    </button>
                 </div>
-                ${plusBtn}
+                ${scatterHtml}
             </div>`;
 
         stepOptions.forEach((ballParams, optIndex) => {
@@ -229,10 +234,6 @@ function renderEditor() {
             const spin = ballParams[B.SPIN];
             const type = ballParams[B.TYPE];
             const currentMaxSpin = maxSpinFor(speed);
-
-            // --- UPDATED: Backspin Visual Logic (Red Input Field) ---
-            const spinStyle = type === 'back' ? 'background:var(--danger); color:#fff; border-radius:4px;' : '';
-            // -------------------------------------
 
             const bpmValue = freqToBpm(ballParams[B.FREQ]);
 
@@ -261,18 +262,17 @@ function renderEditor() {
             const inputsHtml = `
                 <div class="editor-grid">
                     <div class="editor-field">
-                        <div class="field-header"><label>${t('field.speed')}</label><span class="range-hint">0-10</span></div>
+                        <div class="field-header"><label>${t('field.speed')}</label></div>
                         <input type="number" inputmode="decimal" id="inp-speed-${stepIndex}-${optIndex}" value="${speed}" step="0.5" min="0" max="10"
                             onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPEED}, this.value)">
                     </div>
                     <div class="editor-field">
                         <div class="field-header"><label>${t('field.spin')}</label><span class="range-hint" id="lbl-spin-${stepIndex}-${optIndex}">${t('unit.max', { n: currentMaxSpin })}</span></div>
                         <input type="number" inputmode="decimal" id="inp-spin-${stepIndex}-${optIndex}" value="${spin}" step="0.5" min="0" max="${currentMaxSpin}"
-                            style="${spinStyle}"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.SPIN}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>${t('field.height')}</label><span class="range-hint">-50/100</span></div>
+                        <div class="field-header"><label>${t('field.height')}</label></div>
                         <input type="number" inputmode="decimal" value="${ballParams[B.HEIGHT]}" step="1" min="-50" max="100"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.HEIGHT}, this.value)">
                     </div>
@@ -282,12 +282,12 @@ function renderEditor() {
                             onchange="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.DROP}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>${t('field.bpm')}</label><span class="range-hint">30-90</span></div>
+                        <div class="field-header"><label>${t('field.bpm')}</label></div>
                         <input type="number" inputmode="decimal" value="${bpmValue}" step="1" min="30" max="90"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.FREQ}, this.value)">
                     </div>
                     <div class="editor-field">
-                        <div class="field-header"><label>${t('field.reps')}</label><span class="range-hint">#</span></div>
+                        <div class="field-header"><label>${t('field.reps')}</label></div>
                         <input type="number" inputmode="decimal" value="${ballParams[B.REPS]}" step="1" min="1" max="200"
                             oninput="window.handleEditorInput(${stepIndex}, ${optIndex}, ${B.REPS}, this.value)">
                     </div>
@@ -295,20 +295,26 @@ function renderEditor() {
 
             const isLastBall = tempDrillData.length === 1 && stepOptions.length === 1;
 
+            // Two controls, not five coloured ones. Everything that is not
+            // "try this ball" lives behind the same overflow, in one list, so a
+            // ball card reads as one object instead of a toolbar with a form
+            // attached. Delete keeps its danger ink; nothing is a filled red
+            // button any more, and there is no second blue.
             const actionsHtml = `
                 <div class="card-actions">
                      <button class="btn-action btn-act-test"
                              onclick="window.handleTestBall(${stepIndex}, ${optIndex})"
-                             ${isConnected && isActive ? '' : 'disabled'}>${t('action.test')}</button>
-                     <button class="btn-action btn-act-clone"
-                             onclick="window.handleAddVariant(${stepIndex}, ${optIndex})">${t('editor.addVariant')}</button>
-                     <button class="btn-action btn-act-del"
-                             onclick="window.handleDeleteBall(${stepIndex}, ${optIndex})"
-                             ${isLastBall ? 'disabled' : ''}>${t('action.delete')}</button>
-                     <button class="btn-action btn-act-preset" title="${t('editor.saveBallAsPreset')}"
-                             onclick="window.handleSaveBallAsPreset(${stepIndex}, ${optIndex})">
-                         <svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"></path></svg>
-                     </button>
+                             ${isConnected && isActive ? '' : 'disabled'}>${ICON_TEST}<span>${t('action.test')}</span></button>
+                     <details class="ball-more">
+                         <summary class="btn-action btn-more" title="${t('editor.more')}" aria-label="${t('editor.more')}">${ICON_MORE}</summary>
+                         <div class="ball-more-list">
+                             <button class="ball-more-item" onclick="window.handleAddVariant(${stepIndex}, ${optIndex})">${ICON_VARIANT}<span>${t('editor.addVariant')}</span></button>
+                             <button class="ball-more-item" onclick="window.handleAddSequenceStep(${stepIndex})">${ICON_PLUS}<span>${t('editor.duplicateBall')}</span></button>
+                             <button class="ball-more-item" onclick="window.handleSaveBallAsPreset(${stepIndex}, ${optIndex})">${ICON_STAR}<span>${t('editor.saveBallAsPreset')}</span></button>
+                             <button class="ball-more-item danger" onclick="window.handleDeleteBall(${stepIndex}, ${optIndex})"
+                                     ${isLastBall ? 'disabled' : ''}>${ICON_TRASH}<span>${t('action.delete')}</span></button>
+                         </div>
+                     </details>
                 </div>
             `;
             

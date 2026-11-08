@@ -64,7 +64,16 @@ export const en = {
         drillSelection: 'Drill Selection',
         shareCode: 'Share Code',
         selectDestination: 'Select Destination',
-        drillNameMax40: 'Drill Name (Max 40)'
+        drillNameMax40: 'Drill Name (Max 40)',
+        // The collapsed session-setup row. The four "short" forms are one line
+        // of prose ("Level 1 · Reps 10 · Pause 0.0s"), not field labels.
+        runSetup: 'Session setup',
+        level: 'Level',
+        mode: 'Mode',
+        levelShort: 'Level {n}',
+        repsShort: 'Reps {n}',
+        timeShort: 'Time {n}s',
+        pauseShort: 'Pause {n}s'
     },
 
     mode: {
@@ -165,7 +174,8 @@ export const en = {
         duplicateLastBall: 'Duplicate the last ball',
         addVariant: '+ Variant',
         saveBallAsPreset: 'Save this ball as a preset',
-        rotation: 'Rotation:'
+        rotation: 'Rotation:',
+        more: 'More options'
     },
 
     // --- editor.js + presetUi.js: the shared ball fields. Both forms show the
@@ -255,7 +265,8 @@ export const en = {
             all: 'All'
         },
         newDrill: 'New Drill',
-        sharedDrill: 'Shared Drill'
+        sharedDrill: 'Shared Drill',
+        noBalls: 'No balls yet'
     },
 
     // --- settingsUi.js: the Settings screen ---
@@ -346,6 +357,7 @@ export const en = {
     // --- ui.js: the IA tab ---
     ia: {
         emptyList: 'Nothing here yet. Build a drill in the AI assistant and save it, and it shows up here.',
+        meta: 'Built by the assistant',
         moveTo: 'Move to Custom {bank}',
         source: {
             voice: 'Spoken',
@@ -651,6 +663,8 @@ export const en = {
         deleteSessionTitle: 'Delete this session',
         createNewDrill: 'Create New Drill',
         dragToReorder: 'Drag to reorder',
+        playDrill: 'Play drill',
+        editDrill: 'Edit drill',
         installApp: 'Install Nova',
         openAi: 'Open the AI assistant',
         talk: 'Talk to the assistant',

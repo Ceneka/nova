@@ -292,12 +292,12 @@ eq('editor grew by 9 groups', groups().length - before, 9);
 
 const drops = [...document.querySelectorAll('#editor-body .ball-group')]
     .slice(-9)
-    .map(g => Number(g.querySelectorAll('.editor-field input')[4].value));
+    .map(g => Number(g.querySelectorAll('.option-card .editor-field input')[3].value));
 eq('last 9 steps carry BH/Center/FH per depth', drops, [-5,0,5,-5,0,5,-5,0,5]);
 
 const heights = [...document.querySelectorAll('#editor-body .ball-group')]
     .slice(-9)
-    .map(g => Number(g.querySelectorAll('.editor-field input')[3].value));
+    .map(g => Number(g.querySelectorAll('.option-card .editor-field input')[2].value));
 eq('depths are anchored on the preset height (30)', heights, [10,10,10,30,30,30,50,50,50]);
 
 /* ---- 3. variants mode = one step, many variants ---- */

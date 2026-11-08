@@ -105,77 +105,97 @@
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVUpload(event)">
     <input type="file" id="preset-file-input" accept=".json,.csv" style="display:none" onchange="handlePresetFileUpload(event)">
 
-    <div class="settings-card">
-        <div id="status-text" data-i18n="status.disconnected">Disconnected</div>
-        <button id="btn-connect" class="btn-connect" data-i18n="action.connect">Connect</button>
-
-        <div class="control-group" id="grp-difficulty">
-            <div style="text-align:center; font-size:0.65rem; color:var(--text-light); margin-bottom:5px; font-weight:700;" data-i18n="label.difficulty">DIFFICULTY LEVEL</div>
-            <div class="level-select">
-                <div class="lvl-dot active" onclick="setLevel(1, this)">1</div>
-                <div class="lvl-dot" onclick="setLevel(2, this)">2</div>
-                <div class="lvl-dot" onclick="setLevel(3, this)">3</div>
-            </div>
+    <!-- The connection card is deliberately small: connecting is a one-off, and
+         it used to take a third of the screen away from the drill list on every
+         visit. The run settings live one tap away in a native <details>, whose
+         summary always shows what the next run will do. `#grp-difficulty` is
+         still the element switchTab() hides for categories where a level means
+         nothing. -->
+    <section class="session-card" id="session-card">
+        <div class="session-state">
+            <span class="conn-dot" id="conn-dot" aria-hidden="true"></span>
+            <span class="conn-label" id="status-text" data-i18n="status.disconnected">Disconnected</span>
+            <button id="btn-connect" class="btn-connect" data-i18n="action.connect">Connect</button>
         </div>
 
-        <div class="control-pill" style="margin-bottom: 10px; box-shadow:none; background:transparent; padding:0;">
-            <div class="mode-switch">
-                <div class="mode-option active" onclick="setMode('reps', this)" data-i18n="mode.reps">Reps</div>
-                <div class="mode-option" onclick="setMode('time', this)" data-i18n="mode.time">Time</div>
-            </div>
-        </div>
+        <details class="session-setup" id="session-setup">
+            <summary class="setup-summary" data-i18n-attr="aria-label:label.runSetup">
+                <span class="setup-title" data-i18n="label.runSetup">Session setup</span>
+                <span class="setup-values" id="setup-values"></span>
+                <svg class="setup-chevron" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
 
-        <div class="controls-row">
-            <div class="control-pill" id="ui-reps">
-                <label data-i18n="label.count">Count</label>
-                <input type="number" id="input-reps" value="10">
-            </div>
-            <div class="control-pill hidden" id="ui-time">
-                <label data-i18n="label.timeSeconds">Time (s)</label>
-                <input type="number" id="input-time" value="60" step="10">
-            </div>
-                <div class="control-pill">
-                    <label data-i18n="label.pauseSeconds">Pause (s)</label> <input type="number" id="input-pause" value="0.0" step="0.1">
+            <div class="setup-panel">
+                <div class="setup-field" id="grp-difficulty">
+                    <span class="setup-field-label" data-i18n="label.level">Level</span>
+                    <div class="level-select">
+                        <div class="lvl-dot active" onclick="setLevel(1, this)">1</div>
+                        <div class="lvl-dot" onclick="setLevel(2, this)">2</div>
+                        <div class="lvl-dot" onclick="setLevel(3, this)">3</div>
+                    </div>
                 </div>
-        </div>
-    </div>
+
+                <div class="setup-field">
+                    <span class="setup-field-label" data-i18n="label.mode">Mode</span>
+                    <div class="mode-switch">
+                        <div class="mode-option active" onclick="setMode('reps', this)" data-i18n="mode.reps">Reps</div>
+                        <div class="mode-option" onclick="setMode('time', this)" data-i18n="mode.time">Time</div>
+                    </div>
+                </div>
+
+                <div class="controls-row">
+                    <div class="control-pill" id="ui-reps">
+                        <label data-i18n="label.count">Count</label>
+                        <input type="number" id="input-reps" value="10">
+                    </div>
+                    <div class="control-pill hidden" id="ui-time">
+                        <label data-i18n="label.timeSeconds">Time (s)</label>
+                        <input type="number" id="input-time" value="60" step="10">
+                    </div>
+                    <div class="control-pill">
+                        <label data-i18n="label.pauseSeconds">Pause (s)</label>
+                        <input type="number" id="input-pause" value="0.0" step="0.1">
+                    </div>
+                </div>
+            </div>
+        </details>
+    </section>
 
     <div class="section-label" data-i18n="label.drillSelection">Drill Selection</div>
-    
+
+    <!-- Two rows instead of a 3x3 grid: the factory drills read as one group and
+         the user's own sets as another, and the whole strip costs half the
+         height. The icons were seven copies of the same decoration and are
+         gone; the label is the affordance. -->
     <div class="tabs-container">
-        <div class="tab-btn active" onclick="switchTab('basic', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.basic">Basic</span>
+        <div class="tab-row">
+            <div class="tab-btn active" onclick="switchTab('basic', this)"><span data-i18n="tab.basic">Basic</span></div>
+            <div class="tab-btn" onclick="switchTab('combined', this)"><span data-i18n="tab.combined">Combined</span></div>
+            <div class="tab-btn" onclick="switchTab('complex', this)"><span data-i18n="tab.complex">Complex</span></div>
         </div>
-        <div class="tab-btn" onclick="switchTab('combined', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.combined">Combined</span>
-        </div>
-        <div class="tab-btn" onclick="switchTab('complex', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.complex">Complex</span>
-        </div>
-        
-        <div class="tab-btn" 
-             onclick="switchTab('custom-a', this)"
-             ondrop="window.handleTabDrop(event, 'custom-a')" 
-             ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-a">Custom A</span>
-        </div>
-        <div class="tab-btn" 
-             onclick="switchTab('custom-b', this)"
-             ondrop="window.handleTabDrop(event, 'custom-b')" 
-             ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-b">Custom B</span>
-        </div>
-        <div class="tab-btn" 
-             onclick="switchTab('custom-c', this)"
-             ondrop="window.handleTabDrop(event, 'custom-c')" 
-             ondragover="window.allowTabDrop(event)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.custom-c">Custom C</span>
-        </div>
-        <!-- The assistant's own category. It is NOT a custom set: AI drills
-             live in nova_ai_drills, so importing a CSV cannot reach them and
-             they are not in the shared drill file until one is moved. -->
-        <div class="tab-btn" onclick="switchTab('ia', this)">
-            <div class="icon-grid"><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div><div class="icon-dot"></div></div> <span data-i18n="tab.ia">IA</span>
+        <div class="tab-row tab-row-4">
+            <div class="tab-btn"
+                 onclick="switchTab('custom-a', this)"
+                 ondrop="window.handleTabDrop(event, 'custom-a')"
+                 ondragover="window.allowTabDrop(event)">
+                <span data-i18n="tab.custom-a">Custom A</span>
+            </div>
+            <div class="tab-btn"
+                 onclick="switchTab('custom-b', this)"
+                 ondrop="window.handleTabDrop(event, 'custom-b')"
+                 ondragover="window.allowTabDrop(event)">
+                <span data-i18n="tab.custom-b">Custom B</span>
+            </div>
+            <div class="tab-btn"
+                 onclick="switchTab('custom-c', this)"
+                 ondrop="window.handleTabDrop(event, 'custom-c')"
+                 ondragover="window.allowTabDrop(event)">
+                <span data-i18n="tab.custom-c">Custom C</span>
+            </div>
+            <!-- The assistant's own category. It is NOT a custom set: AI drills
+                 live in nova_ai_drills, so importing a CSV cannot reach them and
+                 they are not in the shared drill file until one is moved. -->
+            <div class="tab-btn" onclick="switchTab('ia', this)"><span data-i18n="tab.ia">IA</span></div>
         </div>
     </div>
 

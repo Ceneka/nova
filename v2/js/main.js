@@ -12,7 +12,8 @@ import {
     userCustomDrills,
     currentDrills,
     saveDrillsToStorage,
-    selectedLevel 
+    selectedLevel,
+    runMode
 } from './state.js';
 
 import { initStats } from './stats.js';
@@ -83,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initStats(); // seals any session a previous page left open
     renderDrillButtons();
     updateStatsUI();
+    updateSetupSummary();
     setupEventListeners();
     // Last, and deliberately so: the precache competes for the same connection
     // as the app's own modules, and the app has to boot first either way.
@@ -160,7 +162,16 @@ function setupEventListeners() {
         renderDrillButtons();
         updateDrillButtonStates();
         updateStatsUI();
+        updateSetupSummary();
     });
+
+    // The collapsed setup line has to follow the three inputs it summarises.
+    // `input` rather than `change`: the number spinner and the keyboard both
+    // fire it, and the line is up on screen while the field is being edited.
+    for (const id of ['input-reps', 'input-time', 'input-pause']) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateSetupSummary);
+    }
 
     document.addEventListener('connection-changed', () => {
         updateDrillButtonStates();
@@ -182,11 +193,15 @@ window.setLevel = (lvl, btn) => {
     setLevel(lvl);
     document.querySelectorAll('.lvl-dot').forEach(d => d.classList.remove('active'));
     if(btn) btn.classList.add('active');
+    updateSetupSummary();
 };
 
 window.setMode = (mode, btn) => {
     setMode(mode);
-    document.querySelectorAll('.mode-option').forEach(d => d.classList.remove('active'));
+    // Only the run-mode switch, never every .mode-option in the document: this
+    // used to clear the category picker inside the import/save-as modals too.
+    const group = btn ? btn.parentElement : document.querySelector('#session-setup .mode-switch');
+    group?.querySelectorAll('.mode-option').forEach(d => d.classList.remove('active'));
     if(btn) btn.classList.add('active');
     
     const uiReps = document.getElementById('ui-reps');
@@ -198,7 +213,31 @@ window.setMode = (mode, btn) => {
         uiReps?.classList.add('hidden');
         uiTime?.classList.remove('hidden');
     }
+    updateSetupSummary();
 };
+
+/**
+ * The one line inside the collapsed "Session setup". The numbers are read from
+ * the inputs, because those are the model for reps/time/pause; the level and
+ * the mode are module state.
+ */
+export function updateSetupSummary() {
+    const el = document.getElementById('setup-values');
+    if (!el) return;
+
+    const reps = document.getElementById('input-reps')?.value || '10';
+    const secs = document.getElementById('input-time')?.value || '60';
+    const pause = document.getElementById('input-pause')?.value || '0.0';
+    const amount = runMode === 'time'
+        ? t('label.timeShort', { n: secs })
+        : t('label.repsShort', { n: reps });
+
+    el.textContent = [
+        t('label.levelShort', { n: selectedLevel }),
+        amount,
+        t('label.pauseShort', { n: pause })
+    ].join(' · ');
+}
 
 window.resetStats = resetStats;
 window.saveAsDefault = saveAsDefault;
