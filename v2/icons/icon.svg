@@ -4,8 +4,8 @@
 
   The style is tenisdemesa.ar's: the dark low-chroma ground, one bright neon
   accent, monoline geometry, and a single hot counter-colour. The mark is this
-  app's own - a ball leaving the machine on a programmed trajectory - so the two
-  read as one brand without being one image.
+  app's own - a table in perspective with a net, and a ball leaving it on a
+  programmed trajectory.
 
   Full-bleed square on purpose: the platform supplies its own mask, and a
   rounded rect here would be rounded a second time on Android.
@@ -20,8 +20,8 @@
     </linearGradient>
     <!-- One soft lamp behind the ball. Without it a dark icon is a black
          square on a black home screen; with it the mark carries its own glow. -->
-    <radialGradient id="glow" cx="0.65" cy="0.36" r="0.62">
-      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.20"/>
+    <radialGradient id="glow" cx="0.66" cy="0.34" r="0.58">
+      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.22"/>
       <stop offset="0.55" stop-color="#40e2a7" stop-opacity="0.06"/>
       <stop offset="1" stop-color="#40e2a7" stop-opacity="0"/>
     </radialGradient>
@@ -32,9 +32,15 @@
       <stop offset="0.35" stop-color="#f5a93f"/>
       <stop offset="1" stop-color="#b86407"/>
     </radialGradient>
-    <linearGradient id="trail" gradientUnits="userSpaceOnUse" x1="116" y1="362" x2="288" y2="228">
-      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.22"/>
-      <stop offset="0.5" stop-color="#40e2a7" stop-opacity="0.85"/>
+    <!-- A dark table surface is what makes the perspective read: without it
+         the far edge, net and near edge are three floating bars. -->
+    <linearGradient id="table" gradientUnits="userSpaceOnUse" x1="0" y1="322" x2="0" y2="424">
+      <stop offset="0" stop-color="#0d241d"/>
+      <stop offset="1" stop-color="#12382c"/>
+    </linearGradient>
+    <linearGradient id="trail" gradientUnits="userSpaceOnUse" x1="128" y1="398" x2="282" y2="232">
+      <stop offset="0" stop-color="#40e2a7" stop-opacity="0.18"/>
+      <stop offset="0.55" stop-color="#40e2a7" stop-opacity="0.85"/>
       <stop offset="1" stop-color="#6df3c1"/>
     </linearGradient>
   </defs>
@@ -42,37 +48,47 @@
   <rect width="512" height="512" fill="url(#bg)"/>
   <rect width="512" height="512" fill="url(#glow)"/>
 
-  <!-- Measured, not guessed: drawn dead centre the mark sits ~12px high,
-       because the ball is the only mass up there and the table is a hairline.
-       The nudge is in one place so icon-maskable.svg scales the same artwork. -->
-  <g transform="translate(0 12)">
-    <!-- The table in the site's own two-bar perspective: far edge, the net,
-         then the near edge. The far edge stops short of the trail on purpose,
-         so nothing crosses a stroke but the ball. -->
-    <path d="M176 324 H384" fill="none" stroke="#40e2a7" stroke-opacity="0.62"
-          stroke-width="15" stroke-linecap="round"/>
-    <path d="M256 324 V390" fill="none" stroke="#40e2a7" stroke-opacity="0.62"
+  <!-- Measured, not guessed: the table is the visual floor and the ball is the
+       mass above it, so the whole group sits 6 units down from dead centre. The
+       nudge is in one place so icon-maskable.svg scales the same artwork. -->
+  <g transform="translate(0 6)">
+    <!-- The table in perspective: far edge, side rails, centre line, then the
+         bright near edge. The surface is filled so the shape reads as a table
+         rather than a bench. -->
+    <path d="M78 424 L142 322 H370 L434 424 Z" fill="url(#table)"/>
+
+    <path d="M142 322 H370" fill="none" stroke="#40e2a7" stroke-opacity="0.55"
           stroke-width="12" stroke-linecap="round"/>
-    <path d="M88 390 H424" fill="none" stroke="#40e2a7" stroke-width="27"
+    <path d="M78 424 L142 322 M434 424 L370 322" fill="none" stroke="#40e2a7"
+          stroke-opacity="0.30" stroke-width="8" stroke-linecap="round"/>
+    <path d="M256 322 V424" fill="none" stroke="#40e2a7" stroke-opacity="0.16"
+          stroke-width="5" stroke-linecap="round"/>
+
+    <path d="M78 424 H434" fill="none" stroke="#6df3c1" stroke-width="24"
           stroke-linecap="round"/>
+
+    <!-- The net is the brightest table stroke because it is the line that says
+         "table tennis" at 32px. Its posts sit on the side rails, not mid-air. -->
+    <path d="M111 372 H401" fill="none" stroke="#6df3c1" stroke-width="11"
+          stroke-linecap="round"/>
+    <path d="M111 359 V385 M401 359 V385" fill="none" stroke="#6df3c1"
+          stroke-width="7" stroke-linecap="round" stroke-opacity="0.85"/>
 
     <!-- Dashes, not a smear. A drill is the same ball over and over, and the
          rhythm is the whole difference between a trajectory and a machine.
-         The dashoffset is not decoration: the path is 225 units long and the
-         period is 76, so unphased the last dash stops 43 units short and the
-         trail dies in mid air. At 8 the run lands under the ball. -->
-    <path d="M116 362 C 132 318 178 266 288 228" fill="none" stroke="url(#trail)"
-          stroke-width="28" stroke-linecap="round" stroke-dasharray="30 46"
-          stroke-dashoffset="8"/>
+         `pathLength="100"` normalises the run, so the dash pattern and the last
+         dash finishing at the ball do not depend on the curve's real length. -->
+    <path d="M128 398 C150 332 198 274 282 232" fill="none" stroke="url(#trail)"
+          stroke-width="24" stroke-linecap="round" pathLength="100"
+          stroke-dasharray="14 8"/>
 
-    <!-- The ball, and the seam across it. Two thin parallel strokes on the
-         near face, which is how the site's own icon draws its ball: a ring
-         wide enough to reach the edge cuts the sphere in two at 32px, and a
-         single wide arc reads as a highlight rather than a seam. -->
-    <circle cx="334" cy="182" r="78" fill="url(#ball)"/>
-    <g stroke="#fff1d6" stroke-width="10" stroke-linecap="round" stroke-opacity="0.62" fill="none">
-      <path d="M290 232 L322 200"/>
-      <path d="M314 248 L346 216"/>
-    </g>
+    <!-- One diagonal seam, not two parallel strokes. Two short straight lines
+         read as scratches; a centred downward arc reads as a smile. A single
+         seam on the lower-right face reads as a ping pong ball at both sizes. -->
+    <circle cx="334" cy="176" r="82" fill="url(#ball)"/>
+    <path d="M286 150 Q330 188 382 212" fill="none" stroke="#fff1d6"
+          stroke-width="7" stroke-linecap="round" stroke-opacity="0.42"/>
+    <ellipse cx="306" cy="142" rx="25" ry="13" transform="rotate(-24 306 142)"
+             fill="#fff6e4" opacity="0.16"/>
   </g>
 </svg>

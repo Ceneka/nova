@@ -1123,25 +1123,30 @@ librsvg delegate, because its own MSVG renderer flattens the gradients). The
 two SVGs carry the same `<defs>` and the same artwork group, and **an edit to
 one is an edit to the other** - only the wrapper differs: `icon.svg` is
 full-bleed and untransformed, the maskable wraps the mark in
-`translate(256 256) scale(0.8) translate(-256 -256)` with the glow inside the
+`translate(256 256) scale(0.75) translate(-256 -256)` with the glow inside the
 scale so it stays behind the ball.
 
 The mark is tenisdemesa.ar's *style* - the dark low-chroma ground, one neon
 accent, monoline round caps, one warm counter-colour - and not its picture.
-Ball, table and dotted trail in the app's own mint (`--primary`) and amber
-(`--spin-top`). Things that are load-bearing rather than taste:
+A table in perspective with a net, and an amber ball leaving it on a dashed
+mint trajectory. The table surface is a dark fill so the far edge, net and
+near edge read as one object instead of three floating bars. Things that are
+load-bearing rather than taste:
 
 - **A double hyphen inside an XML comment is a parse error**, so no CSS token
   (`--primary`) can be named in a comment. rsvg fails with no useful line.
-- **The seam on the ball is two thin parallel light strokes, not a ring.** A
-  ring wide enough to reach the edge cuts the sphere in two at 32px, and a dark
-  one reads as the shadow the ball is sitting in.
-- **`stroke-dashoffset="8"` on the trail is arithmetic, not decoration.** The
-  path is 225 units long and the dash period is 76, so unphased the last dash
-  stops 43 units short and the trail dies in mid air.
-- **The maskable's scale is bounded by the table bar, not the ball.** The bar's
-  lower-left cap is the furthest point of anything drawn, and it alone decides
-  whether 0.8 of the radius is safe. The suite says so out loud.
+- **The ball has one diagonal seam, not two parallel strokes and not a ring.**
+  Two short straight lines read as scratches; a centred downward arc reads as
+  a smile at every size. The diagonal on the lower-right face is the one that
+  reads as a ping pong ball at 32px.
+- **`pathLength="100"` on the trail is arithmetic, not decoration.** With
+  `stroke-dasharray="14 8"` the last dash finishes at the ball no matter how
+  long the cubic really is. The old fixed `stroke-dashoffset` had to be
+  recomputed by hand every time the path moved; this cannot drift.
+- **The maskable's scale is bounded by the near table bar, not the ball.** Its
+  corners are the furthest point of anything drawn. At `scale(0.75)` the
+  measured extent is ~76% of the radius, inside the 80% the suite enforces;
+  `0.80` overshot at ~83%. The suite says so out loud.
 
 
 ## Conventions
