@@ -1,0 +1,22 @@
+[     443ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[     651ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[     813ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[     970ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[     970ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[    1167ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1168ms] [LOG] [4:22:01] Ready @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1198ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1229ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1244ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[    1481ms] [LOG] [4:22:01] Connect Error: Connected to the robot but it did not finish authorising. Try again. @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1932ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1932ms] [LOG] [4:22:01] Device picker dismissed @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1954ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1955ms] [LOG] [4:22:01] Connect Error: That robot is still connected to another tab. Disconnect it and try again. @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1985ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    1986ms] [LOG] [4:22:01] Connect Error: The robot answered but did not offer the Nova service. Check you picked the right device. @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    2016ms] [LOG] [4:22:01] Scanning... @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    2028ms] [LOG] [4:22:01] Ready @ http://127.0.0.1:8123/v2/js/utils.js:15
+[    2241ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8123/v2/callback?code=ABC&state=xyz:0
+[    2368ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) @ http://127.0.0.1:8123/tests/integration.html?x=1794154919960:0
+[    2378ms] [WARNING] i18n: no translation for "no.such.key" @ http://127.0.0.1:8123/v2/js/i18n.js:94

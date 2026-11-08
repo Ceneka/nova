@@ -31,77 +31,114 @@ export const SPIN_LIMITS = {
     "10": 0
 };
 
-// Helper to create standard drill steps
-const mkStep = (t, b, h, d, f, r) => [[t, b, h, d, f, r, 1]];
+/**
+ * A step whose ball carries its editor fields (speed / spin / type) as well as
+ * the raw motor RPMs.
+ *
+ * Every factory ball is stored this way now. The push needs it: at speed 2 the
+ * table allows spin 6, but the backspin top wheel clamps at RPM_MIN, so
+ * reverse-calculating [400, 4283] would show 5.5 instead of the 6 the drill
+ * was built with. Indexes 7-9 are the ball array's optional editor fields -
+ * see ball.js.
+ */
+const mkBallStep = (t, b, h, d, f, r, speed, spin, type) =>
+    [[t, b, h, d, f, r, 1, speed, spin, type]];
 
-// Standard Physics Presets
-const PUSH_B = [1547, 2915, 50, -5, 10, 1];
-const PUSH_F = [1547, 2915, 50, 5, 10, 1];
-const DRIVE_B = [3545, 2177, 50, -5, 40, 1];
-const DRIVE_F = [3545, 2177, 50, 5, 40, 1];
-const LOOP_B = [1520, 3572, 50, -5, 10, 1];
-const LOOP_F = [1520, 3572, 50, 5, 10, 1];
+/**
+ * The factory library's ball recipes.
+ *
+ * These replace the old +50 / +55 / +60 rally balls, which were reported as
+ * not working directly: every one of them floated high. The six Level-1
+ * balls below are the validated reference (short two-bounce push, low drives
+ * and loops). Levels 2 and 3 are the same shot with a little more speed, spin
+ * and pace - never a higher arc. Combined, complex and random drills are
+ * sequences of these same balls, so a drill cannot reintroduce a shot that
+ * was not validated.
+ */
+const BALLS = {
+    pushB: {
+        1: mkBallStep(400, 4283, -43, -5, 10, 1, 2, 6, 'back'),
+        2: mkBallStep(400, 4769, -43, -5, 20, 1, 2.5, 6.5, 'back'),
+        3: mkBallStep(468, 5256, -43, -5, 30, 1, 3, 7, 'back'),
+    },
+    pushF: {
+        1: mkBallStep(400, 4283, -43, 5, 10, 1, 2, 6, 'back'),
+        2: mkBallStep(400, 4769, -43, 5, 20, 1, 2.5, 6.5, 'back'),
+        3: mkBallStep(468, 5256, -43, 5, 30, 1, 3, 7, 'back'),
+    },
+    driveB: {
+        1: mkBallStep(3546, 2178, 30, -4, 73.33333333333334, 1, 3, 2, 'top'),
+        2: mkBallStep(4032, 2322, 30, -4, 83.33333333333334, 1, 3.5, 2.5, 'top'),
+        3: mkBallStep(4518, 2466, 30, -4, 93.33333333333334, 1, 4, 3, 'top'),
+    },
+    driveF: {
+        1: mkBallStep(3204, 2520, 30, 5, 56.66666666666667, 1, 3, 1, 'top'),
+        2: mkBallStep(3690, 2664, 30, 5, 66.66666666666667, 1, 3.5, 1.5, 'top'),
+        3: mkBallStep(4176, 2808, 30, 5, 76.66666666666667, 1, 4, 2, 'top'),
+    },
+    loopB: {
+        1: mkBallStep(1178, 3914, 20, -5, 10, 1, 2.5, 4, 'back'),
+        2: mkBallStep(1323, 4401, 20, -5, 20, 1, 3, 4.5, 'back'),
+        3: mkBallStep(1467, 4887, 20, -5, 30, 1, 3.5, 5, 'back'),
+    },
+    loopF: {
+        1: mkBallStep(836, 4256, 20, 5, 10, 1, 2.5, 5, 'back'),
+        2: mkBallStep(981, 4743, 20, 5, 20, 1, 3, 5.5, 'back'),
+        3: mkBallStep(1125, 5229, 20, 5, 30, 1, 3.5, 6, 'back'),
+    }
+};
 
-// Helper to wrap preset arrays into the correct drill structure
-// Example: [A, B] -> [ [[...A]], [[...B]] ]
-const combine = (arr) => arr.map(d => [d]);
+/** A one-ball drill: the same shot at each of the three levels. */
+const one = (id) => ({ 1: [BALLS[id][1]], 2: [BALLS[id][2]], 3: [BALLS[id][3]] });
+
+/** A sequence drill: one step per ball, each at the selected level. */
+const seq = (ids, random = false) => ({
+    1: ids.map(id => BALLS[id][1]),
+    2: ids.map(id => BALLS[id][2]),
+    3: ids.map(id => BALLS[id][3]),
+    ...(random ? { random: true } : {})
+});
 
 export const DEFAULT_DRILLS = {
     // --- BASIC ---
-    "push(b)": { 1: [mkStep(...PUSH_B)], 2: [mkStep(1205, 3257, 50, -5, 20, 1)], 3: [mkStep(863, 3599, 50, -5, 30, 1)] },
-    "push(f)": { 1: [mkStep(...PUSH_F)], 2: [mkStep(1205, 3257, 50, 5, 20, 1)], 3: [mkStep(863, 3599, 50, 5, 30, 1)] },
-    "drive(b)": { 1: [mkStep(...DRIVE_B)], 2: [mkStep(3545, 2177, 50, -5, 50, 1)], 3: [mkStep(3545, 2177, 50, -5, 70, 1)] },
-    "drive(f)": { 1: [mkStep(...DRIVE_F)], 2: [mkStep(3545, 2177, 50, 5, 50, 1)], 3: [mkStep(3545, 2177, 50, 5, 70, 1)] },
-    "loop(f)": { 1: [mkStep(...LOOP_F)], 2: [mkStep(1178, 3914, 50, 5, 20, 1)], 3: [mkStep(836, 4256, 50, 5, 30, 1)] },
-    "loop(b)": { 1: [mkStep(...LOOP_B)], 2: [mkStep(1178, 3914, 50, -5, 20, 1)], 3: [mkStep(836, 4256, 50, -5, 30, 1)] },
+    "push(b)": one('pushB'),
+    "push(f)": one('pushF'),
+    "drive(b)": one('driveB'),
+    "drive(f)": one('driveF'),
+    "loop(f)": one('loopF'),
+    "loop(b)": one('loopB'),
 
     // --- COMBINED ---
-    // Fixed: Removed inner brackets [LOOP_B] -> LOOP_B
-    "loop(b)-drive(b)": { 1: combine([LOOP_B, DRIVE_B]), 2: combine([LOOP_B, DRIVE_B]), 3: combine([LOOP_B, DRIVE_B]) },
-    "loop(f)-drive(f)": { 1: combine([LOOP_F, DRIVE_F]), 2: combine([LOOP_F, DRIVE_F]), 3: combine([LOOP_F, DRIVE_F]) },
-    "drive(f)-drive(b)": { 1: combine([DRIVE_F, DRIVE_B]), 2: combine([DRIVE_F, DRIVE_B]), 3: combine([DRIVE_F, DRIVE_B]) },
-    "push(f)-drive(f)": { 1: combine([PUSH_F, DRIVE_F]), 2: combine([PUSH_F, DRIVE_F]), 3: combine([PUSH_F, DRIVE_F]) },
-    "push(b)-loop(b)": { 1: combine([PUSH_B, LOOP_B]), 2: combine([PUSH_B, LOOP_B]), 3: combine([PUSH_B, LOOP_B]) },
-    "loop(f)-drive(b)": { 1: combine([LOOP_F, DRIVE_B]), 2: combine([LOOP_F, DRIVE_B]), 3: combine([LOOP_F, DRIVE_B]) },
-    "push(f)-loop(b)": { 1: combine([PUSH_F, LOOP_B]), 2: combine([PUSH_F, LOOP_B]), 3: combine([PUSH_F, LOOP_B]) },
-    "drive(f)-drive(f)": { 1: combine([DRIVE_F, DRIVE_F]), 2: combine([DRIVE_F, DRIVE_F]), 3: combine([DRIVE_F, DRIVE_F]) },
-    "push(b)-loop(f)": { 1: combine([PUSH_B, LOOP_F]), 2: combine([PUSH_B, LOOP_F]), 3: combine([PUSH_B, LOOP_F]) },
-    "push(f)-loop(f)": { 1: combine([PUSH_F, LOOP_F]), 2: combine([PUSH_F, LOOP_F]), 3: combine([PUSH_F, LOOP_F]) },
-    "loop(f)-loop(f)": { 1: combine([LOOP_F, LOOP_F]), 2: combine([LOOP_F, LOOP_F]), 3: combine([LOOP_F, LOOP_F]) },
-    "loop(b)-drive(f)": { 1: combine([LOOP_B, DRIVE_F]), 2: combine([LOOP_B, DRIVE_F]), 3: combine([LOOP_B, DRIVE_F]) },
+    "loop(b)-drive(b)": seq(['loopB', 'driveB']),
+    "loop(f)-drive(f)": seq(['loopF', 'driveF']),
+    "drive(f)-drive(b)": seq(['driveF', 'driveB']),
+    "push(f)-drive(f)": seq(['pushF', 'driveF']),
+    "push(b)-loop(b)": seq(['pushB', 'loopB']),
+    "loop(f)-drive(b)": seq(['loopF', 'driveB']),
+    "push(f)-loop(b)": seq(['pushF', 'loopB']),
+    "drive(f)-drive(f)": seq(['driveF', 'driveF']),
+    "push(b)-loop(f)": seq(['pushB', 'loopF']),
+    "push(f)-loop(f)": seq(['pushF', 'loopF']),
+    "loop(f)-loop(f)": seq(['loopF', 'loopF']),
+    "loop(b)-drive(f)": seq(['loopB', 'driveF']),
 
     // --- COMPLEX ---
-    "push(b)-loop(f)-drive(b)": { 1: combine([PUSH_B, LOOP_F, DRIVE_B]), 2: combine([PUSH_B, LOOP_F, DRIVE_B]), 3: combine([PUSH_B, LOOP_F, DRIVE_B]) },
-    "push(f)-loop(b)-drive(f)": { 1: combine([PUSH_F, LOOP_B, DRIVE_F]), 2: combine([PUSH_F, LOOP_B, DRIVE_F]), 3: combine([PUSH_F, LOOP_B, DRIVE_F]) },
-    "loop(f)-drive(f)-drive(b)": { 1: combine([LOOP_F, DRIVE_F, DRIVE_B]), 2: combine([LOOP_F, DRIVE_F, DRIVE_B]), 3: combine([LOOP_F, DRIVE_F, DRIVE_B]) },
-    "loop(b)-drive(f)-drive(b)": { 1: combine([LOOP_B, DRIVE_F, DRIVE_B]), 2: combine([LOOP_B, DRIVE_F, DRIVE_B]), 3: combine([LOOP_B, DRIVE_F, DRIVE_B]) },
-    "drive(f)-drive(f)-drive(f)": { 1: combine([DRIVE_F, DRIVE_F, DRIVE_F]), 2: combine([DRIVE_F, DRIVE_F, DRIVE_F]), 3: combine([DRIVE_F, DRIVE_F, DRIVE_F]) },
-    "push(f)-loop(f)-drive(f)": { 1: combine([PUSH_F, LOOP_F, DRIVE_F]), 2: combine([PUSH_F, LOOP_F, DRIVE_F]), 3: combine([PUSH_F, LOOP_F, DRIVE_F]) },
-    "push(b)-loop(b)-drive(b)": { 1: combine([PUSH_B, LOOP_B, DRIVE_B]), 2: combine([PUSH_B, LOOP_B, DRIVE_B]), 3: combine([PUSH_B, LOOP_B, DRIVE_B]) },
-    "push(f)-loop(b)-drive(b)": { 1: combine([PUSH_F, LOOP_B, DRIVE_B]), 2: combine([PUSH_F, LOOP_B, DRIVE_B]), 3: combine([PUSH_F, LOOP_B, DRIVE_B]) },
-    "loop(f)-drive(b)-drive(f)": { 1: combine([LOOP_F, DRIVE_B, DRIVE_F]), 2: combine([LOOP_F, DRIVE_B, DRIVE_F]), 3: combine([LOOP_F, DRIVE_B, DRIVE_F]) },
-    "loop(b)-drive(b)-drive(f)": { 1: combine([LOOP_B, DRIVE_B, DRIVE_F]), 2: combine([LOOP_B, DRIVE_B, DRIVE_F]), 3: combine([LOOP_B, DRIVE_B, DRIVE_F]) },
-    "push(b)-loop(f)-drive(f)": { 1: combine([PUSH_B, LOOP_F, DRIVE_F]), 2: combine([PUSH_B, LOOP_F, DRIVE_F]), 3: combine([PUSH_B, LOOP_F, DRIVE_F]) },
-    "push(b)-loop(b)-drive(f)": { 1: combine([PUSH_B, LOOP_B, DRIVE_F]), 2: combine([PUSH_B, LOOP_B, DRIVE_F]), 3: combine([PUSH_B, LOOP_B, DRIVE_F]) },
-    "drive(b)-drive(f)-drive(f)": { 1: combine([DRIVE_B, DRIVE_F, DRIVE_F]), 2: combine([DRIVE_B, DRIVE_F, DRIVE_F]), 3: combine([DRIVE_B, DRIVE_F, DRIVE_F]) },
+    "push(b)-loop(f)-drive(b)": seq(['pushB', 'loopF', 'driveB']),
+    "push(f)-loop(b)-drive(f)": seq(['pushF', 'loopB', 'driveF']),
+    "loop(f)-drive(f)-drive(b)": seq(['loopF', 'driveF', 'driveB']),
+    "loop(b)-drive(f)-drive(b)": seq(['loopB', 'driveF', 'driveB']),
+    "drive(f)-drive(f)-drive(f)": seq(['driveF', 'driveF', 'driveF']),
+    "push(f)-loop(f)-drive(f)": seq(['pushF', 'loopF', 'driveF']),
+    "push(b)-loop(b)-drive(b)": seq(['pushB', 'loopB', 'driveB']),
+    "push(f)-loop(b)-drive(b)": seq(['pushF', 'loopB', 'driveB']),
+    "loop(f)-drive(b)-drive(f)": seq(['loopF', 'driveB', 'driveF']),
+    "loop(b)-drive(b)-drive(f)": seq(['loopB', 'driveB', 'driveF']),
+    "push(b)-loop(f)-drive(f)": seq(['pushB', 'loopF', 'driveF']),
+    "push(b)-loop(b)-drive(f)": seq(['pushB', 'loopB', 'driveF']),
+    "drive(b)-drive(f)-drive(f)": seq(['driveB', 'driveF', 'driveF']),
 
     // --- RANDOM ---
-    "random-drive": { 
-        1: combine([DRIVE_F, DRIVE_B]), 
-        2: combine([DRIVE_F, DRIVE_B]), 
-        3: combine([DRIVE_F, DRIVE_B]), 
-        random: true 
-    },
-    "23-random-drive": { 
-        1: combine([DRIVE_F, DRIVE_B, DRIVE_F]), 
-        2: combine([DRIVE_F, DRIVE_B, DRIVE_F]), 
-        3: combine([DRIVE_F, DRIVE_B, DRIVE_F]), 
-        random: true 
-    },
-    "all-random": { 
-        1: combine([PUSH_F, PUSH_B, DRIVE_F, DRIVE_B]), 
-        2: combine([PUSH_F, PUSH_B, DRIVE_F, DRIVE_B]), 
-        3: combine([PUSH_F, PUSH_B, DRIVE_F, DRIVE_B]), 
-        random: true 
-    }
+    "random-drive": seq(['driveF', 'driveB'], true),
+    "23-random-drive": seq(['driveF', 'driveB', 'driveF'], true),
+    "all-random": seq(['pushF', 'pushB', 'driveF', 'driveB'], true)
 };

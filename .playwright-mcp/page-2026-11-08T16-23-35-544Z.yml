@@ -1,0 +1,181 @@
+- generic [active] [ref=f18e1]:
+  - generic [ref=f18e2]:
+    - banner [ref=f18e3]:
+      - heading [level=1] [ref=f18e4]:
+        - link "Nova" [ref=f18e5] [cursor=pointer]:
+          - /url: https://tenisdemesa.ar/
+      - generic [ref=f18e6]:
+        - button "Open the AI assistant" [ref=f18e7] [cursor=pointer]
+        - generic [ref=f18e11] [cursor=pointer]
+      - generic:
+        - generic: Drill
+        - generic: Download Drill
+        - generic: Export Drills
+        - generic: Import Drills
+        - generic: Settings
+        - generic: About
+    - generic [ref=f18e13]:
+      - generic [ref=f18e14]:
+        - generic [ref=f18e16]: Disconnected
+        - button "Connect" [ref=f18e17] [cursor=pointer]
+      - group [ref=f18e18]:
+        - generic "Session setup" [ref=f18e19] [cursor=pointer]: Pos 7 · Lvl 1 · Reps 10 · 0.0s
+    - generic [ref=f18e24]: Drill Selection
+    - generic [ref=f18e25]:
+      - generic [ref=f18e26]:
+        - generic [ref=f18e27] [cursor=pointer]: Basic
+        - generic [ref=f18e29] [cursor=pointer]: Combined
+        - generic [ref=f18e31] [cursor=pointer]: Complex
+      - generic [ref=f18e33]:
+        - generic [ref=f18e34] [cursor=pointer]: Custom A
+        - generic [ref=f18e36] [cursor=pointer]: Custom B
+        - generic [ref=f18e38] [cursor=pointer]: Custom C
+        - generic [ref=f18e40] [cursor=pointer]: IA
+    - generic [ref=f18e42]:
+      - generic [ref=f18e43]:
+        - 'button "Play drill: Push(B)" [ref=f18e44] [cursor=pointer]'
+        - 'button "Edit drill: Push(B)" [ref=f18e47] [cursor=pointer]':
+          - generic [ref=f18e48]:
+            - generic [ref=f18e49]: Push(B)
+            - generic [ref=f18e50]: 20 balls
+        - generic "Drag to reorder" [ref=f18e55]
+      - generic [ref=f18e63]:
+        - 'button "Play drill: Push(F)" [ref=f18e64] [cursor=pointer]'
+        - 'button "Edit drill: Push(F)" [ref=f18e67] [cursor=pointer]':
+          - generic [ref=f18e68]:
+            - generic [ref=f18e69]: Push(F)
+            - generic [ref=f18e70]: 1 ball
+        - generic "Drag to reorder" [ref=f18e75]
+      - generic [ref=f18e83]:
+        - 'button "Play drill: Drive(B)" [ref=f18e84] [cursor=pointer]'
+        - 'button "Edit drill: Drive(B)" [ref=f18e87] [cursor=pointer]':
+          - generic [ref=f18e88]:
+            - generic [ref=f18e89]: Drive(B)
+            - generic [ref=f18e90]: 1 ball
+        - generic "Drag to reorder" [ref=f18e95]
+      - generic [ref=f18e103]:
+        - 'button "Play drill: Drive(F)" [ref=f18e104] [cursor=pointer]'
+        - 'button "Edit drill: Drive(F)" [ref=f18e107] [cursor=pointer]':
+          - generic [ref=f18e108]:
+            - generic [ref=f18e109]: Drive(F)
+            - generic [ref=f18e110]: 1 ball
+        - generic "Drag to reorder" [ref=f18e115]
+      - generic [ref=f18e123]:
+        - 'button "Play drill: Loop(B)" [ref=f18e124] [cursor=pointer]'
+        - 'button "Edit drill: Loop(B)" [ref=f18e127] [cursor=pointer]':
+          - generic [ref=f18e128]:
+            - generic [ref=f18e129]: Loop(B)
+            - generic [ref=f18e130]: 2 balls
+        - generic "Drag to reorder" [ref=f18e135]
+      - generic [ref=f18e143]:
+        - 'button "Play drill: Loop(F)" [ref=f18e144] [cursor=pointer]'
+        - 'button "Edit drill: Loop(F)" [ref=f18e147] [cursor=pointer]':
+          - generic [ref=f18e148]:
+            - generic [ref=f18e149]: Loop(F)
+            - generic [ref=f18e150]: 1 ball
+        - generic "Drag to reorder" [ref=f18e155]
+    - generic [ref=f18e163]:
+      - 'button "Balls: 0 | Drills: 0 Statistics" [ref=f18e164] [cursor=pointer]':
+        - generic [ref=f18e166]: "Balls: 0 | Drills: 0"
+        - generic [ref=f18e167]: Statistics
+      - generic [ref=f18e168]: Version 2.5a
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic: Drill Name
+            - generic: ✎
+          - generic: ×
+        - generic:
+          - button "Share Drill"
+          - generic: Random
+      - generic:
+        - button "Delete"
+        - button "Test drill"
+        - button "Save As"
+        - button "Save"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Import Drill
+        - generic: ×
+      - generic:
+        - generic:
+          - generic: Share Code
+          - textbox "ABC123"
+        - generic:
+          - generic: Select Destination
+          - generic:
+            - generic: Custom A
+            - generic: Custom B
+            - generic: Custom C
+      - generic:
+        - button "Download & Import"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Save As New Drill
+        - generic: ×
+      - generic:
+        - generic:
+          - generic: Drill Name (Max 40)
+          - textbox "My New Drill"
+        - generic:
+          - generic: Select Destination
+          - generic:
+            - generic: Custom A
+            - generic: Custom B
+            - generic: Custom C
+      - generic:
+        - button "Save Drill"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Ball Presets
+        - generic: ×
+      - generic:
+        - button "+ New Preset"
+  - generic:
+    - generic:
+      - generic:
+        - generic: New Preset
+        - generic: ×
+      - generic:
+        - button "Delete preset"
+        - button "Save Preset"
+  - generic:
+    - generic:
+      - generic:
+        - generic: About
+        - generic: ×
+      - generic:
+        - heading "Nova Drill | Tenisdemesa.ar" [level=3]
+        - paragraph: Version 2.5a
+        - link "View on GitHub":
+          - /url: https://github.com/Ceneka/nova
+        - link "tenisdemesa.ar Find table tennis tournaments all over Argentina.":
+          - /url: https://tenisdemesa.ar/
+          - generic: tenisdemesa.ar
+          - generic: Find table tennis tournaments all over Argentina.
+        - generic:
+          - paragraph: An independent continuation of the original Nova app. Thanks to its author for the work this is built on.
+          - link "Visit the original project":
+            - /url: https://github.com/olanga/nova
+  - generic:
+    - generic:
+      - generic: Session Summary
+      - generic:
+        - generic: Training session complete!
+        - generic:
+          - generic:
+            - generic: Drills
+            - generic: "0"
+          - generic:
+            - generic: Balls
+            - generic: "0"
+          - generic:
+            - generic: Time
+            - generic: 0:00
+      - generic:
+        - button "Close"

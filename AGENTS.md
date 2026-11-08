@@ -66,6 +66,7 @@ v2/                 THE APP. Nothing outside this directory is part of it.
     pwa.js            service worker registration, install prompt, theme colour
     editor.js         drill editor: renders ball cards, handles edits
     runner.js         plays a drill over Bluetooth
+    robotPosition.js  the nine-square robot grid and its ball compensation
     ui.js             drill lists, tabs, drag-and-drop, session summary
     bluetooth.js      Web Bluetooth + the wire packet format
     cloud.js          share-code upload/download
@@ -131,9 +132,24 @@ Rules that have bitten people before:
 - **`A[6] === undefined` means active, not inactive.** `runner.js`,
   `renderEditor()` and `normalizeBall()` all default to 1. Do not "fix" this
   to a plain truthiness check.
-- **Indexes 7-9 are optional.** The factory drills in `constants.js` store raw
-  RPMs only; `normalizeBall()` reverse-calculates speed/spin/type on first
-  read. Older `localStorage` data is the same.
+- **Indexes 7-9 are optional.** Older `localStorage` data stores raw RPMs only
+  and `normalizeBall()` reverse-calculates speed/spin/type on first read.
+  **Every factory ball in `constants.js` now carries 7-9**, and the push is why:
+  speed 2 / spin 6 clamps the backspin top wheel at `RPM_MIN`, so
+  reverse-calculating `[400, 4283]` would show spin 5.5 instead of the 6 the
+  drill was built with. Stripping those indexes silently weakens the ball.
+- **The factory library is built from six validated balls**, not from the old
+  `+50` / `+55` / `+60` rally balls, which were reported as not working
+  directly. The six are the tuned Basic level-1 recipes: a `-43` two-bounce
+  backspin push, a `30` drive and a `20` loop, each at both sides. Levels 2 and
+  3 are the same shot with more speed, spin and pace - **never a higher arc**.
+  Combined, complex and random drills are sequences of those same recipes, so
+  no drill reintroduces a shot that was not validated. `constants.js` defines
+  the six in one `BALLS` table and the drills as `one(id)` / `seq(ids)`.
+  Existing installs migrate on load: `migrateLegacyFactoryDrills()` replaces a
+  factory level only when every ball in it is still on the old `>= 40` arc, so
+  a level the user tuned low and every custom drill are left alone. Without
+  that, `custom_drills` would keep the old library forever.
 - **Drop and scatter share 20 units.** `abs(drop) + scatter <= 10`, enforced by
   `maxScatterFor()`.
 - **Spin is capped by speed** via `SPIN_LIMITS` — at speed 10 the table takes
@@ -171,6 +187,68 @@ rather than snapping back to fixed values.
 
 `MAX_STEPS_PER_DRILL` (20) is enforced on insert only — the manual "+" button
 in the editor is not capped, as before.
+
+### Serve presets are two-bounce balls
+
+A negative height is not an error. It is what a serve is: the head points
+down, the ball bounces on the robot's half, clears the net and bounces again.
+The shipped serve presets therefore use `SERVE_DEPTHS` (`Short -35 / Mid -40 /
+Long -45`) and are stored as `back`, because "under" means backspin. Changing
+only a preset's base `height` is not enough: `buildPresetBalls()` reads the
+depth axis, so the old positive axis still fed rally balls from a preset named
+"serve". `standardDepths()` returns the serve band whenever the base height is
+negative, which is also what the "Use Short / Mid / Long" button writes.
+
+`aiMatch.isServePreset()` uses a negative height as the marker and refuses to
+offer a serve preset for a rally intent. Without it, a plain "drive f" could
+match a neutral-drop sidespin serve on speed alone and inherit its negative
+height — the rotation term cannot object when the sentence never named one.
+
+## Robot position
+
+The original app's nine-square grid, in `js/robotPosition.js`, numbered like a
+phone keypad seen from the **player's** end of the table:
+
+```
+7 8 9   near the net
+4 5 6   middle
+1 2 3   back edge (2 = standard position, the calibrated origin)
+```
+
+Where the robot stands changes where the same packet lands, and the robot has
+no position sensor: `packBall()` sends a head angle, a lateral angle, wheel
+speeds and a frequency, nothing about the board. So the compensation is done
+here, at playback, and **the stored drill is never rewritten**:
+
+- **Lateral** is geometry: one column off-centre shifts every landing by the
+  same amount, so `applyRobotPosition()` adds the opposite `drop`.
+- **Longitudinal** is a first-pass approximation, not a measured projectile
+  model. Moving toward the net scales the height's magnitude (keeping its sign,
+  so a two-bounce serve never becomes a lofted one) and trims speed. The table
+  is `ROW_PROFILE`; after a real-table session, tune that one table rather than
+  the call sites. Position 2 is byte-for-byte the stored ball.
+- **Applied once per run**, in `startSequence()` and the editor's Test button,
+  not per iteration. Tapping a square mid-drill changes the next run, not the
+  ball in flight.
+- **A custom drill has only level 1**, so `resolveDrillLevel()` falls back to
+  it. This also fixes the old trap where the level selector was hidden for
+  custom tabs but its global value still made playback look for an empty level
+  3 and do nothing.
+
+The grid lives in the session-setup `<details>` on the main screen, because it
+is a physical setup you change between drills. The name under it and the
+`Pos n` in the collapsed summary are translated; the numbers are the model and
+the DOM only mirrors them.
+
+### Difficulty stars
+
+The same `level` control is now rendered as 1/2/3 stars and is visible for
+every category. For a factory drill it selects one of the three hand-tuned
+stored levels. For a custom or AI drill it becomes the star modifier in
+`applyStarLevel()`: +0.5 speed, +0.5 spin and +6 bpm per star, with
+`SPIN_LIMITS` still winning. Height and drop do not move — a star is the same
+ball played a little harder, not a different shot. The modifier is applied at
+playback and Test, so one saved drill covers all three stars.
 
 ## Training history
 
@@ -334,13 +412,15 @@ cannot be violated. Rules that have bitten people before:
   matcher read it as a backspin preset - which is how a backspin serve chose
   "Topspin loop" over the sidespin serve the sentence actually meant.
 - **A serve is scored against its DEPTH LABEL, not its ball height.**
-  Correcting the sign above nearly broke preset matching: every preset is a
-  rally shot with a positive height, so `depthDistance` comparing -35 against
-  +50 saturated its term (`|50 - (-35)| / 60` clamps to 1) and pushed every
-  preset past `MATCH_THRESHOLD`. Correcting the sign made serves stop matching
-  presets entirely. `Short` / `Mid` / `Long` in `preset.depths` are the words
-  the sentence actually uses, so those are the comparison; a preset with no
-  depth axis is neutral rather than disqualified.
+  Correcting the sign above nearly broke preset matching: at the time every
+  preset was a rally shot with a positive height, so `depthDistance` comparing
+  -35 against +50 saturated its term (`|50 - (-35)| / 60` clamps to 1) and
+  pushed every preset past `MATCH_THRESHOLD`. Correcting the sign made serves
+  stop matching presets entirely. `Short` / `Mid` / `Long` in `preset.depths`
+  are the words the sentence actually uses, so those are the comparison; a
+  preset with no depth axis is neutral rather than disqualified. The shipped
+  serve presets are negative now, but the rule stays because a user's own
+  presets may still be rally-shaped.
 - **Intensity is a speed, never a scatter.** "fuerte" moves `speed` by at most
   +/-2. Scatter stays the explicit "con dispersion", so a drill can never
   surprise you mid-rally.
@@ -830,8 +910,8 @@ the layout below is built on, not decoration.
 
 - **Main screen.** A compact status row (dot, state, Connect) and a collapsed
   `<details>` holding the run settings. The summary line always states the next
-  run (`Level 1 · Reps 10 · Pause 0.0s`) so the card is never a mystery box, and
-  `updateSetupSummary()` redraws it after an edit or a language switch. The
+  run (`Pos 2 · Lvl 1 · Reps 10 · 0.0s`) so the card is never a mystery box,
+  and `updateSetupSummary()` redraws it after an edit or a language switch. The
   settings used to be permanently open and pushed the first drill below the
   fold on every visit.
 - **Tabs.** Two rows: the three factory groups, then Custom A/B/C and IA. Seven
@@ -868,12 +948,15 @@ at ~650px; it now begins at ~300px.
   from `bleState`; the dot is `aria-hidden` because the words say the same
   thing and colour alone is not a state.
 - **Run settings live in a native `<details>`.** The summary is a sentence -
-  `Level 1 · Reps 10 · Pause 0.0s` - rebuilt by `updateSetupSummary()` in
+  `Pos 2 · Lvl 1 · Reps 10 · 0.0s` - rebuilt by `updateSetupSummary()` in
   `main.js` on `input` and on `locale-changed`, so a collapsed row never
   describes the last run. Native `<details>` again: keyboard support, the open
   state in the accessibility tree, and no listener to keep working.
-  `#grp-difficulty` is still the element `switchTab()` hides for the custom and
-  IA tabs, so the level control disappears where it means nothing.
+  The panel now has the nine-square **robot position** grid and the
+  **difficulty stars**. `#grp-difficulty` is deliberately no longer hidden for
+  the custom and IA tabs: for those drills it is the modifier applied at
+  playback, not a stored factory level. See "Robot position" and "Difficulty
+  stars" above.
 - **The tabs are two rows: three factory drills, then four user categories.**
   Seven pills in a 3x3 grid left two holes and cost ~220px; the two-row strip
   is ~96px and every cell is used. The seven identical dot icons are gone -
@@ -1074,8 +1157,8 @@ Ball, table and dotted trail in the app's own mint (`--primary`) and amber
 - **Storage keys**: `custom_drills`, `custom_data`, `drill_order`,
   `user_defaults`, `nova_stats`, `nova_theme_pref`, `nova_last_played`,
   `nova_ball_presets`, `nova_sessions`, `nova_active_session`, `nova_lang`,
-  `nova_ai_drills`, `nova_ai_config`, plus the account trio
-  `nova_account`, `nova_last_sync`, `nova_api_base`.
+  `nova_ai_drills`, `nova_ai_config`, `nova_robot_position`, plus the account
+  trio `nova_account`, `nova_last_sync`, `nova_api_base`.
   `factoryReset()` wipes all of them (it calls `localStorage.clear()`; the key
   list here is documentation, not a second implementation).
   `nova_api_base` is developer-only — there is no UI that writes it.
@@ -1282,12 +1365,12 @@ belong on somebody else's *server* either.
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs            # 115 unit tests, no dependencies
+node --test tests/*.test.mjs            # 127 unit tests, no dependencies
 # or, both gates plus the browser suite, in one command:
 tools/run-checks.sh
 ```
 
-Browser integration (587 checks, needs the HTTP server above):
+Browser integration (618 checks, needs the HTTP server above):
 
 ```bash
 google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \

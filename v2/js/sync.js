@@ -46,7 +46,8 @@ export const SYNC_KEYS = [
     'nova_active_session',
     'nova_lang',
     'nova_theme_pref',
-    'nova_last_played'
+    'nova_last_played',
+    'nova_robot_position'
 ];
 
 /** Keys that must never leave the device, restated so the pairing is visible. */

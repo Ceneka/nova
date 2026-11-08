@@ -74,10 +74,11 @@
 <pre id="out"></pre>
 
 <script type="module">
-import { initData, currentDrills, userCustomDrills, importCustomDrills, exportCustomDrills } from '../../v2/js/state.js';
+import { initData, currentDrills, userCustomDrills, importCustomDrills, exportCustomDrills, resolveDrillLevel } from '../../v2/js/state.js';
 import { openEditor, closeEditor, saveDrillChanges, insertPresetIntoDrill } from '../../v2/js/editor.js';
 import * as P from '../../v2/js/presets.js';
-import { B, normalizeBall, makeBall, freqToBpm } from '../../v2/js/ball.js';
+import { B, normalizeBall, makeBall, freqToBpm, applyStarLevel } from '../../v2/js/ball.js';
+import { getRobotPosition, setRobotPosition, normalizePosition, applyRobotPosition, positionRow, positionCol } from '../../v2/js/robotPosition.js';
 import { asciiSlug, drillKeyName } from '../../v2/js/utils.js';
 import { DEFAULT_DRILLS, CATEGORIES } from '../../v2/js/constants.js';
 import { bleState, connectDevice, setConnectTimeouts } from '../../v2/js/bluetooth.js';
@@ -298,7 +299,9 @@ eq('last 9 steps carry BH/Center/FH per depth', drops, [-5,0,5,-5,0,5,-5,0,5]);
 const heights = [...document.querySelectorAll('#editor-body .ball-group')]
     .slice(-9)
     .map(g => Number(g.querySelectorAll('.option-card .editor-field input')[2].value));
-eq('depths are anchored on the preset height (30)', heights, [10,10,10,30,30,30,50,50,50]);
+// The shipped short serve is a two-bounce ball now: its depth axis is the
+// serve band (-35 / -40 / -45), not the old rally heights.
+eq('depths are the serve band, not a positive rally axis', heights, [-35,-35,-35,-40,-40,-40,-45,-45,-45]);
 
 /* ---- 3. variants mode = one step, many variants ---- */
 const nBefore = groups().length;
@@ -361,11 +364,11 @@ openEditor('push(f)');
 window.handleSaveBallAsPreset(0, 0);
 ok('preset editor opened from a ball', document.getElementById('preset-modal').classList.contains('open'));
 eq('seeded name field', document.getElementById('pf-name').value, 'New preset');
-// push(f) is [1547,2915,50,+5,10,1] -> speed 2, spin 2, back, height 50, drop +5
+// The tuned level-1 push(f) is speed 2 / spin 6 / back / height -43 / drop +5.
 const pfInputs = [...document.querySelectorAll('#preset-editor-body .editor-field input')];
 eq('seeded speed from the ball', pfInputs[0].value, '2');
-eq('seeded spin from the ball', pfInputs[1].value, '2');
-eq('seeded height from the ball', pfInputs[2].value, '50');
+eq('seeded spin from the ball', pfInputs[1].value, '6');
+eq('seeded height from the ball', pfInputs[2].value, '-43');
 eq('seeded drop from the ball', pfInputs[3].value, '5');
 
 const nameEl = document.getElementById('pf-name');
@@ -3381,6 +3384,43 @@ ok('the editor labels are translated as well', (() => {
     closeEditor();
     return /Velocidad/.test(txt) && /Efecto/.test(txt) && !/\bSpeed\b/.test(txt);
 })());
+
+/* --- robot position and difficulty stars --- */
+localStorage.removeItem('nova_robot_position');
+eq('robot position defaults to the standard back-centre square', getRobotPosition(), 2);
+eq('square 7 is near-net left', [positionRow(7), positionCol(7)], [2, 0]);
+eq('square 3 is back-right', [positionRow(3), positionCol(3)], [0, 2]);
+eq('a junk position falls back rather than inventing a square', normalizePosition('junk'), 2);
+setRobotPosition(9);
+eq('choosing a square is remembered', getRobotPosition(), 9);
+localStorage.removeItem('nova_robot_position');
+
+const serveBase = makeBall({ speed: 4, spin: 1.5, type: 'back', height: -35, drop: 0, bpm: 60, reps: 1 });
+const fromNearLeft = applyRobotPosition(serveBase, 7);
+ok('a near-net left square aims right, lower and slower',
+   fromNearLeft[B.DROP] > serveBase[B.DROP]
+   && fromNearLeft[B.HEIGHT] > serveBase[B.HEIGHT]
+   && fromNearLeft[B.SPEED] < serveBase[B.SPEED],
+   `${fromNearLeft[B.DROP]} / ${fromNearLeft[B.HEIGHT]} / ${fromNearLeft[B.SPEED]}`);
+ok('a two-bounce serve stays below the table line from every square',
+   [1, 5, 9].every(pos => applyRobotPosition(serveBase, pos)[B.HEIGHT] < 0));
+ok('position 2 leaves the stored ball byte-for-byte', applyRobotPosition(serveBase, 2).join('|') === serveBase.join('|'));
+
+const starred = applyStarLevel(serveBase, 3);
+ok('three stars are the same ball, faster and with more spin',
+   starred[B.SPEED] > serveBase[B.SPEED]
+   && starred[B.SPIN] > serveBase[B.SPIN]
+   && starred[B.HEIGHT] === serveBase[B.HEIGHT]
+   && starred[B.DROP] === serveBase[B.DROP]);
+
+currentDrills['__test_levels'] = { 1: [[serveBase]], 2: [], 3: [], random: false };
+const custom = resolveDrillLevel('__test_levels', 3);
+eq('a custom drill falls back to level 1 and turns the level into stars',
+   [custom.level, custom.stars, custom.stored], [1, 3, false]);
+delete currentDrills['__test_levels'];
+const factory = resolveDrillLevel('push(b)', 2);
+eq('a factory drill keeps its stored level and no star modifier',
+   [factory.level, factory.stars, factory.stored], [2, 1, true]);
 
 // Leave the app in English, which is what the rest of this page assumes.
 localStorage.removeItem('nova_lang');

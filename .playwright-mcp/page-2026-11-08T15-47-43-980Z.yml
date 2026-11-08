@@ -1,0 +1,181 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - heading [level=1] [ref=e4]:
+        - link "Nova Drill | Tenisdemesa.ar" [ref=e5] [cursor=pointer]:
+          - /url: https://tenisdemesa.ar/
+      - generic [ref=e6]:
+        - button "Open the AI assistant" [ref=e7] [cursor=pointer]
+        - generic [ref=e11] [cursor=pointer]
+      - generic:
+        - generic: Drill
+        - generic: Download Drill
+        - generic: Export Drills
+        - generic: Import Drills
+        - generic: Settings
+        - generic: About
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e16]: Disconnected
+        - button "Connect" [ref=e17] [cursor=pointer]
+      - group [ref=e18]:
+        - generic "Session setup" [ref=e19] [cursor=pointer]: Level 1 · Reps 10 · Pause 0.0s
+    - generic [ref=e24]: Drill Selection
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27] [cursor=pointer]: Basic
+        - generic [ref=e29] [cursor=pointer]: Combined
+        - generic [ref=e31] [cursor=pointer]: Complex
+      - generic [ref=e33]:
+        - generic [ref=e34] [cursor=pointer]: Custom A
+        - generic [ref=e36] [cursor=pointer]: Custom B
+        - generic [ref=e38] [cursor=pointer]: Custom C
+        - generic [ref=e40] [cursor=pointer]: IA
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - 'button "Play drill: Push(B)" [ref=e44] [cursor=pointer]'
+        - 'button "Edit drill: Push(B)" [ref=e47] [cursor=pointer]':
+          - generic [ref=e48]:
+            - generic [ref=e49]: Push(B)
+            - generic [ref=e50]: 1 ball
+        - generic "Drag to reorder" [ref=e55]
+      - generic [ref=e63]:
+        - 'button "Play drill: Push(F)" [ref=e64] [cursor=pointer]'
+        - 'button "Edit drill: Push(F)" [ref=e67] [cursor=pointer]':
+          - generic [ref=e68]:
+            - generic [ref=e69]: Push(F)
+            - generic [ref=e70]: 1 ball
+        - generic "Drag to reorder" [ref=e75]
+      - generic [ref=e83]:
+        - 'button "Play drill: Drive(B)" [ref=e84] [cursor=pointer]'
+        - 'button "Edit drill: Drive(B)" [ref=e87] [cursor=pointer]':
+          - generic [ref=e88]:
+            - generic [ref=e89]: Drive(B)
+            - generic [ref=e90]: 1 ball
+        - generic "Drag to reorder" [ref=e95]
+      - generic [ref=e103]:
+        - 'button "Play drill: Drive(F)" [ref=e104] [cursor=pointer]'
+        - 'button "Edit drill: Drive(F)" [ref=e107] [cursor=pointer]':
+          - generic [ref=e108]:
+            - generic [ref=e109]: Drive(F)
+            - generic [ref=e110]: 1 ball
+        - generic "Drag to reorder" [ref=e115]
+      - generic [ref=e123]:
+        - 'button "Play drill: Loop(B)" [ref=e124] [cursor=pointer]'
+        - 'button "Edit drill: Loop(B)" [ref=e127] [cursor=pointer]':
+          - generic [ref=e128]:
+            - generic [ref=e129]: Loop(B)
+            - generic [ref=e130]: 1 ball
+        - generic "Drag to reorder" [ref=e135]
+      - generic [ref=e143]:
+        - 'button "Play drill: Loop(F)" [ref=e144] [cursor=pointer]'
+        - 'button "Edit drill: Loop(F)" [ref=e147] [cursor=pointer]':
+          - generic [ref=e148]:
+            - generic [ref=e149]: Loop(F)
+            - generic [ref=e150]: 1 ball
+        - generic "Drag to reorder" [ref=e155]
+    - generic [ref=e163]:
+      - 'button "Balls: 0 | Drills: 0 Statistics" [ref=e164] [cursor=pointer]':
+        - generic [ref=e166]: "Balls: 0 | Drills: 0"
+        - generic [ref=e167]: Statistics
+      - generic [ref=e168]: Version 2.4a
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic: Drill Name
+            - generic: ✎
+          - generic: ×
+        - generic:
+          - button "Share Drill"
+          - generic: Random
+      - generic:
+        - button "Delete"
+        - button "Test drill"
+        - button "Save As"
+        - button "Save"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Import Drill
+        - generic: ×
+      - generic:
+        - generic:
+          - generic: Share Code
+          - textbox "ABC123"
+        - generic:
+          - generic: Select Destination
+          - generic:
+            - generic: Custom A
+            - generic: Custom B
+            - generic: Custom C
+      - generic:
+        - button "Download & Import"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Save As New Drill
+        - generic: ×
+      - generic:
+        - generic:
+          - generic: Drill Name (Max 40)
+          - textbox "My New Drill"
+        - generic:
+          - generic: Select Destination
+          - generic:
+            - generic: Custom A
+            - generic: Custom B
+            - generic: Custom C
+      - generic:
+        - button "Save Drill"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Ball Presets
+        - generic: ×
+      - generic:
+        - button "+ New Preset"
+  - generic:
+    - generic:
+      - generic:
+        - generic: New Preset
+        - generic: ×
+      - generic:
+        - button "Delete preset"
+        - button "Save Preset"
+  - generic:
+    - generic:
+      - generic:
+        - generic: About
+        - generic: ×
+      - generic:
+        - heading "Nova Drill | Tenisdemesa.ar" [level=3]
+        - paragraph: Version 2.4a
+        - link "View on GitHub":
+          - /url: https://github.com/Ceneka/nova
+        - link "tenisdemesa.ar Find table tennis tournaments all over Argentina.":
+          - /url: https://tenisdemesa.ar/
+          - generic: tenisdemesa.ar
+          - generic: Find table tennis tournaments all over Argentina.
+        - generic:
+          - paragraph: An independent continuation of the original Nova app. Thanks to its author for the work this is built on.
+          - link "Visit the original project":
+            - /url: https://github.com/olanga/nova
+  - generic:
+    - generic:
+      - generic: Session Summary
+      - generic:
+        - generic: Training session complete!
+        - generic:
+          - generic:
+            - generic: Drills
+            - generic: "0"
+          - generic:
+            - generic: Balls
+            - generic: "0"
+          - generic:
+            - generic: Time
+            - generic: 0:00
+      - generic:
+        - button "Close"

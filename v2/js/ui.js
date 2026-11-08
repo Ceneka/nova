@@ -5,9 +5,9 @@ import {
     drillOrder, 
     saveDrillOrder, 
     saveDrillsToStorage, 
-    selectedLevel,
     lastPlayedDrill,
-    getSessionSummary 
+    getSessionSummary,
+    resolveDrillLevel
 } from './state.js';
 import { bleState } from './bluetooth.js';
 import { makeBall } from './ball.js';
@@ -355,7 +355,9 @@ const ICON_GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true">'
 
 /** The line under a drill's name: how much is in it, and a hint that it edits. */
 function drillMeta(key) {
-    const steps = currentDrills[key]?.[selectedLevel]?.length || 0;
+    // The same resolution the runner uses: a custom drill has only level 1, so
+    // it stays readable when the star control is on 2 or 3.
+    const steps = resolveDrillLevel(key).steps?.length || 0;
     return steps ? t('unit.countBalls', { n: steps }) : t('drill.noBalls');
 }
 
@@ -573,12 +575,11 @@ export function switchTab(catName, btn) {
     document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
     if(btn) btn.classList.add('active');
 
-    const diffGroup = document.getElementById('grp-difficulty');
-    if(diffGroup) {
-        // A level applies to the factory drills; a custom set or the IA
-        // category has its own content, so the control would mean nothing.
-        diffGroup.style.display = ['custom-a', 'custom-b', 'custom-c', 'ia'].includes(catName) ? 'none' : 'flex';
-    }
+    // The star control now applies to every category: factory drills pick one
+    // of their three hand-tuned levels, while custom and AI drills use the
+    // same number as the difficulty modifier applied at playback (see
+    // resolveDrillLevel in state.js). Hiding it for the custom tabs is what
+    // left those drills with no difficulty control at all.
 }
 
 // --- NEW: About Modal Handlers ---

@@ -19,10 +19,13 @@ globalThis.localStorage = {
     clear: () => store.clear()
 };
 
-const { B, makeBall, calculateRPMs, reverseCalculate, normalizeBall, freqToBpm, bpmToFreq, maxScatterFor } =
+const { B, makeBall, calculateRPMs, reverseCalculate, normalizeBall, freqToBpm, bpmToFreq, maxScatterFor, maxSpinFor, applyStarLevel } =
     await import('../v2/js/ball.js');
 
 const P = await import('../v2/js/presets.js');
+const R = await import('../v2/js/robotPosition.js');
+const { DEFAULT_DRILLS } = await import('../v2/js/constants.js');
+const S = await import('../v2/js/state.js');
 
 const preset = (over = {}) => P.normalizePreset({
     id: 'p_test', name: 'Test', speed: 4, spin: 1.5, type: 'top',
@@ -216,6 +219,53 @@ test('a store holding junk entries keeps the good ones', () => {
     assert.deepEqual(P.getPresets().map(p => p.name), ['keep']);
 });
 
+test('an existing library refreshes untouched built-in serves, never edits', () => {
+    // The old shipped short serve, including the half-fixed state that only
+    // changed the base height (-30) and left the positive depth axis.
+    const oldShort = preset({
+        id: 'preset_short_under', name: 'My short serve', builtIn: true,
+        speed: 4, spin: 1.5, type: 'top', height: -30, bpm: 60,
+        placements: [{ label: 'BH', drop: -5 }, { label: 'Center', drop: 0 }, { label: 'FH', drop: 5 }],
+        depths: [{ label: 'Short', height: 10 }, { label: 'Mid', height: 30 }, { label: 'Long', height: 50 }]
+    });
+    const editedLong = preset({
+        id: 'preset_long_under', name: 'Long under serve', builtIn: true,
+        speed: 9, spin: 1, type: 'top', height: 55, bpm: 60,
+        placements: [{ label: 'BH', drop: -5 }, { label: 'Center', drop: 0 }, { label: 'FH', drop: 5 }],
+        depths: [{ label: 'Short', height: 35 }, { label: 'Mid', height: 55 }, { label: 'Long', height: 75 }]
+    });
+    const mine = preset({ id: 'mine', name: 'Mine', builtIn: false });
+
+    store.set('nova_ball_presets', JSON.stringify([oldShort, editedLong, mine]));
+    P.loadPresets();
+
+    const short = P.getPresetById('preset_short_under');
+    assert.equal(short.name, 'My short serve', 'a renamed built-in keeps its name');
+    assert.equal(short.type, 'back');
+    assert.deepEqual(short.depths.map(d => d.height), [-35, -40, -45]);
+
+    const long = P.getPresetById('preset_long_under');
+    assert.equal(long.speed, 9, 'a hand-edited built-in is left alone');
+    assert.equal(long.type, 'top');
+
+    assert.ok(P.getPresetById('mine'), 'a custom preset survives');
+});
+
+test('an old preset export cannot put the positive serves back', () => {
+    P.setPresets(P.DEFAULT_PRESETS.map(P.clonePreset));
+    const oldShort = preset({
+        id: 'preset_short_under', name: 'Short under serve', builtIn: true,
+        speed: 4, spin: 1.5, type: 'top', height: 30, bpm: 60,
+        placements: [{ label: 'BH', drop: -5 }, { label: 'Center', drop: 0 }, { label: 'FH', drop: 5 }],
+        depths: [{ label: 'Short', height: 10 }, { label: 'Mid', height: 30 }, { label: 'Long', height: 50 }]
+    });
+
+    P.mergePresets([oldShort]);
+    const p = P.getPresetById('preset_short_under');
+    assert.equal(p.type, 'back');
+    assert.deepEqual(p.depths.map(d => d.height), [-35, -40, -45]);
+});
+
 test('merge skips name clashes and refreshes built-ins', () => {
     P.setPresets([preset({ id: 'preset_short_under', name: 'Short under serve' }), preset({ id: 'mine', name: 'Mine' })]);
 
@@ -248,6 +298,66 @@ test('add/update/delete round-trip through the store', () => {
     assert.equal(P.getPresets().length, P.DEFAULT_PRESETS.length);
 });
 
+test('the factory library is built from the validated slow-feed balls', () => {
+    // From the user's own tuned library. The push is a two-bounce ball and the
+    // drive/loop are low; the same recipe at level 1 carries its editor fields
+    // because spin 6 at speed 2 clamps the backspin wheel.
+    const push = DEFAULT_DRILLS['push(b)'][1][0][0];
+    assert.equal(push[B.SPEED], 2);
+    assert.equal(push[B.SPIN], 6);
+    assert.equal(push[B.TYPE], 'back');
+    assert.equal(push[B.HEIGHT], -43);
+    assert.equal(freqToBpm(push[B.FREQ]), 36);
+
+    const drive = DEFAULT_DRILLS['drive(f)'][1][0][0];
+    assert.equal(drive[B.SPEED], 3);
+    assert.equal(drive[B.SPIN], 1);
+    assert.equal(drive[B.TYPE], 'top');
+    assert.equal(drive[B.HEIGHT], 30);
+    assert.equal(freqToBpm(drive[B.FREQ]), 64);
+
+    const loop = DEFAULT_DRILLS['loop(b)'][1][0][0];
+    assert.equal(loop[B.SPEED], 2.5);
+    assert.equal(loop[B.SPIN], 4);
+    assert.equal(loop[B.HEIGHT], 20);
+
+    // The combined drills use the same validated push, not the old +50 ball.
+    const comboPush = normalizeBall(DEFAULT_DRILLS['push(f)-drive(f)'][1][0][0].slice());
+    assert.equal(comboPush[B.SPEED], 2);
+    assert.equal(comboPush[B.SPIN], 6);
+    assert.equal(comboPush[B.HEIGHT], -43);
+
+    // Level 2 is the same shot, a little harder - never a higher arc.
+    const comboPush2 = normalizeBall(DEFAULT_DRILLS['push(f)-drive(f)'][2][0][0].slice());
+    assert.equal(comboPush2[B.SPEED], 2.5);
+    assert.equal(comboPush2[B.SPIN], 6.5);
+    assert.equal(comboPush2[B.HEIGHT], -43);
+});
+
+test('an existing install migrates only untouched high-ball factory levels', () => {
+    const old = {
+        'push(b)': {
+            1: [[[1547, 2915, 50, -5, 10, 1, 1]]],
+            2: [[[1205, 3257, 50, -5, 20, 1, 1]]],
+            3: [[[863, 3599, 50, -5, 30, 1, 1]]]
+        },
+        'loop(b)': {
+            1: [[[1520, 3572, 50, -5, 10, 1, 1]]],                 // old high
+            2: [[[400, 4283, 20, -5, 10, 1, 1, 2.5, 4, 'back']]],   // tuned low
+            3: []
+        },
+        'cust_A_mine': { 1: [[[1547, 2915, 50, -5, 10, 1, 1]]] }
+    };
+
+    assert.equal(S.migrateLegacyFactoryDrills(old), true);
+    assert.equal(old['push(b)'][1][0][0][B.HEIGHT], -43, 'old basic level replaced');
+    assert.equal(old['push(b)'][1][0][0][B.SPEED], 2);
+    assert.equal(old['push(b)'][3][0][0][B.HEIGHT], -43, 'old level 3 replaced too');
+    assert.equal(old['loop(b)'][1][0][0][B.HEIGHT], 20);
+    assert.equal(old['loop(b)'][2][0][0][B.HEIGHT], 20, 'a low level the user tuned is kept');
+    assert.equal(old['cust_A_mine'][1][0][0][B.HEIGHT], 50, 'custom drills are never touched');
+});
+
 test('the shipped library expands to something sane', () => {
     for (const p of P.DEFAULT_PRESETS) {
         const clean = P.normalizePreset(p);
@@ -262,5 +372,105 @@ test('the shipped library expands to something sane', () => {
             assert.ok(b[B.DROP] >= -10 && b[B.DROP] <= 10, `${p.name} drop in range`);
             assert.ok(b[B.TOP] >= 400 && b[B.BOT] >= 400, `${p.name} rpm in range`);
         }
+    }
+});
+
+test('the serve presets use the negative two-bounce band', () => {
+    // A serve is the one ball that is supposed to be launched down. The old
+    // library stored "Short under serve" at +30 and "Long under serve" at +55,
+    // so the sequence and variants modes fed rally balls from a preset with
+    // "serve" in its name. Changing only the base height would not have fixed
+    // that: buildPresetBalls() reads the depth axis.
+    for (const id of ['preset_short_under', 'preset_long_under', 'preset_short_side', 'preset_long_side']) {
+        const p = P.DEFAULT_PRESETS.find(x => x.id === id);
+        assert.equal(p.type, 'back', `${id} is backspin`);
+        for (const d of p.depths) {
+            assert.ok(d.height < 0, `${id} ${d.label} is launched down (${d.height})`);
+        }
+        for (const b of P.buildPresetBalls(P.normalizePreset(p))) {
+            assert.ok(b[B.HEIGHT] < 0, `${id} plays a two-bounce ball`);
+        }
+    }
+});
+
+test('standardDepths never puts a serve back above the table', () => {
+    const negative = P.standardDepths(-35);
+    assert.deepEqual(negative.map(d => d.height), [-35, -40, -45]);
+    assert.deepEqual(negative.map(d => d.label), ['Short', 'Mid', 'Long']);
+    // Positive heights keep the original 20-unit spacing.
+    assert.deepEqual(P.standardDepths(50).map(d => d.height), [30, 50, 70]);
+});
+
+test('a star is the same ball, a little faster and with more spin', () => {
+    const base = makeBall({ speed: 4, spin: 1.5, type: 'top', height: -35, drop: -5, bpm: 60, reps: 2 });
+
+    assert.equal(applyStarLevel(base, 1).join('|'), base.join('|'), 'level 1 is untouched');
+
+    const two = applyStarLevel(base, 2);
+    const three = applyStarLevel(base, 3);
+    assert.equal(two[B.SPEED], 4.5);
+    assert.equal(two[B.SPIN], 2);
+    assert.equal(freqToBpm(two[B.FREQ]), 66);
+    assert.equal(three[B.SPEED], 5);
+    assert.equal(three[B.SPIN], 2.5);
+    assert.equal(freqToBpm(three[B.FREQ]), 72);
+
+    // The shot is the same shot: no target or trajectory change.
+    for (const b of [two, three]) {
+        assert.equal(b[B.HEIGHT], base[B.HEIGHT]);
+        assert.equal(b[B.DROP], base[B.DROP]);
+        assert.equal(b[B.REPS], base[B.REPS]);
+        assert.equal(b[B.TYPE], base[B.TYPE]);
+    }
+
+    // SPIN_LIMITS still wins at the top of the table.
+    const fast = makeBall({ speed: 10, spin: 0, type: 'top' });
+    assert.equal(applyStarLevel(fast, 3)[B.SPIN], 0);
+});
+
+test('robot position 2 is the calibrated origin', () => {
+    const ball = makeBall({ speed: 4, spin: 1.5, type: 'back', height: -35, drop: -5, bpm: 60, reps: 1 });
+    assert.equal(R.normalizePosition(2), 2);
+    assert.equal(R.normalizePosition(99), 9);
+    assert.equal(R.normalizePosition('junk'), R.DEFAULT_POSITION);
+    assert.equal(R.applyRobotPosition(ball, 2).join('|'), ball.join('|'));
+});
+
+test('moving the robot sideways compensates the drop, not the drill', () => {
+    const ball = makeBall({ speed: 4, spin: 1.5, type: 'top', height: 50, drop: 0, bpm: 60, reps: 1 });
+
+    const left = R.applyRobotPosition(ball, 1);    // back left
+    const right = R.applyRobotPosition(ball, 3);   // back right
+    assert.equal(left[B.DROP], 4, 'standing left means aiming right');
+    assert.equal(right[B.DROP], -4, 'standing right means aiming left');
+
+    // Back row: only the lateral term applies.
+    assert.equal(left[B.HEIGHT], ball[B.HEIGHT]);
+    assert.equal(left[B.SPEED], ball[B.SPEED]);
+});
+
+test('moving the robot toward the net lowers and slows the same ball', () => {
+    const ball = makeBall({ speed: 4, spin: 1.5, type: 'back', height: -35, drop: 0, bpm: 60, reps: 1 });
+    const near = R.applyRobotPosition(ball, 8); // near net, centre
+
+    assert.ok(near[B.HEIGHT] > ball[B.HEIGHT], 'less downward for a two-bounce serve');
+    assert.equal(near[B.HEIGHT], -24.5);
+    assert.equal(near[B.SPEED], 3);
+    assert.equal(near[B.DROP], 0, 'centre stays centre');
+    // The sign is preserved: it is still a two-bounce serve, never a lofted one.
+    assert.ok(near[B.HEIGHT] < 0);
+});
+
+test('every robot square produces a legal ball', () => {
+    for (let pos = 1; pos <= R.POSITION_COUNT; pos++) {
+        const near = R.applyRobotPosition(
+            makeBall({ speed: 9, spin: 1, type: 'top', height: -50, drop: 9, bpm: 90, reps: 1 }),
+            pos
+        );
+        assert.ok(near[B.HEIGHT] >= -50 && near[B.HEIGHT] <= 100, `pos ${pos} height`);
+        assert.ok(near[B.DROP] >= -10 && near[B.DROP] <= 10, `pos ${pos} drop`);
+        assert.ok(near[B.SPEED] >= 0 && near[B.SPEED] <= 10, `pos ${pos} speed`);
+        assert.ok(near[B.SPIN] <= maxSpinFor(near[B.SPEED]), `pos ${pos} spin`);
+        assert.ok(near[B.TOP] >= 400 && near[B.BOT] >= 400, `pos ${pos} rpm`);
     }
 });

@@ -82,11 +82,30 @@ export const es = {
         drillNameMax40: 'Nombre (máx. 40)',
         runSetup: 'Ajustes de sesión',
         level: 'Nivel',
+        ballLevel: 'Dificultad',
+        robotPosition: 'Posición del robot',
         mode: 'Modo',
-        levelShort: 'Nivel {n}',
+        levelShort: 'Niv {n}',
+        positionShort: 'Pos {n}',
         repsShort: '{n} reps',
         timeShort: '{n}s',
-        pauseShort: 'Pausa {n}s'
+        pauseShort: '{n}s'
+    },
+
+    // --- index.html + main.js: la grilla de nueve posiciones del robot. Los
+    //     nombres son desde el punto de vista del JUGADOR, mirando al robot. ---
+    position: {
+        net: 'Red',
+        hint: 'Los ejercicios se ajustan a esta posición.',
+        1: 'Atrás izquierda',
+        2: 'Atrás centro',
+        3: 'Atrás derecha',
+        4: 'Medio izquierda',
+        5: 'Medio centro',
+        6: 'Medio derecha',
+        7: 'Cerca de la red izquierda',
+        8: 'Cerca de la red centro',
+        9: 'Cerca de la red derecha'
     },
 
     mode: {
@@ -156,7 +175,7 @@ export const es = {
     // --- ui.js: the footer counter ---
     footer: {
         totals: 'Bolas: {balls} | Ejercicios: {drills}',
-        version: 'Versión 2.4a'
+        version: 'Versión 2.5a'
     },
 
     // --- bluetooth.js: los mensajes de una conexion fallida ---
@@ -184,6 +203,7 @@ export const es = {
         addVariant: '+ Variante',
         saveBallAsPreset: 'Guardar esta bola como preset',
         rotation: 'Rotación:',
+        playingFrom: '{stars} · {position}',
         more: 'Más opciones'
     },
 
@@ -327,7 +347,7 @@ export const es = {
         resetStatsDesc: '{balls} bolas · {drills} ejercicios · también borra el historial.',
         factoryReset: 'Restablecer de fábrica',
         factoryResetDesc: 'Borra todo, incluidos los presets.',
-        foot: 'Nova Drill | Tenisdemesa.ar · Versión 2.4a'
+        foot: 'Nova Drill | Tenisdemesa.ar · Versión 2.5a'
     },
 
     // --- account.js / sync.js: la cuenta de tenisdemesa.ar ---
@@ -655,6 +675,9 @@ export const es = {
         playDrill: 'Iniciar ejercicio',
         editDrill: 'Editar ejercicio',
         installApp: 'Instalar Nova',
+        star1: 'Una estrella: el más fácil',
+        star2: 'Dos estrellas: un poco más rápido y con más efecto',
+        star3: 'Tres estrellas: el más rápido y con más efecto',
         openAi: 'Abrir el asistente IA',
         talk: 'Hablarle al asistente',
         send: 'Enviar lo que escribiste',

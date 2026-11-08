@@ -1,10 +1,11 @@
-import { currentDrills, selectedLevel, runMode, appStats, setLastPlayed } from './state.js';
+import { currentDrills, runMode, appStats, setLastPlayed, resolveDrillLevel } from './state.js';
 import { noteSessionDrill, noteSessionBalls } from './stats.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
 import { log, showToast, clamp, toggleBodyScroll } from './utils.js';
 import { t } from './i18n.js';
 import { updateStatsUI, updateLastPlayedHighlight } from './ui.js';
-import { B } from './ball.js';
+import { B, applyStarLevel } from './ball.js';
+import { applyRobotPosition, getRobotPosition, DEFAULT_POSITION } from './robotPosition.js';
 
 let isRunning = false;
 let isPaused = false;
@@ -20,6 +21,14 @@ let startTimeout = null; // --- ADDED: Track the start delay
 
 let activeDrillParams = null;
 let activeDrillRandom = false;
+
+/**
+ * The difficulty and robot square are read once per run, not per ball. Moving
+ * the robot or tapping a star while a drill is playing should not change the
+ * ball that is already in flight; the next run picks it up.
+ */
+let activeStars = 1;
+let activePosition = DEFAULT_POSITION;
 
 /**
  * The name the training history files this run under, and the key the "last
@@ -62,8 +71,9 @@ export function isDrillRunning() {
  * @param {string|null} [options.label]  what to file this run under in the history
  * @param {string|null} [options.key]    a `currentDrills` key, for the last-played mark
  * @param {boolean}     [options.random] shuffle the step order every repetition
+ * @param {number}      [options.stars]  1..3, applied to every ball (custom and AI drills)
  */
-export function startSequence(steps, { label = null, key = null, random = false } = {}) {
+export function startSequence(steps, { label = null, key = null, random = false, stars = 1 } = {}) {
     // --- FILTER INACTIVE STEPS ---
     // Index 6 being undefined means "active", not "inactive" - see ball.js and
     // AGENTS.md. A step plays on the strength of its first ball, which is the
@@ -83,6 +93,8 @@ export function startSequence(steps, { label = null, key = null, random = false 
     activeDrillParams = executableSteps;
     activeDrillRandom = !!random;
     activeDrillName = label;
+    activeStars = clamp(Math.round(Number(stars) || 1), 1, 3);
+    activePosition = getRobotPosition();
 
     // --- NEW: SAVE LAST PLAYED STATE ---
     // Only a drill the list can point at gets the highlight. An in-memory draft
@@ -128,16 +140,20 @@ export function startSequence(steps, { label = null, key = null, random = false 
 
 /** Look a named drill up in the list and play the current level. */
 export function startDrillSequence(drillName) {
-    const rawParams = currentDrills[drillName] ? currentDrills[drillName][selectedLevel] : null;
-    if (!rawParams) {
+    const resolved = resolveDrillLevel(drillName);
+    if (!resolved.steps) {
         log("Drill data not found: " + drillName);
         return false;
     }
 
-    return startSequence(rawParams, {
+    return startSequence(resolved.steps, {
         label: drillName,
         key: drillName,
-        random: !!currentDrills[drillName].random
+        random: !!currentDrills[drillName].random,
+        // Factory levels are already hand-tuned, so stars is 1 for them. A
+        // custom drill resolves to its level-1 balls with the selected level
+        // as the star modifier.
+        stars: resolved.stars
     });
 }
 
@@ -216,7 +232,11 @@ async function runIteration() {
     const balls = [];
     sequence.forEach((stepOptions, i) => {
         const chosenOption = stepOptions[Math.floor(Math.random() * stepOptions.length)];
-        const tempBall = [...chosenOption];
+        // Difficulty first, then position: a star is the same ball played a
+        // little harder, and the square is where that ball has to land from.
+        // Both return a copy, so the stored drill is never rewritten.
+        let tempBall = applyStarLevel(chosenOption, activeStars);
+        tempBall = applyRobotPosition(tempBall, activePosition);
 
         const scatter = tempBall[10] || 0;
         if (scatter > 0) {
@@ -306,6 +326,7 @@ export function stopRun() {
     activeDrillParams = null;
     activeDrillRandom = false;
     activeDrillName = null;
+    activeStars = 1;
 
     // --- UNLOCK SCROLL ON STOP ---
     toggleBodyScroll(false);

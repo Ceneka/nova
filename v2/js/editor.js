@@ -1,7 +1,7 @@
-import { currentDrills, userCustomDrills, selectedLevel, saveDrillsToStorage } from './state.js';
+import { currentDrills, userCustomDrills, saveDrillsToStorage, resolveDrillLevel } from './state.js';
 import {
     B, LIMITS, calculateRPMs, reverseCalculate, makeBall, normalizeBall,
-    bpmToFreq, freqToBpm, maxSpinFor, maxScatterFor, isMultiVariant
+    bpmToFreq, freqToBpm, maxSpinFor, maxScatterFor, isMultiVariant, applyStarLevel
 } from './ball.js';
 import { MAX_STEPS_PER_DRILL, getPresetById, buildVariantStep, buildSequenceSteps, buildSingleBall } from './presets.js';
 import { sendPacket, packBall, bleState } from './bluetooth.js';
@@ -9,10 +9,16 @@ import { showToast, clamp, toggleBodyScroll, drillKeyName } from './utils.js';
 import { t, drillDisplayName } from './i18n.js';
 import { uploadDrill } from './cloud.js';
 import { updateAiDrillSteps } from './aiStore.js';
+import { applyRobotPosition, getRobotPosition } from './robotPosition.js';
 
 // --- Local State ---
 let tempDrillData = null;
 let editingDrillKey = null;
+// The level being edited and the star modifier are resolved once on open. A
+// custom drill has only level 1, so opening it at "level 3" edits level 1 and
+// plays it with three stars; a factory drill opens the hand-tuned level.
+let editingLevel = 1;
+let editingStars = 1;
 let selectedSaveCat = 'custom-a'; 
 
 // --- Public Module Functions ---
@@ -24,8 +30,12 @@ export function openEditor(key) {
     const chk = document.getElementById('chk-drill-random');
     if (chk) chk.checked = !!(currentDrills[key] && currentDrills[key].random);
 
-    if (currentDrills[key] && currentDrills[key][selectedLevel]) {
-        tempDrillData = JSON.parse(JSON.stringify(currentDrills[key][selectedLevel]));
+    const resolved = resolveDrillLevel(key);
+    editingLevel = resolved.level;
+    editingStars = resolved.stars;
+
+    if (resolved.steps) {
+        tempDrillData = JSON.parse(JSON.stringify(resolved.steps));
     } else {
         tempDrillData = [[makeBall({ speed: 5, spin: 2, type: 'top', height: 50, drop: 0, bpm: 60, reps: 1 })]];
     }
@@ -54,6 +64,8 @@ export function closeEditor() {
     }
     editingDrillKey = null;
     tempDrillData = null;
+    editingLevel = 1;
+    editingStars = 1;
     syncDrillContext();
     toggleBodyScroll(false);
 }
@@ -73,7 +85,10 @@ export function saveDrillChanges() {
         updateAiDrillSteps(editingDrillKey, tempDrillData);
         document.dispatchEvent(new CustomEvent('ai-drills-updated'));
     } else {
-        currentDrills[editingDrillKey][selectedLevel] = tempDrillData;
+        // `editingLevel`, not `selectedLevel`: a custom drill opened while the
+        // star control said 3 still edits its base level-1 balls. Writing to
+        // level 3 would create a drill that vanishes when the control moves.
+        currentDrills[editingDrillKey][editingLevel] = tempDrillData;
         saveDrillsToStorage();
     }
 
@@ -177,6 +192,18 @@ function renderEditor() {
         </svg>
         <span>${t('editor.addFromPreset')}</span>`;
     modalBody.appendChild(entry);
+
+    // The editor shows the stored ball, but playback applies the star level and
+    // the robot's square. Say so where the balls are, or Test looks like it is
+    // firing something other than the drill on screen.
+    const displayStars = editingLevel > 1 && editingStars === 1 ? editingLevel : editingStars;
+    const context = document.createElement('div');
+    context.className = 'editor-context';
+    context.textContent = t('editor.playingFrom', {
+        stars: '\u2605'.repeat(displayStars),
+        position: t(`position.${getRobotPosition()}`)
+    });
+    modalBody.appendChild(context);
 
     tempDrillData.forEach((stepOptions, stepIndex) => {
         const isActive = stepOptions[0][6] === undefined ? 1 : stepOptions[0][6];
@@ -526,14 +553,16 @@ window.performSaveAs = () => {
     const newKey = `cust_${catChar}_${drillKeyName(newName)}_${Date.now()}`;
     userCustomDrills[targetCat].push({ name: newName, key: newKey });
 
-    let baseDrill = currentDrills[editingDrillKey] || { 1: [], 2: [], 3: [] }; 
-    const newDrillData = JSON.parse(JSON.stringify(baseDrill));
-    newDrillData[selectedLevel] = tempDrillData;
-    
+    // A custom drill's base is level 1, whatever level of the source was open.
+    // Copying a factory level 2 into level 2 of a custom drill used to create a
+    // drill that looked empty and could not be played from the star control.
     const chk = document.getElementById('chk-drill-random');
-    if (chk) newDrillData.random = chk.checked;
-
-    currentDrills[newKey] = newDrillData;
+    currentDrills[newKey] = {
+        1: JSON.parse(JSON.stringify(tempDrillData)),
+        2: [],
+        3: [],
+        random: chk ? chk.checked : false
+    };
     saveDrillsToStorage(); 
     localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
 
@@ -636,9 +665,19 @@ function updateTitleDisplay(key) {
     }
 }
 
+/**
+ * The ball as it will actually be sent: the editor's stored numbers, with the
+ * star level and the robot square applied exactly as the runner does. `Test`
+ * used to fire the stored array, which meant testing from position 8 proved
+ * nothing about the drill you were about to play.
+ */
+function ballForRobot(ball) {
+    return applyRobotPosition(applyStarLevel(ball, editingStars), getRobotPosition());
+}
+
 window.handleTestBall = async (stepIdx, optIdx) => {
     if (!bleState.isConnected) { showToast(t('toast.notConnected')); return; }
-    const d = tempDrillData[stepIdx][optIdx];
+    const d = ballForRobot(tempDrillData[stepIdx][optIdx]);
     const ballData = packBall(d[0], d[1], d[2], d[3], d[4], 1); 
     const buffer = new ArrayBuffer(31); 
     const view = new DataView(buffer);
@@ -658,7 +697,7 @@ window.handleTestCombo = async () => {
     tempDrillData.forEach(stepOptions => {
         if (stepOptions[0][6] === 0) return;
         const chosen = stepOptions[0]; 
-        const d = [...chosen];
+        const d = ballForRobot(chosen);
         
         // --- SCATTER LOGIC FOR TEST COMBO ---
         const scatter = d[10] || 0;
@@ -699,7 +738,7 @@ window.handleShareDrill = async () => {
 
     const payload = {
         name: drillName,
-        level: selectedLevel,
+        level: editingLevel,
         params: tempDrillData,
         random: document.getElementById('chk-drill-random')?.checked || false
     };

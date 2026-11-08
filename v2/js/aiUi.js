@@ -55,7 +55,7 @@ import { rankPresets } from './aiMatch.js';
 import {
     getDraft, setDraft, clearDraft, persistDrill, getAiDrill
 } from './aiStore.js';
-import { currentDrills, setLastPlayed } from './state.js';
+import { currentDrills, setLastPlayed, selectedLevel } from './state.js';
 import { openEditor } from './editor.js';
 import { getPresets } from './presets.js';
 import { bleState } from './bluetooth.js';
@@ -803,7 +803,13 @@ export function playAiDraft() {
     // `label` is what the session files this under; `key` is left null because a
     // draft has no row in any list yet, and writing a key nothing resolves to
     // would leave junk in nova_last_played.
-    return startSequence(draft.steps, { label: draft.name || t('ai.title'), random: false });
+    return startSequence(draft.steps, {
+        label: draft.name || t('ai.title'),
+        random: false,
+        // An AI drill is a base-1 drill like a custom one, so the star control
+        // applies to it as well.
+        stars: selectedLevel
+    });
 }
 
 /**
@@ -868,7 +874,7 @@ export function playAiDrill(key) {
     }
     setLastPlayed(key);
     updateLastPlayedHighlight();
-    return startSequence(drill.steps, { label: drill.name, key });
+    return startSequence(drill.steps, { label: drill.name, key, stars: selectedLevel });
 }
 
 /**

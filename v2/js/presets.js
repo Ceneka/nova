@@ -35,8 +35,30 @@ export function standardPlacements(baseDrop = 0) {
     ];
 }
 
+/**
+ * The three heights a two-bounce serve is played at.
+ *
+ * A serve is the one place a negative height is normal: the head points down,
+ * the ball bounces on the robot's side, clears the net and bounces again. The
+ * band descends with distance - a longer serve is launched lower and harder -
+ * so Short is the least negative and Long the most.
+ *
+ * This is the same band `aiTerms.js` uses for a spoken serve, deliberately:
+ * a preset and a compiled serve must not disagree about what "short" means.
+ */
+export const SERVE_DEPTHS = [
+    { label: 'Short', height: -35 },
+    { label: 'Mid', height: -40 },
+    { label: 'Long', height: -45 }
+];
+
 /** Same idea on the height axis: three depths spaced 20 apart. */
 export function standardDepths(baseHeight = 50) {
+    // A negative height is a 2-bounce serve, and spacing that axis 20 apart
+    // produced -50 / -30 / -10 - the last one above the table, which is a
+    // serve that is no longer a serve. Use the serve band instead.
+    if (baseHeight < 0) return SERVE_DEPTHS.map(d => ({ ...d }));
+
     const step = 20;
     const center = clamp(baseHeight, -50 + step, 100 - step);
     return [
@@ -55,10 +77,19 @@ const mk = (id, name, speed, spin, type, height, drop, bpm, reps = 1, scatter = 
 
 /** Shipped starter library. Anything here can be edited, renamed or deleted. */
 export const DEFAULT_PRESETS = [
-    mk('preset_short_under', 'Short under serve', 4, 1.5, 'top', 30, 0, 60),
-    mk('preset_long_under', 'Long under serve', 5, 1, 'top', 55, 0, 60),
-    mk('preset_short_side', 'Short sidespin serve', 5, 3, 'back', 25, 0, 66),
-    mk('preset_long_side', 'Long sidespin serve', 6, 3.5, 'back', 55, 0, 60),
+    // The four serves share the negative height band above. "Under" is
+    // BACKSPIN, so these are 'back', not 'top': the old library had them as
+    // topspin, which meant a preset named "under" played the opposite
+    // rotation (and made the matcher read it as a topspin preset).
+    //
+    // A short serve is -35: the head points down, the ball bounces on the
+    // robot's half and again on the receiver's. The long one is -45, the same
+    // shape hit harder. A serve from near the net is the other method - slow
+    // and flat - and that comes from the robot position, not from the preset.
+    mk('preset_short_under', 'Short under serve', 4, 1.5, 'back', -35, 0, 60),
+    mk('preset_long_under', 'Long under serve', 5, 1, 'back', -45, 0, 60),
+    mk('preset_short_side', 'Short sidespin serve', 5, 3, 'back', -35, 0, 66),
+    mk('preset_long_side', 'Long sidespin serve', 6, 3.5, 'back', -45, 0, 60),
     mk('preset_heavy_push', 'Heavy backspin push', 1.5, 4, 'back', 45, -5, 45),
     mk('preset_safe_push', 'Safe push', 1.5, 1, 'top', 40, -5, 40),
     mk('preset_fast_drive', 'Fast drive', 5, 3, 'top', 55, -5, 72),
@@ -68,6 +99,64 @@ export const DEFAULT_PRESETS = [
     // matched it over the sidespin serve the sentence actually meant.
     mk('preset_loop', 'Topspin loop', 4, 3.5, 'top', 60, -5, 60)
 ];
+
+/**
+ * The four serve presets as they shipped before the negative-height fix.
+ *
+ * A stored library is a full copy of the defaults and `loadPresets()` does not
+ * overwrite it, so an existing install would keep the old positive-height
+ * serves forever. These signatures are deliberately exact: a preset that
+ * still matches every value is one nobody edited, so replacing it is safe. A
+ * preset the user moved, retuned or renamed is left alone - their edits win.
+ *
+ * The short serve has two accepted heights because the first report of the
+ * problem changed only the base height (30 -> -30) and left the positive depth
+ * axis behind. That is still the unmodified old recipe.
+ */
+const LEGACY_SERVES = {
+    preset_short_under: { speed: 4, spin: 1.5, type: 'top', bpm: 60, heights: [30, -30], depths: [10, 30, 50], drops: [-5, 0, 5] },
+    preset_long_under: { speed: 5, spin: 1, type: 'top', bpm: 60, heights: [55], depths: [35, 55, 75], drops: [-5, 0, 5] },
+    preset_short_side: { speed: 5, spin: 3, type: 'back', bpm: 66, heights: [25], depths: [5, 25, 45], drops: [-5, 0, 5] },
+    preset_long_side: { speed: 6, spin: 3.5, type: 'back', bpm: 60, heights: [55], depths: [35, 55, 75], drops: [-5, 0, 5] }
+};
+
+const sameNumbers = (a, b) => Array.isArray(a)
+    && Array.isArray(b)
+    && a.length === b.length
+    && a.every((v, i) => Number(v) === Number(b[i]));
+
+function matchesLegacyServe(preset, sig) {
+    return preset
+        && Number(preset.speed) === sig.speed
+        && Number(preset.spin) === sig.spin
+        && preset.type === sig.type
+        && Number(preset.bpm) === sig.bpm
+        && sig.heights.includes(Number(preset.height))
+        && sameNumbers((preset.depths || []).map(d => d.height), sig.depths)
+        && sameNumbers((preset.placements || []).map(p => p.drop), sig.drops);
+}
+
+/**
+ * Refresh the unmodified built-in serves in a stored library. Returns how many
+ * were updated, so callers can decide whether to write the store back.
+ * Names are preserved: a renamed built-in is still the same recipe.
+ */
+export function migrateLegacyServes(list = getPresets()) {
+    let changed = 0;
+    for (const preset of list) {
+        if (!preset || !preset.builtIn) continue;
+        const sig = LEGACY_SERVES[preset.id];
+        if (!sig || !matchesLegacyServe(preset, sig)) continue;
+
+        const next = DEFAULT_PRESETS.find(p => p.id === preset.id);
+        if (!next) continue;
+
+        const name = preset.name;
+        Object.assign(preset, clonePreset(next), { name, builtIn: true });
+        changed++;
+    }
+    return changed;
+}
 
 // --- STORE -----------------------------------------------------------------
 
@@ -172,6 +261,7 @@ export function loadPresets() {
 
     const clean = parsed.map(normalizePreset).filter(Boolean);
     presets = clean.length ? clean : DEFAULT_PRESETS.map(clonePreset);
+    migrateLegacyServes(presets);
     savePresetsToStorage();
 }
 
@@ -437,6 +527,11 @@ export function mergePresets(incoming) {
         list.push(preset);
         added++;
     }
+
+    // An old export of the shipped library would otherwise put the
+    // positive-height serves back. Only untouched built-ins are refreshed -
+    // a preset the user edited is not matched by the signature.
+    migrateLegacyServes(list);
 
     savePresetsToStorage();
     return { added, updated };

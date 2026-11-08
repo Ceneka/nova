@@ -678,6 +678,102 @@ input[type="number"]:disabled { opacity: 0.5; cursor: not-allowed; color: var(--
     color: var(--primary);
 }
 
+/* Stars are wider than a single digit, so the same control becomes a pill.
+   The minimum width keeps a one-star target as tappable as the old circle. */
+.level-select.stars .lvl-dot {
+    width: auto;
+    min-width: 34px;
+    padding: 0 7px;
+    border-radius: 17px;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    letter-spacing: -1px;
+}
+
+/* --- ROBOT POSITION ---
+   A 3x3 keypad: near the net at the top, the back edge at the bottom, so the
+   picture is the table as the player sees it. The cells are fixed-size and
+   get no horizontal padding, because this stylesheet is content-box. */
+.position-field {
+    align-items: flex-start;
+}
+
+.position-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
+}
+
+.position-name {
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 1.25;
+}
+
+.position-hint {
+    font-size: 0.65rem;
+    color: var(--text-light);
+    line-height: 1.35;
+}
+
+.position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.position-net {
+    grid-column: 1 / -1;
+    height: 14px;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-light);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1;
+    padding-bottom: 3px;
+}
+
+.pos-cell {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text-light);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--trans-speed);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pos-cell.active {
+    background: var(--accent-fill);
+    border-color: var(--accent-line);
+    color: var(--primary);
+}
+
+.pos-cell:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* The one line in the editor that explains why Test may not match the form. */
+.editor-context {
+    margin: -4px 0 10px;
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--text-light);
+    letter-spacing: 0.02em;
+}
+
 .section-label {
     font-size: 0.65rem;
     font-weight: 700;

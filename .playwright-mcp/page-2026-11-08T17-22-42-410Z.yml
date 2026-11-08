@@ -1,0 +1,72 @@
+- generic [ref=f6e2]:
+  - heading "Drill Converter v4.1" [level=1] [ref=f6e3]
+  - generic [ref=f6e4]: Top rpm = 970 + (630.5 × Speed) + (342 x Spin) Bot rpm = 970 + (630.5 × Speed) - (342 × Spin)
+  - generic [ref=f6e5]:
+    - checkbox "Random Sequence" [ref=f6e6] [cursor=pointer]
+    - generic [ref=f6e7] [cursor=pointer]: Random Sequence
+  - generic [ref=f6e8]:
+    - generic [ref=f6e9]:
+      - generic [ref=f6e10]: Spin Type
+      - combobox [ref=f6e11]:
+        - option "Top Spin" [selected]
+        - option "Under Spin (Back)"
+    - generic [ref=f6e12]:
+      - generic [ref=f6e13]:
+        - text: Reps
+        - generic [ref=f6e14]: "1"
+      - slider [ref=f6e15] [cursor=pointer]: "1"
+  - generic [ref=f6e16]:
+    - generic [ref=f6e17]:
+      - generic [ref=f6e18]:
+        - text: Speed (0-10)
+        - generic [ref=f6e19]: "5"
+      - slider [ref=f6e20] [cursor=pointer]: "5"
+    - generic [ref=f6e21]:
+      - generic [ref=f6e22]:
+        - text: Spin (0-10)
+        - generic [ref=f6e23]: "2"
+      - slider [ref=f6e24] [cursor=pointer]: "2"
+  - generic [ref=f6e25]:
+    - generic [ref=f6e26]:
+      - generic [ref=f6e27]:
+        - text: Height (-50 to 100)
+        - generic [ref=f6e28]: "45"
+      - slider [ref=f6e29] [cursor=pointer]: "45"
+    - generic [ref=f6e30]:
+      - generic [ref=f6e31]:
+        - text: Drop Point (-10 to 10)
+        - generic [ref=f6e32]: "0"
+      - slider [ref=f6e33] [cursor=pointer]: "0"
+  - generic [ref=f6e34]:
+    - generic [ref=f6e35]:
+      - text: Frequency (0-100)
+      - generic [ref=f6e36]: "50"
+    - slider [ref=f6e37] [cursor=pointer]: "50"
+  - generic [ref=f6e38]:
+    - generic [ref=f6e39]:
+      - generic [ref=f6e40]: "Top Motor:"
+      - generic [ref=f6e41]: 4807 RPM
+    - generic [ref=f6e42]:
+      - generic [ref=f6e43]: "Bot Motor:"
+      - generic [ref=f6e44]: 3439 RPM
+    - generic [ref=f6e45]:
+      - generic [ref=f6e46]: "Internal Height:"
+      - generic [ref=f6e47]: "45"
+    - generic [ref=f6e48]:
+      - generic [ref=f6e49]: "Drop Point:"
+      - generic [ref=f6e50]: "0"
+    - generic [ref=f6e51]:
+      - generic [ref=f6e52]: "Frequency:"
+      - generic [ref=f6e53]: "50"
+    - generic [ref=f6e54]:
+      - generic [ref=f6e55]: "Reps:"
+      - generic [ref=f6e56]: "1"
+    - generic [ref=f6e57]: Internal Params (CSV)
+    - generic [ref=f6e58]: 4807,3439,45,0,50,1
+    - generic [ref=f6e59]: Binary Command (Hex)
+    - generic [ref=f6e60]: 811c0001010000c71200006f0d0000abaa3a41000000000000803f01000000
+  - generic [ref=f6e61]:
+    - button "Copy CSV" [ref=f6e62] [cursor=pointer]
+    - button "Copy Hex" [ref=f6e63] [cursor=pointer]
+  - link "tenisdemesa.ar" [ref=f6e65] [cursor=pointer]:
+    - /url: https://tenisdemesa.ar/

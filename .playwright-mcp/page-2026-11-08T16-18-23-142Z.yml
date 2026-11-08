@@ -1,0 +1,640 @@
+- generic [ref=f12e1]:
+  - generic [ref=f12e3]:
+    - generic [ref=f12e4]:
+      - generic [ref=f12e5]: Loop(B)
+      - checkbox [ref=f12e7]
+    - generic [ref=f12e8]:
+      - button "Add from preset" [ref=f12e9] [cursor=pointer]
+      - generic [ref=f12e13]:
+        - generic [ref=f12e14]:
+          - generic [ref=f12e15]:
+            - generic [ref=f12e16]: Ball 1
+            - switch "Off / On" [checked] [ref=f12e17] [cursor=pointer]
+          - generic "Scatter" [ref=f12e19]:
+            - spinbutton "Scatter" [ref=f12e21]: "0"
+        - generic [ref=f12e22]:
+          - generic [ref=f12e23]:
+            - generic [ref=f12e24]: "Rotation:"
+            - generic [ref=f12e25]:
+              - generic [ref=f12e26] [cursor=pointer]: TOP
+              - generic [ref=f12e27] [cursor=pointer]: BACK
+          - generic [ref=f12e28]:
+            - generic [ref=f12e29]:
+              - generic [ref=f12e30]: Speed
+              - spinbutton [ref=f12e32]: "2.5"
+            - generic [ref=f12e33]:
+              - generic [ref=f12e34]:
+                - generic [ref=f12e35]: Spin
+                - generic [ref=f12e36]: Max 7
+              - spinbutton [ref=f12e37]: "3"
+            - generic [ref=f12e38]:
+              - generic [ref=f12e39]: Height
+              - spinbutton [ref=f12e41]: "50"
+            - generic [ref=f12e42]:
+              - generic [ref=f12e43]:
+                - generic [ref=f12e44]: Drop
+                - generic [ref=f12e45]: L/R
+              - spinbutton [ref=f12e46]: "-5"
+            - generic [ref=f12e47]:
+              - generic [ref=f12e48]: BPM
+              - spinbutton [ref=f12e50]: "36"
+            - generic [ref=f12e51]:
+              - generic [ref=f12e52]: Reps
+              - spinbutton [ref=f12e54]: "1"
+          - generic [ref=f12e55]:
+            - button "Test" [disabled] [ref=f12e56]
+            - group [ref=f12e60]:
+              - generic "More options" [ref=f12e61] [cursor=pointer]
+      - button "⇅" [ref=f12e67] [cursor=pointer]
+      - generic [ref=f12e68]:
+        - generic [ref=f12e70]:
+          - generic [ref=f12e71]: Ball 2
+          - switch "Off / On" [checked] [ref=f12e72] [cursor=pointer]
+        - generic [ref=f12e74]:
+          - generic [ref=f12e75]: Variant 1
+          - generic [ref=f12e76]:
+            - generic [ref=f12e77]: "Rotation:"
+            - generic [ref=f12e78]:
+              - generic [ref=f12e79] [cursor=pointer]: TOP
+              - generic [ref=f12e80] [cursor=pointer]: BACK
+          - generic [ref=f12e81]:
+            - generic [ref=f12e82]:
+              - generic [ref=f12e83]: Speed
+              - spinbutton [ref=f12e85]: "5"
+            - generic [ref=f12e86]:
+              - generic [ref=f12e87]:
+                - generic [ref=f12e88]: Spin
+                - generic [ref=f12e89]: Max 9
+              - spinbutton [ref=f12e90]: "3"
+            - generic [ref=f12e91]:
+              - generic [ref=f12e92]: Height
+              - spinbutton [ref=f12e94]: "35"
+            - generic [ref=f12e95]:
+              - generic [ref=f12e96]:
+                - generic [ref=f12e97]: Drop
+                - generic [ref=f12e98]: L/R
+              - spinbutton [ref=f12e99]: "-10"
+            - generic [ref=f12e100]:
+              - generic [ref=f12e101]: BPM
+              - spinbutton [ref=f12e103]: "72"
+            - generic [ref=f12e104]:
+              - generic [ref=f12e105]: Reps
+              - spinbutton [ref=f12e107]: "1"
+          - generic [ref=f12e108]:
+            - button "Test" [disabled] [ref=f12e109]
+            - group [ref=f12e113]:
+              - generic "More options" [ref=f12e114] [cursor=pointer]
+        - generic [ref=f12e119]:
+          - generic [ref=f12e120]: Variant 2
+          - generic [ref=f12e121]:
+            - generic [ref=f12e122]: "Rotation:"
+            - generic [ref=f12e123]:
+              - generic [ref=f12e124] [cursor=pointer]: TOP
+              - generic [ref=f12e125] [cursor=pointer]: BACK
+          - generic [ref=f12e126]:
+            - generic [ref=f12e127]:
+              - generic [ref=f12e128]: Speed
+              - spinbutton [ref=f12e130]: "5"
+            - generic [ref=f12e131]:
+              - generic [ref=f12e132]:
+                - generic [ref=f12e133]: Spin
+                - generic [ref=f12e134]: Max 9
+              - spinbutton [ref=f12e135]: "3"
+            - generic [ref=f12e136]:
+              - generic [ref=f12e137]: Height
+              - spinbutton [ref=f12e139]: "35"
+            - generic [ref=f12e140]:
+              - generic [ref=f12e141]:
+                - generic [ref=f12e142]: Drop
+                - generic [ref=f12e143]: L/R
+              - spinbutton [ref=f12e144]: "-5"
+            - generic [ref=f12e145]:
+              - generic [ref=f12e146]: BPM
+              - spinbutton [ref=f12e148]: "72"
+            - generic [ref=f12e149]:
+              - generic [ref=f12e150]: Reps
+              - spinbutton [ref=f12e152]: "1"
+          - generic [ref=f12e153]:
+            - button "Test" [disabled] [ref=f12e154]
+            - group [ref=f12e158]:
+              - generic "More options" [ref=f12e159] [cursor=pointer]
+        - generic [ref=f12e164]:
+          - generic [ref=f12e165]: Variant 3
+          - generic [ref=f12e166]:
+            - generic [ref=f12e167]: "Rotation:"
+            - generic [ref=f12e168]:
+              - generic [ref=f12e169] [cursor=pointer]: TOP
+              - generic [ref=f12e170] [cursor=pointer]: BACK
+          - generic [ref=f12e171]:
+            - generic [ref=f12e172]:
+              - generic [ref=f12e173]: Speed
+              - spinbutton [ref=f12e175]: "5"
+            - generic [ref=f12e176]:
+              - generic [ref=f12e177]:
+                - generic [ref=f12e178]: Spin
+                - generic [ref=f12e179]: Max 9
+              - spinbutton [ref=f12e180]: "3"
+            - generic [ref=f12e181]:
+              - generic [ref=f12e182]: Height
+              - spinbutton [ref=f12e184]: "35"
+            - generic [ref=f12e185]:
+              - generic [ref=f12e186]:
+                - generic [ref=f12e187]: Drop
+                - generic [ref=f12e188]: L/R
+              - spinbutton [ref=f12e189]: "0"
+            - generic [ref=f12e190]:
+              - generic [ref=f12e191]: BPM
+              - spinbutton [ref=f12e193]: "72"
+            - generic [ref=f12e194]:
+              - generic [ref=f12e195]: Reps
+              - spinbutton [ref=f12e197]: "1"
+          - generic [ref=f12e198]:
+            - button "Test" [disabled] [ref=f12e199]
+            - group [ref=f12e203]:
+              - generic "More options" [ref=f12e204] [cursor=pointer]
+        - generic [ref=f12e209]:
+          - generic [ref=f12e210]: Variant 4
+          - generic [ref=f12e211]:
+            - generic [ref=f12e212]: "Rotation:"
+            - generic [ref=f12e213]:
+              - generic [ref=f12e214] [cursor=pointer]: TOP
+              - generic [ref=f12e215] [cursor=pointer]: BACK
+          - generic [ref=f12e216]:
+            - generic [ref=f12e217]:
+              - generic [ref=f12e218]: Speed
+              - spinbutton [ref=f12e220]: "5"
+            - generic [ref=f12e221]:
+              - generic [ref=f12e222]:
+                - generic [ref=f12e223]: Spin
+                - generic [ref=f12e224]: Max 9
+              - spinbutton [ref=f12e225]: "3"
+            - generic [ref=f12e226]:
+              - generic [ref=f12e227]: Height
+              - spinbutton [ref=f12e229]: "55"
+            - generic [ref=f12e230]:
+              - generic [ref=f12e231]:
+                - generic [ref=f12e232]: Drop
+                - generic [ref=f12e233]: L/R
+              - spinbutton [ref=f12e234]: "-10"
+            - generic [ref=f12e235]:
+              - generic [ref=f12e236]: BPM
+              - spinbutton [ref=f12e238]: "72"
+            - generic [ref=f12e239]:
+              - generic [ref=f12e240]: Reps
+              - spinbutton [ref=f12e242]: "1"
+          - generic [ref=f12e243]:
+            - button "Test" [disabled] [ref=f12e244]
+            - group [ref=f12e248]:
+              - generic "More options" [ref=f12e249] [cursor=pointer]
+        - generic [ref=f12e254]:
+          - generic [ref=f12e255]: Variant 5
+          - generic [ref=f12e256]:
+            - generic [ref=f12e257]: "Rotation:"
+            - generic [ref=f12e258]:
+              - generic [ref=f12e259] [cursor=pointer]: TOP
+              - generic [ref=f12e260] [cursor=pointer]: BACK
+          - generic [ref=f12e261]:
+            - generic [ref=f12e262]:
+              - generic [ref=f12e263]: Speed
+              - spinbutton [ref=f12e265]: "5"
+            - generic [ref=f12e266]:
+              - generic [ref=f12e267]:
+                - generic [ref=f12e268]: Spin
+                - generic [ref=f12e269]: Max 9
+              - spinbutton [ref=f12e270]: "3"
+            - generic [ref=f12e271]:
+              - generic [ref=f12e272]: Height
+              - spinbutton [ref=f12e274]: "55"
+            - generic [ref=f12e275]:
+              - generic [ref=f12e276]:
+                - generic [ref=f12e277]: Drop
+                - generic [ref=f12e278]: L/R
+              - spinbutton [ref=f12e279]: "-5"
+            - generic [ref=f12e280]:
+              - generic [ref=f12e281]: BPM
+              - spinbutton [ref=f12e283]: "72"
+            - generic [ref=f12e284]:
+              - generic [ref=f12e285]: Reps
+              - spinbutton [ref=f12e287]: "1"
+          - generic [ref=f12e288]:
+            - button "Test" [disabled] [ref=f12e289]
+            - group [ref=f12e293]:
+              - generic "More options" [ref=f12e294] [cursor=pointer]
+        - generic [ref=f12e299]:
+          - generic [ref=f12e300]: Variant 6
+          - generic [ref=f12e301]:
+            - generic [ref=f12e302]: "Rotation:"
+            - generic [ref=f12e303]:
+              - generic [ref=f12e304] [cursor=pointer]: TOP
+              - generic [ref=f12e305] [cursor=pointer]: BACK
+          - generic [ref=f12e306]:
+            - generic [ref=f12e307]:
+              - generic [ref=f12e308]: Speed
+              - spinbutton [ref=f12e310]: "5"
+            - generic [ref=f12e311]:
+              - generic [ref=f12e312]:
+                - generic [ref=f12e313]: Spin
+                - generic [ref=f12e314]: Max 9
+              - spinbutton [ref=f12e315]: "3"
+            - generic [ref=f12e316]:
+              - generic [ref=f12e317]: Height
+              - spinbutton [ref=f12e319]: "55"
+            - generic [ref=f12e320]:
+              - generic [ref=f12e321]:
+                - generic [ref=f12e322]: Drop
+                - generic [ref=f12e323]: L/R
+              - spinbutton [ref=f12e324]: "0"
+            - generic [ref=f12e325]:
+              - generic [ref=f12e326]: BPM
+              - spinbutton [ref=f12e328]: "72"
+            - generic [ref=f12e329]:
+              - generic [ref=f12e330]: Reps
+              - spinbutton [ref=f12e332]: "1"
+          - generic [ref=f12e333]:
+            - button "Test" [disabled] [ref=f12e334]
+            - group [ref=f12e338]:
+              - generic "More options" [ref=f12e339] [cursor=pointer]
+        - generic [ref=f12e344]:
+          - generic [ref=f12e345]: Variant 7
+          - generic [ref=f12e346]:
+            - generic [ref=f12e347]: "Rotation:"
+            - generic [ref=f12e348]:
+              - generic [ref=f12e349] [cursor=pointer]: TOP
+              - generic [ref=f12e350] [cursor=pointer]: BACK
+          - generic [ref=f12e351]:
+            - generic [ref=f12e352]:
+              - generic [ref=f12e353]: Speed
+              - spinbutton [ref=f12e355]: "5"
+            - generic [ref=f12e356]:
+              - generic [ref=f12e357]:
+                - generic [ref=f12e358]: Spin
+                - generic [ref=f12e359]: Max 9
+              - spinbutton [ref=f12e360]: "3"
+            - generic [ref=f12e361]:
+              - generic [ref=f12e362]: Height
+              - spinbutton [ref=f12e364]: "75"
+            - generic [ref=f12e365]:
+              - generic [ref=f12e366]:
+                - generic [ref=f12e367]: Drop
+                - generic [ref=f12e368]: L/R
+              - spinbutton [ref=f12e369]: "-10"
+            - generic [ref=f12e370]:
+              - generic [ref=f12e371]: BPM
+              - spinbutton [ref=f12e373]: "72"
+            - generic [ref=f12e374]:
+              - generic [ref=f12e375]: Reps
+              - spinbutton [ref=f12e377]: "1"
+          - generic [ref=f12e378]:
+            - button "Test" [disabled] [ref=f12e379]
+            - group [ref=f12e383]:
+              - generic "More options" [ref=f12e384] [cursor=pointer]
+        - generic [ref=f12e389]:
+          - generic [ref=f12e390]: Variant 8
+          - generic [ref=f12e391]:
+            - generic [ref=f12e392]: "Rotation:"
+            - generic [ref=f12e393]:
+              - generic [ref=f12e394] [cursor=pointer]: TOP
+              - generic [ref=f12e395] [cursor=pointer]: BACK
+          - generic [ref=f12e396]:
+            - generic [ref=f12e397]:
+              - generic [ref=f12e398]: Speed
+              - spinbutton [ref=f12e400]: "5"
+            - generic [ref=f12e401]:
+              - generic [ref=f12e402]:
+                - generic [ref=f12e403]: Spin
+                - generic [ref=f12e404]: Max 9
+              - spinbutton [ref=f12e405]: "3"
+            - generic [ref=f12e406]:
+              - generic [ref=f12e407]: Height
+              - spinbutton [ref=f12e409]: "75"
+            - generic [ref=f12e410]:
+              - generic [ref=f12e411]:
+                - generic [ref=f12e412]: Drop
+                - generic [ref=f12e413]: L/R
+              - spinbutton [ref=f12e414]: "-5"
+            - generic [ref=f12e415]:
+              - generic [ref=f12e416]: BPM
+              - spinbutton [ref=f12e418]: "72"
+            - generic [ref=f12e419]:
+              - generic [ref=f12e420]: Reps
+              - spinbutton [ref=f12e422]: "1"
+          - generic [ref=f12e423]:
+            - button "Test" [disabled] [ref=f12e424]
+            - group [ref=f12e428]:
+              - generic "More options" [ref=f12e429] [cursor=pointer]
+        - generic [ref=f12e434]:
+          - generic [ref=f12e435]: Variant 9
+          - generic [ref=f12e436]:
+            - generic [ref=f12e437]: "Rotation:"
+            - generic [ref=f12e438]:
+              - generic [ref=f12e439] [cursor=pointer]: TOP
+              - generic [ref=f12e440] [cursor=pointer]: BACK
+          - generic [ref=f12e441]:
+            - generic [ref=f12e442]:
+              - generic [ref=f12e443]: Speed
+              - spinbutton [ref=f12e445]: "5"
+            - generic [ref=f12e446]:
+              - generic [ref=f12e447]:
+                - generic [ref=f12e448]: Spin
+                - generic [ref=f12e449]: Max 9
+              - spinbutton [ref=f12e450]: "3"
+            - generic [ref=f12e451]:
+              - generic [ref=f12e452]: Height
+              - spinbutton [ref=f12e454]: "75"
+            - generic [ref=f12e455]:
+              - generic [ref=f12e456]:
+                - generic [ref=f12e457]: Drop
+                - generic [ref=f12e458]: L/R
+              - spinbutton [ref=f12e459]: "0"
+            - generic [ref=f12e460]:
+              - generic [ref=f12e461]: BPM
+              - spinbutton [ref=f12e463]: "72"
+            - generic [ref=f12e464]:
+              - generic [ref=f12e465]: Reps
+              - spinbutton [ref=f12e467]: "1"
+          - generic [ref=f12e468]:
+            - button "Test" [disabled] [ref=f12e469]
+            - group [ref=f12e473]:
+              - generic "More options" [ref=f12e474] [cursor=pointer]
+      - button "Duplicate the last ball" [ref=f12e480] [cursor=pointer]
+      - button "Add from preset" [ref=f12e482] [cursor=pointer]
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: Short under serve
+              - generic: Speed 4 · Spin 1.5 · BACK · 60 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -5
+            - generic: Center 0
+            - generic: FH 5
+            - generic: Depth
+            - generic: Short -35
+            - generic: Mid -40
+            - generic: Long -45
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Long under serve
+              - generic: Speed 5 · Spin 1 · BACK · 60 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -5
+            - generic: Center 0
+            - generic: FH 5
+            - generic: Depth
+            - generic: Short -35
+            - generic: Mid -40
+            - generic: Long -45
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Short sidespin serve
+              - generic: Speed 5 · Spin 3 · BACK · 66 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -5
+            - generic: Center 0
+            - generic: FH 5
+            - generic: Depth
+            - generic: Short -35
+            - generic: Mid -40
+            - generic: Long -45
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Long sidespin serve
+              - generic: Speed 6 · Spin 3.5 · BACK · 60 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -5
+            - generic: Center 0
+            - generic: FH 5
+            - generic: Depth
+            - generic: Short -35
+            - generic: Mid -40
+            - generic: Long -45
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Heavy backspin push
+              - generic: Speed 1.5 · Spin 4 · BACK · 45 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -10
+            - generic: Center -5
+            - generic: FH 0
+            - generic: Depth
+            - generic: Short 25
+            - generic: Mid 45
+            - generic: Long 65
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Safe push
+              - generic: Speed 1.5 · Spin 1 · TOP · 40 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -10
+            - generic: Center -5
+            - generic: FH 0
+            - generic: Depth
+            - generic: Short 20
+            - generic: Mid 40
+            - generic: Long 60
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Fast drive
+              - generic: Speed 5 · Spin 3 · TOP · 72 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -10
+            - generic: Center -5
+            - generic: FH 0
+            - generic: Depth
+            - generic: Short 35
+            - generic: Mid 55
+            - generic: Long 75
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Topspin loop
+              - generic: Speed 4 · Spin 3.5 · TOP · 60 bpm · 9 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH -10
+            - generic: Center -5
+            - generic: FH 0
+            - generic: Depth
+            - generic: Short 40
+            - generic: Mid 60
+            - generic: Long 80
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+        - generic:
+          - generic:
+            - generic:
+              - generic: My serve
+              - generic: Speed 2 · Spin 2 · BACK · 36 bpm · 3 balls
+            - button "Edit preset"
+          - generic:
+            - generic: Placement
+            - generic: BH 0
+            - generic: Center 5
+            - generic: FH 10
+          - generic:
+            - button "+ Ball"
+            - button "Variants"
+            - button "Sequence"
+  - generic:
+    - generic:
+      - generic: Edit Preset
+      - generic:
+        - textbox "Preset name" [active]: Short under serve
+        - generic:
+          - generic: "Rotation:"
+          - generic:
+            - generic: TOP
+            - generic: BACK
+        - generic:
+          - generic:
+            - generic:
+              - generic: Speed
+              - generic: 0-10
+            - spinbutton: "4"
+          - generic:
+            - generic:
+              - generic: Spin
+              - generic: Max 10
+            - spinbutton: "1.5"
+          - generic:
+            - generic:
+              - generic: Height
+              - generic: "-50/100"
+            - spinbutton: "-35"
+        - generic:
+          - generic:
+            - generic:
+              - generic: Drop
+              - generic: L/R
+            - spinbutton: "0"
+          - generic:
+            - generic:
+              - generic: BPM
+              - generic: 30-90
+            - spinbutton: "60"
+          - generic:
+            - generic:
+              - generic: Reps
+              - generic: "#"
+            - spinbutton: "1"
+        - generic:
+          - generic:
+            - generic: Scatter
+            - generic: Max 10
+          - spinbutton: "0"
+        - generic:
+          - generic: Placement (Drop L/R)
+          - generic: "Sideways target. Named from the receiver’s view, right-handed: backhand is a negative drop, forehand positive."
+          - generic:
+            - textbox "Label": BH
+            - spinbutton: "-5"
+            - button "Remove"
+          - generic:
+            - textbox "Label": Center
+            - spinbutton: "0"
+            - button "Remove"
+          - generic:
+            - textbox "Label": FH
+            - spinbutton: "5"
+            - button "Remove"
+          - button "+ Add placement"
+          - button "Use BH / Center / FH"
+        - generic:
+          - generic: Depth (Height)
+          - generic: How far the ball carries. Use this to go short / mid / long off the same serve.
+          - generic:
+            - textbox "Label": Short
+            - spinbutton: "-35"
+            - button "Remove"
+          - generic:
+            - textbox "Label": Mid
+            - spinbutton: "-40"
+            - button "Remove"
+          - generic:
+            - textbox "Label": Long
+            - spinbutton: "-45"
+            - button "Remove"
+          - button "+ Add depth"
+          - button "Use Short / Mid / Long"
+        - generic: Adds 9 balls (3 placements x 3 depths)
+      - button
+  - generic:
+    - generic:
+      - textbox: 🔥
+  - banner [ref=f12e486]:
+    - generic:
+      - generic: Settings
+      - generic: About
+  - generic [ref=f12e488]:
+    - banner [ref=f12e489]:
+      - button "Drills" [ref=f12e490] [cursor=pointer]
+      - heading "AI assistant" [level=1] [ref=f12e492]
+    - generic [ref=f12e493]:
+      - generic [ref=f12e494]: Say or type a drill. This reads your sentence on this device — no API key, no signal needed.
+      - button "Ask the AI" [ref=f12e497] [cursor=pointer]
+      - generic [ref=f12e498]:
+        - textbox "e.g. push b, then a long backspin serve to the forehand" [ref=f12e499]
+        - button "Talk to the assistant" [ref=f12e500] [cursor=pointer]
+        - button "Send what you typed" [ref=f12e504] [cursor=pointer]
+      - generic [ref=f12e508]:
+        - generic [ref=f12e509]: The model is not set up. Drills this device can read still work.
+        - button "Set up the model" [ref=f12e510] [cursor=pointer]
+  - generic [ref=f12e511]:
+    - generic [ref=f12e512]:
+      - generic [ref=f12e513]: Disconnected
+      - button "Connect" [ref=f12e514] [cursor=pointer]
+    - button [ref=f12e516] [cursor=pointer]
+  - generic [ref=f12e517]: History deleted

@@ -56,6 +56,27 @@ function typeFor(rotation) {
 }
 
 /**
+ * Does this preset describe a two-bounce serve?
+ *
+ * A negative height is the physical marker: the head points down, the ball
+ * bounces on the robot's half and again on the receiver's. It is also the only
+ * honest signal available, because a preset has no role field and a name is
+ * user data that cannot be parsed.
+ *
+ * Why it matters: a serve preset has a neutral drop and often a speed that
+ * happens to sit next to a drive's, so before this check a plain "drive f"
+ * could match a sidespin serve and play a two-bounce ball as a rally shot.
+ * Rotation does not save it, because an intent that never said "top" or
+ * "back" has nothing to disagree with.
+ */
+export function isServePreset(preset) {
+    if (!preset) return false;
+    if (Number(preset.height) < 0) return true;
+    return (Array.isArray(preset.depths) ? preset.depths : [])
+        .some(d => d && Number(d.height) < 0);
+}
+
+/**
  * How far the preset's spin is from the rotation that was asked for.
  *
  * "cortado" asks for backspin, and backspin is a ball with some on it - so
@@ -84,10 +105,12 @@ function intensityDistance(preset, target) {
  *
  * **A serve is scored against its DEPTH LABEL, not its ball height.** A serve
  * height is negative - a service is played down onto the receiver's half - and
- * a rally preset's height is positive, so comparing the two numbers measures
+ * a rally preset's height is positive. Comparing the two numbers measures
  * nothing at all and saturates the term: `|50 - (-35)| / 60` clamps to 1, and
  * every preset is pushed past MATCH_THRESHOLD for being a rally shot. Serves
- * stopped matching presets entirely when the heights were corrected.
+ * stopped matching presets entirely when the heights were corrected. The
+ * shipped serve presets are negative now, but a user's own library may not be,
+ * so the label remains the only stable comparison.
  *
  * The labels are the right comparison and the module already preferred them:
  * `standardDepths()` writes `Short` / `Mid` / `Long`, and those are the words a
@@ -160,6 +183,10 @@ export function matchPreset(intent, presets, { threshold = MATCH_THRESHOLD } = {
     let best = null;
     for (const preset of presets) {
         if (!preset || typeof preset !== 'object') continue;
+        // A two-bounce serve is not a candidate for a rally stroke. The
+        // compiler would otherwise inherit its negative height and play a
+        // serve as a drive; a fallback ball with the right sign is better.
+        if (intent.role !== 'serve' && isServePreset(preset)) continue;
         const { score, parts, relevant } = scorePreset(intent, preset);
         if (!best || score < best.score) best = { preset, score, parts, relevant };
     }
@@ -176,6 +203,7 @@ export function rankPresets(intent, presets, limit = 5) {
     if (!intent || !Array.isArray(presets)) return [];
     return presets
         .filter(p => p && typeof p === 'object')
+        .filter(p => intent.role === 'serve' || !isServePreset(p))
         .map(preset => ({ preset, ...scorePreset(intent, preset) }))
         .sort((a, b) => a.score - b.score)
         .slice(0, limit)

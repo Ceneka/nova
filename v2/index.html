@@ -126,12 +126,39 @@
             </summary>
 
             <div class="setup-panel">
+                <!-- Where the robot stands, using the original app's nine-square
+                     grid. The row order is the keypad's: 7-9 at the top are
+                     beside the net, 1-3 at the bottom are on the back edge, and
+                     the player is looking across the table. The runner
+                     compensates each ball for this square; the drill itself is
+                     never rewritten. -->
+                <div class="setup-field position-field">
+                    <div class="position-copy">
+                        <span class="setup-field-label" data-i18n="label.robotPosition">Robot position</span>
+                        <span class="position-name" id="position-name"></span>
+                        <span class="position-hint" data-i18n="position.hint">Drills adjust to where the robot is standing.</span>
+                    </div>
+                    <div class="position-grid" id="position-grid" role="group"
+                         data-i18n-attr="aria-label:label.robotPosition">
+                        <span class="position-net" data-i18n="position.net">Net</span>
+                        <button type="button" class="pos-cell" data-pos="7" onclick="setRobotPosition(7)" data-i18n-attr="aria-label:position.7">7</button>
+                        <button type="button" class="pos-cell" data-pos="8" onclick="setRobotPosition(8)" data-i18n-attr="aria-label:position.8">8</button>
+                        <button type="button" class="pos-cell" data-pos="9" onclick="setRobotPosition(9)" data-i18n-attr="aria-label:position.9">9</button>
+                        <button type="button" class="pos-cell" data-pos="4" onclick="setRobotPosition(4)" data-i18n-attr="aria-label:position.4">4</button>
+                        <button type="button" class="pos-cell" data-pos="5" onclick="setRobotPosition(5)" data-i18n-attr="aria-label:position.5">5</button>
+                        <button type="button" class="pos-cell" data-pos="6" onclick="setRobotPosition(6)" data-i18n-attr="aria-label:position.6">6</button>
+                        <button type="button" class="pos-cell" data-pos="1" onclick="setRobotPosition(1)" data-i18n-attr="aria-label:position.1">1</button>
+                        <button type="button" class="pos-cell" data-pos="2" onclick="setRobotPosition(2)" data-i18n-attr="aria-label:position.2">2</button>
+                        <button type="button" class="pos-cell" data-pos="3" onclick="setRobotPosition(3)" data-i18n-attr="aria-label:position.3">3</button>
+                    </div>
+                </div>
+
                 <div class="setup-field" id="grp-difficulty">
-                    <span class="setup-field-label" data-i18n="label.level">Level</span>
-                    <div class="level-select">
-                        <div class="lvl-dot active" onclick="setLevel(1, this)">1</div>
-                        <div class="lvl-dot" onclick="setLevel(2, this)">2</div>
-                        <div class="lvl-dot" onclick="setLevel(3, this)">3</div>
+                    <span class="setup-field-label" data-i18n="label.ballLevel">Ball level</span>
+                    <div class="level-select stars" role="group" data-i18n-attr="aria-label:label.ballLevel">
+                        <div class="lvl-dot active" onclick="setLevel(1, this)" data-i18n-attr="aria-label:a11y.star1">★</div>
+                        <div class="lvl-dot" onclick="setLevel(2, this)" data-i18n-attr="aria-label:a11y.star2">★★</div>
+                        <div class="lvl-dot" onclick="setLevel(3, this)" data-i18n-attr="aria-label:a11y.star3">★★★</div>
                     </div>
                 </div>
 
@@ -226,7 +253,7 @@
             <span id="stats-display">Balls: 0 | Drills: 0</span>
             <span class="sr-only" data-i18n="menu.statistics">Statistics</span>
         </button>
-        <div data-i18n="footer.version">Version 2.4a</div>
+        <div data-i18n="footer.version">Version 2.5a</div>
     </div>
     
     <div id="log" class="log-box"></div>
@@ -442,7 +469,7 @@
         </div>
         <div class="modal-body about-body">
             <h3 class="about-title" data-i18n="app.title">Nova Drill | Tenisdemesa.ar</h3>
-            <p class="about-version" data-i18n="footer.version">Version 2.4a</p>
+            <p class="about-version" data-i18n="footer.version">Version 2.5a</p>
             <a class="about-link" href="https://github.com/Ceneka/nova" target="_blank" rel="noopener noreferrer"
                data-i18n="about.viewOnGithub">View on GitHub</a>
 

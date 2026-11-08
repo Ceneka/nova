@@ -131,6 +131,48 @@ export function makeBall(cfg = {}) {
 }
 
 /**
+ * How much one star adds. The original app's 1/2/3-star levels are "the same
+ * ball, a little harder": a little more pace, a little more spin, a slightly
+ * quicker feed. These are deliberately small steps - a star change is not a
+ * different shot, and the factory drills already have hand-tuned variants for
+ * their three levels.
+ */
+export const STAR_STEP = { speed: 0.5, spin: 0.5, bpm: 6 };
+
+/**
+ * A star-level copy of a ball. Level 1 is the calibrated origin and returns a
+ * plain clone, so an untouched custom drill keeps its stored numbers exactly.
+ *
+ * Height and drop are deliberately not changed: a star makes the same ball
+ * harder to play, it does not move the target. `makeBall()` is the only
+ * builder, so SPIN_LIMITS and the drop/scatter constraint still hold.
+ */
+export function applyStarLevel(ball, stars = 1) {
+    if (!Array.isArray(ball)) return ball;
+    if (ball.length < 2) return ball.slice();
+    const level = clamp(Math.round(Number(stars) || 1), 1, 3);
+    const extra = level - 1;
+    if (!extra) return ball.slice();
+
+    const copy = normalizeBall(ball.slice());
+    const speed = clamp(copy[B.SPEED] + STAR_STEP.speed * extra, ...LIMITS.speed);
+    const spin = normalizeSpin(speed, copy[B.SPIN] + STAR_STEP.spin * extra);
+    const bpm = clamp(freqToBpm(copy[B.FREQ]) + STAR_STEP.bpm * extra, ...LIMITS.bpm);
+
+    return makeBall({
+        speed,
+        spin,
+        type: copy[B.TYPE],
+        height: copy[B.HEIGHT],
+        drop: copy[B.DROP],
+        bpm,
+        reps: copy[B.REPS],
+        scatter: copy[B.SCATTER] ?? 0,
+        active: copy[B.ACTIVE]
+    });
+}
+
+/**
  * Re-derive the motor RPMs / limits of a stored ball in place, the same way
  * saveDrillChanges does before persisting a drill.
  */

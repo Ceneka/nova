@@ -22,7 +22,7 @@
  *     install at all, rather than an app that half-works offline.
  */
 
-const VERSION = 'v30';
+const VERSION = 'v38';
 const CACHE = `nova-shell-${VERSION}`;
 
 /** The precached address of the app itself. Serve as the navigation fallback. */
@@ -112,6 +112,7 @@ const PRECACHE = [
     'js/presets.js',
     'js/presetUi.js',
     'js/pwa.js',
+    'js/robotPosition.js',
     'js/runner.js',
     'js/settingsUi.js',
     'js/state.js',

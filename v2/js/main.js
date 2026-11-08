@@ -41,6 +41,7 @@ import {
 } from './ui.js';
 
 import { showToast, drillKeyName } from './utils.js';
+import { getRobotPosition, setRobotPosition as persistRobotPosition } from './robotPosition.js';
 
 // Registers the service worker and the install prompt
 import { registerServiceWorker } from './pwa.js';
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initStats(); // seals any session a previous page left open
     renderDrillButtons();
     updateStatsUI();
+    renderRobotPosition();
     updateSetupSummary();
     setupEventListeners();
     // Last, and deliberately so: the precache competes for the same connection
@@ -162,6 +164,7 @@ function setupEventListeners() {
         renderDrillButtons();
         updateDrillButtonStates();
         updateStatsUI();
+        renderRobotPosition();
         updateSetupSummary();
     });
 
@@ -233,11 +236,40 @@ export function updateSetupSummary() {
         : t('label.repsShort', { n: reps });
 
     el.textContent = [
+        t('label.positionShort', { n: getRobotPosition() }),
         t('label.levelShort', { n: selectedLevel }),
         amount,
         t('label.pauseShort', { n: pause })
     ].join(' · ');
 }
+
+/**
+ * Paint the robot's square. The numbers are the model; this only moves the
+ * `active` class and the name underneath, so the DOM is never the source of
+ * truth for where the robot is standing.
+ */
+export function renderRobotPosition() {
+    const position = getRobotPosition();
+
+    document.querySelectorAll('#position-grid .pos-cell').forEach(cell => {
+        const isActive = Number(cell.dataset.pos) === position;
+        cell.classList.toggle('active', isActive);
+        cell.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    const name = document.getElementById('position-name');
+    if (name) name.textContent = t(`position.${position}`);
+}
+
+window.setRobotPosition = (value) => {
+    const position = persistRobotPosition(value);
+    renderRobotPosition();
+    updateSetupSummary();
+    // The editor's Test button and the runner both read this on their next
+    // ball, so a screen that is still open has to be told it changed.
+    document.dispatchEvent(new CustomEvent('robot-position-changed', { detail: { position } }));
+    return position;
+};
 
 window.resetStats = resetStats;
 window.saveAsDefault = saveAsDefault;
@@ -368,9 +400,10 @@ window.performDownload = async () => {
         // Save Data
         userCustomDrills[selectedDownloadCat].push({ name: name, key: newKey });
         
-        const newDrillObj = { 1: [], 2: [], 3: [], random: data.random };
-        newDrillObj[selectedLevel] = data.params; 
-        currentDrills[newKey] = newDrillObj;
+        // A downloaded drill lands in a custom bank, and a custom drill's base
+        // is level 1. Writing it to the currently selected factory level made
+        // an imported drill that looked empty at every other level.
+        currentDrills[newKey] = { 1: data.params, 2: [], 3: [], random: data.random };
 
         localStorage.setItem('custom_data', JSON.stringify(userCustomDrills));
         saveDrillsToStorage();

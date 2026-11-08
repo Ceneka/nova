@@ -2,7 +2,7 @@ import { DEFAULT_DRILLS, CATEGORIES } from './constants.js';
 import { B, calculateRPMs, reverseCalculate, bpmToFreq, maxSpinFor } from './ball.js';
 import { loadPresets } from './presets.js';
 import { clearSessions } from './stats.js';
-import { showToast, asciiSlug, drillKeyName } from './utils.js';
+import { showToast, asciiSlug, drillKeyName, clamp } from './utils.js';
 import { t } from './i18n.js';
 
 export let currentDrills = {};
@@ -67,6 +67,44 @@ export function initData() {
     if (customData) userCustomDrills = JSON.parse(customData);
     loadPresets();
     normalizeDrills();
+    if (migrateLegacyFactoryDrills(currentDrills)) saveDrillsToStorage();
+}
+
+/**
+ * Replace factory drill levels that are still on the old high-ball library.
+ *
+ * `custom_drills` is a full copy of the library, so a new `DEFAULT_DRILLS`
+ * never reaches an existing install by itself. The old factory balls all used
+ * height 50 (and 55/60 in the old presets); the new library never goes above
+ * 30. A level whose every ball is still >= 40 is therefore an untouched old
+ * default and is safe to replace. A level the user actually tuned low is left
+ * alone, and custom drills are never touched at all.
+ *
+ * This is what lets the validated six-ball library reach an existing install
+ * without wiping somebody's custom work.
+ */
+export function migrateLegacyFactoryDrills(target = currentDrills) {
+    let changed = false;
+    for (const cat of ['basic', 'combined', 'complex']) {
+        for (const key of CATEGORIES[cat]) {
+            const drill = target[key];
+            if (!drill) continue;
+            for (const lvl of [1, 2, 3]) {
+                const steps = drill[lvl];
+                if (!Array.isArray(steps) || !steps.length) continue;
+
+                const allOldHigh = steps.every(step =>
+                    Array.isArray(step) && step.length > 0 &&
+                    step.every(ball => Array.isArray(ball) && Number(ball[B.HEIGHT]) >= 40)
+                );
+                if (!allOldHigh) continue;
+
+                drill[lvl] = JSON.parse(JSON.stringify(DEFAULT_DRILLS[key][lvl]));
+                changed = true;
+            }
+        }
+    }
+    return changed;
 }
 
 function normalizeDrills() {
@@ -86,6 +124,33 @@ function normalizeDrills() {
 
 export function setLevel(lvl) { selectedLevel = lvl; }
 export function setMode(mode) { runMode = mode; }
+
+/**
+ * What a drill at the selected level actually plays.
+ *
+ * Factory drills ship a hand-tuned ball for each of the three levels, so the
+ * selected level picks one of them. Custom and AI drills have only level 1 -
+ * their levels 2/3 are empty - so the same control becomes the star setting:
+ * level 1 is the base ball, and `stars` is how much `applyStarLevel()` adds on
+ * top at playback.
+ *
+ * Falling back to level 1 also fixes a real trap: the level selector used to
+ * be hidden for custom tabs but its value is global, so a custom drill played
+ * after choosing factory level 3 looked for an empty level 3 and did nothing.
+ */
+export function resolveDrillLevel(key, level = selectedLevel) {
+    const drill = currentDrills[key];
+    const wanted = clamp(Math.round(Number(level) || 1), 1, 3);
+    if (!drill) return { steps: null, level: 1, stars: 1, stored: false };
+
+    if (Array.isArray(drill[wanted]) && drill[wanted].length) {
+        return { steps: drill[wanted], level: wanted, stars: 1, stored: true };
+    }
+    if (Array.isArray(drill[1]) && drill[1].length) {
+        return { steps: drill[1], level: 1, stars: wanted, stored: false };
+    }
+    return { steps: null, level: 1, stars: 1, stored: false };
+}
 export function saveDrillsToStorage() { localStorage.setItem('custom_drills', JSON.stringify(currentDrills)); }
 
 export function saveDrillOrder() {
@@ -105,6 +170,9 @@ export function resetToDefault() {
         drillOrder = JSON.parse(JSON.stringify(CATEGORIES));
         localStorage.removeItem('drill_order');
         normalizeDrills();
+        // A saved default from before this library would otherwise put the
+        // high-ball factory drills straight back.
+        migrateLegacyFactoryDrills(currentDrills);
         localStorage.setItem('custom_drills', JSON.stringify(currentDrills));
         showToast(t('toast.restored'));
         document.dispatchEvent(new CustomEvent('drills-updated'));

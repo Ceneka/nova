@@ -65,15 +65,34 @@ export const en = {
         shareCode: 'Share Code',
         selectDestination: 'Select Destination',
         drillNameMax40: 'Drill Name (Max 40)',
-        // The collapsed session-setup row. The four "short" forms are one line
-        // of prose ("Level 1 · Reps 10 · Pause 0.0s"), not field labels.
+        // The collapsed session-setup row. The "short" forms are one line of
+        // prose ("Pos 2 · Lvl 1 · Reps 10 · 0.0s"), not field labels.
         runSetup: 'Session setup',
         level: 'Level',
+        ballLevel: 'Difficulty',
+        robotPosition: 'Robot position',
         mode: 'Mode',
-        levelShort: 'Level {n}',
+        levelShort: 'Lvl {n}',
+        positionShort: 'Pos {n}',
         repsShort: 'Reps {n}',
         timeShort: 'Time {n}s',
-        pauseShort: 'Pause {n}s'
+        pauseShort: '{n}s'
+    },
+
+    // --- index.html + main.js: the nine-square robot position grid. The names
+    //     are from the PLAYER's view, looking across the table at the robot. ---
+    position: {
+        net: 'Net',
+        hint: 'Drills adjust to this position.',
+        1: 'Back left',
+        2: 'Back center',
+        3: 'Back right',
+        4: 'Middle left',
+        5: 'Middle center',
+        6: 'Middle right',
+        7: 'Near net left',
+        8: 'Near net center',
+        9: 'Near net right'
     },
 
     mode: {
@@ -145,7 +164,7 @@ export const en = {
     //     copy only exists so the page reads right before then. ---
     footer: {
         totals: 'Balls: {balls} | Drills: {drills}',
-        version: 'Version 2.4a'
+        version: 'Version 2.5a'
     },
 
     // --- bluetooth.js: the sentences behind a failed connection. This is the
@@ -175,6 +194,7 @@ export const en = {
         addVariant: '+ Variant',
         saveBallAsPreset: 'Save this ball as a preset',
         rotation: 'Rotation:',
+        playingFrom: '{stars} · {position}',
         more: 'More options'
     },
 
@@ -321,7 +341,7 @@ export const en = {
         resetStatsDesc: '{balls} balls · {drills} drills · clears the history too.',
         factoryReset: 'Factory reset',
         factoryResetDesc: 'Erases everything, including presets.',
-        foot: 'Nova Drill | Tenisdemesa.ar · Version 2.4a'
+        foot: 'Nova Drill | Tenisdemesa.ar · Version 2.5a'
     },
 
     // --- account.js / sync.js: the tenisdemesa.ar account ---
@@ -666,6 +686,9 @@ export const en = {
         playDrill: 'Play drill',
         editDrill: 'Edit drill',
         installApp: 'Install Nova',
+        star1: 'One star: easiest',
+        star2: 'Two stars: a little faster and more spin',
+        star3: 'Three stars: fastest and most spin',
         openAi: 'Open the AI assistant',
         talk: 'Talk to the assistant',
         send: 'Send what you typed',

@@ -357,6 +357,19 @@ test('a named preset the intent asked for is honoured over re-matching', () => {
     assert.equal(plain.steps[0][0][B.SPEED], 5);
 });
 
+test('a two-bounce serve is never offered as a rally stroke', () => {
+    // The serve presets are negative-height balls. A drive with no named
+    // rotation has nothing to disagree with, and used to match a serve on
+    // speed and a neutral drop - which then inherited the negative height.
+    const intent = { role: 'drive', rotation: null, side: 'fh', depth: null, intensity: 7.5 };
+    const ranked = M.rankPresets(intent, library, 20);
+    assert.ok(ranked.length, 'rally presets remain');
+    assert.ok(!ranked.some(r => M.isServePreset(library.find(p => p.id === r.id))),
+        'no negative-height preset is a candidate');
+    const plan = C.buildPlan({ intents: [{ ...intent, intensity: T.NEUTRAL_INTENSITY }], presets: library });
+    assert.ok(plan.steps[0][0][B.HEIGHT] > 0, `${plan.steps[0][0][B.HEIGHT]}`);
+});
+
 test('a matched preset wins the depth and the side', () => {
     // The plan's own example: the preset's Long is height 55, not the nominal
     // 70, and that is the whole reason the preset is the source of truth.
@@ -375,11 +388,13 @@ test('a matched preset wins the depth and the side', () => {
 });
 
 test('a serve still matches a preset, which the negative heights nearly broke', () => {
-    // Every preset is a rally shot with a POSITIVE height, and a serve is now
-    // -35 or -50. Scoring one number against the other saturated the depth term
-    // and pushed every preset past MATCH_THRESHOLD: correcting the sign made
-    // serves stop matching presets entirely. A serve is therefore scored
-    // against its depth LABEL, which is the word the sentence actually used.
+    // At the time every preset was a rally shot with a POSITIVE height, and a
+    // serve is now -35 or -50. Scoring one number against the other saturated
+    // the depth term and pushed every preset past MATCH_THRESHOLD: correcting
+    // the sign made serves stop matching presets entirely. A serve is
+    // therefore scored against its depth LABEL, which is the word the sentence
+    // actually used. The shipped serves are negative now, but a user's own
+    // presets can still be rally-shaped.
     const short = M.matchPreset(T.parseUtterance('saque corto a la derecha').intents[0], library);
     assert.ok(short, 'a short serve still finds a preset');
     const long = M.matchPreset(T.parseUtterance('saque largo a la derecha').intents[0], library);
